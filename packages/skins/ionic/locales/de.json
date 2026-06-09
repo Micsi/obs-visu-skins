@@ -61,6 +61,12 @@
         "posOpen": "Offen",
         "posClosed": "Geschlossen",
         "posPartial": "Teilweise"
+      },
+      "sensor": {
+        "aria": "Sensor"
+      },
+      "scene": {
+        "activate": "Szene aktivieren"
       }
     }
   }
