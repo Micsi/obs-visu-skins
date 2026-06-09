@@ -1,6 +1,13 @@
 {
   "$comment": "Skin-Namespace 'skin.ionic.*' — Ionic-eigene Texte (CONTRACT-v1.md §5, Ctx.t). Kern-Statustexte kommen aus core; hier nur skin-spezifische Strings. Befüllung mit den Renderer-Wellen.",
   "skin": {
-    "ionic": {}
+    "ionic": {
+      "sensor": {
+        "aria": "Sensor"
+      },
+      "scene": {
+        "activate": "Szene aktivieren"
+      }
+    }
   }
 }
