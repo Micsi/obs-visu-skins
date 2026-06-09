@@ -1,6 +1,51 @@
 {
   "$comment": "Skin namespace 'skin.ionic.*' — Ionic-specific strings (CONTRACT-v1.md §5, Ctx.t). Core state text comes from core; only skin-specific strings live here. Filled in with the renderer waves.",
   "skin": {
-    "ionic": {}
+    "ionic": {
+      "common": {
+        "close": "close",
+        "lock": "Lock",
+        "lockedHint": "Locked – operation blocked in the widget",
+        "unlocked": "Unlocked"
+      },
+      "blind": {
+        "open": "Open",
+        "close": "Close",
+        "stepOpen": "Step up",
+        "stepClose": "Step down",
+        "stop": "Stop",
+        "position": "Position",
+        "presets": "Preset positions",
+        "presetMorning": "Good morning!",
+        "presetSlit": "Ajar",
+        "presetSlats": "Slits",
+        "posOpen": "Open",
+        "posClosed": "Closed",
+        "posPartial": "Partial"
+      },
+      "jalousie": {
+        "open": "Open",
+        "close": "Close",
+        "position": "Position",
+        "posHint": "· 0 %=open, 100 %=closed",
+        "slatAngle": "Slat angle",
+        "slatOpen": "Open slats",
+        "slatClose": "Close slats",
+        "driveUp": "up (hold)",
+        "driveDown": "down (hold)",
+        "stop": "Stop",
+        "moving": "moving …",
+        "railTop": "open",
+        "railBot": "closed",
+        "detailHint": "Details · Lock",
+        "status": "Status",
+        "statusActive": "active",
+        "statusOk": "ok",
+        "statusUnknown": "unknown",
+        "posOpen": "Open",
+        "posClosed": "Closed",
+        "posPartial": "Partial"
+      }
+    }
   }
 }
