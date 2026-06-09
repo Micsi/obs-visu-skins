@@ -1,0 +1,47 @@
+{
+  "name": "ionic",
+  "targetsContract": "1.1",
+  "font": { "family": "Manrope", "src": "./Manrope.woff2" },
+  "renderers": "./renderers.ts",
+  "icons": "./icons.ts",
+  "unsupported": ["camera", "media"],
+
+  "widgets": {
+    "light": { "actions": ["toggle", "setDim"] },
+    "switch": { "actions": ["toggle"] },
+    "blind": { "actions": ["setPosition", "lock", "unlock"] },
+    "jalousie": { "actions": ["setPosition", "setSlat", "lock", "unlock"] },
+    "sensor": { "actions": [] },
+    "scene": { "actions": ["activateScene"] }
+  },
+
+  "layout": {
+    "model": "grid",
+    "grid": {
+      "columns": { "min": 3, "max": 6, "default": 3, "configurable": true },
+      "cell": { "aspect": "1/1", "minPx": 112 },
+      "gutter": 7,
+      "flow": "row"
+    },
+    "honors": ["order", "grouping", "role"],
+    "roleMap": {
+      "feature": { "c": 2, "r": 2 },
+      "wide": { "c": 2, "r": 1 },
+      "tall": { "c": 1, "r": 2 },
+      "banner": { "c": 3, "r": 1 },
+      "default": { "c": 1, "r": 1 },
+      "compact": { "c": 1, "r": 1 }
+    }
+  },
+
+  "tweaks": {
+    "stil": { "type": "select", "options": ["glass", "ios", "md"], "default": "glass" },
+    "accentStyle": { "type": "select", "options": ["bar", "glow", "ring"], "default": "glow" },
+    "glassBlur": { "type": "slider", "min": 0, "max": 40, "step": 1, "default": 22 },
+    "tileAlpha": { "type": "slider", "min": 0.3, "max": 0.9, "step": 0.05, "default": 0.55 },
+    "cellScale": { "type": "slider", "min": 0.8, "max": 1.4, "step": 0.05, "default": 1 },
+    "glow": { "type": "slider", "min": 0, "max": 1.6, "step": 0.1, "default": 1 }
+  },
+
+  "themes": ["light", "dark", "image"]
+}

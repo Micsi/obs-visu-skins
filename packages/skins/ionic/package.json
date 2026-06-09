@@ -1,0 +1,23 @@
+{
+  "name": "@obs-visu-skins/ionic",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Ionic-Skin für obs Visu — Glass/iOS/MD-Kacheln auf dem v1-Kern (light · switch · blind · jalousie · sensor · scene). Renderer + Raster + Tweaks; kein State, kein Datenfork.",
+  "type": "module",
+  "main": "renderers.ts",
+  "types": "renderers.ts",
+  "exports": {
+    ".": "./renderers.ts",
+    "./manifest.json": "./manifest.json",
+    "./ionic.css": "./ionic.css"
+  },
+  "scripts": {
+    "test": "vitest run --typecheck"
+  },
+  "dependencies": {
+    "@obs/visu-contract": "link:/Volumes/Daten/Projekte/openbridge/openbridgeserver-visu-integrate/packages/contract"
+  },
+  "devDependencies": {
+    "vitest": "^2.1.8"
+  }
+}

@@ -5,5 +5,8 @@
     "noEmit": false
   },
   "files": [],
-  "references": [{ "path": "./packages/tooling/contract-ref" }]
+  "references": [
+    { "path": "./packages/tooling/contract-ref" },
+    { "path": "./packages/skins/ionic" }
+  ]
 }

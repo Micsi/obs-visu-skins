@@ -1,0 +1,6 @@
+{
+  "$comment": "Skin namespace 'skin.ionic.*' — Ionic-specific strings (CONTRACT-v1.md §5, Ctx.t). Core state text comes from core; only skin-specific strings live here. Filled in with the renderer waves.",
+  "skin": {
+    "ionic": {}
+  }
+}
