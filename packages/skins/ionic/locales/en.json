@@ -1,6 +1,23 @@
 {
   "$comment": "Skin namespace 'skin.ionic.*' — Ionic-specific strings (CONTRACT-v1.md §5, Ctx.t). Core state text comes from core; only skin-specific strings live here. Filled in with the renderer waves.",
   "skin": {
-    "ionic": {}
+    "ionic": {
+      "light": {
+        "brightness": "Brightness",
+        "scenes": "Scenes",
+        "off": "Off",
+        "full": "Full",
+        "cozy": "Cozy",
+        "read": "Read",
+        "work": "Work"
+      },
+      "fan": {
+        "label": "Fan",
+        "active": "Fan control active",
+        "inactive": "Fan control off",
+        "voc": "● VOC",
+        "control": "● Fan control"
+      }
+    }
   }
 }

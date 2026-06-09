@@ -7,5 +7,5 @@
     "noEmit": false,
     "types": ["node", "vitest/importMeta"]
   },
-  "include": ["renderers.ts", "manifest.json", "tests/**/*.ts"]
+  "include": ["renderers.ts", "src/**/*.ts", "manifest.json", "tests/**/*.ts"]
 }
