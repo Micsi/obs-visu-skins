@@ -1,0 +1,9 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true,
+    "noEmit": false
+  },
+  "files": [],
+  "references": [{ "path": "./packages/tooling/contract-ref" }]
+}
