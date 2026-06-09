@@ -20,10 +20,18 @@ describe("ionic skin scaffold", () => {
     );
   });
 
-  it("exposes typed (still empty) renderer maps for the renderer waves", () => {
+  it("exposes typed renderer maps wired by the M2 renderer waves", () => {
     expect(tiles).toBeTypeOf("object");
     expect(details).toBeTypeOf("object");
-    expect(Object.keys(tiles)).toHaveLength(0);
-    expect(Object.keys(details)).toHaveLength(0);
+    // Alle sechs v1-Kern-Typen haben einen Kachel-Renderer.
+    expect(Object.keys(tiles).sort()).toEqual(
+      ["blind", "jalousie", "light", "scene", "sensor", "switch"].sort(),
+    );
+    // Detail-Flächen für die bedienbaren Typen (sensor read-only, scene one-shot).
+    expect(Object.keys(details).sort()).toEqual(
+      ["blind", "jalousie", "light", "switch"].sort(),
+    );
+    for (const fn of Object.values(tiles)) expect(fn).toBeTypeOf("function");
+    for (const fn of Object.values(details)) expect(fn).toBeTypeOf("function");
   });
 });
