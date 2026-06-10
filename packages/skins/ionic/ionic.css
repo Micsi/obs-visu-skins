@@ -1590,9 +1590,14 @@ ion-content.visu-content {
 }
 .skin-host-model-grid {
   display: grid;
-  grid-template-columns: repeat(var(--skin-host-columns, 3), minmax(0, 1fr));
+  /* Fixed square cells: a small widget is a fixed 1×1 unit (--vz-cell), NOT
+     stretched to fill the column width. Spans build wider/taller tiles from the
+     same unit (wide = 2×1, feature = 2×2, …). The grid centres any leftover. */
+  grid-template-columns: repeat(var(--skin-host-columns, 3), var(--vz-cell, 112px));
+  /* Square base unit; tall controls (jalousie) grow downward instead of clipping. */
   grid-auto-rows: minmax(var(--vz-cell, 112px), auto);
   gap: var(--vz-gap, 7px);
+  justify-content: center;
   align-content: start;
   align-items: stretch;
   box-sizing: border-box;
