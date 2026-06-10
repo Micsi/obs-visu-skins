@@ -1577,29 +1577,34 @@ ion-content.visu-content {
   width: 100%;
   box-sizing: border-box;
 }
-.skin-host-model-grid,
-.skin-host-model-list {
+/* One grid PER room block: the host renders .skin-host-grouped wrapping one
+   .skin-host-model-grid per room. Blocks stack with the room gap between them
+   (Must-Keep: the gap reads as "another room"); within a block the rows are
+   uniform via align-items + grid-auto-rows. Edge padding insets it cleanly. */
+.skin-host-grouped {
+  display: flex;
+  flex-direction: column;
+  gap: var(--vz-room-gap, 22px);
+  padding: var(--vz-edge, 12px);
   box-sizing: border-box;
-  width: 100%;
-  max-width: 100%;
 }
 .skin-host-model-grid {
   display: grid;
   grid-template-columns: repeat(var(--skin-host-columns, 3), minmax(0, 1fr));
-  /* Uniform row tracks: every 1×1 cell is at least the square cell height, so
-     tiles in a row line up; taller controls (blind/jalousie) may grow. */
   grid-auto-rows: minmax(var(--vz-cell, 112px), auto);
   gap: var(--vz-gap, 7px);
   align-content: start;
   align-items: stretch;
-  /* Clean inset from the screen edges (the edge tweak; falls back to 12px). */
-  padding: var(--vz-edge, 12px);
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
 }
 .skin-host-model-list {
   display: flex;
   flex-direction: column;
   gap: var(--vz-gap, 7px);
   padding: var(--vz-edge, 12px);
+  box-sizing: border-box;
 }
 .skin-host-cell {
   display: flex;
@@ -1608,14 +1613,6 @@ ion-content.visu-content {
 .skin-host-cell > .vz-tile {
   flex: 1;
   min-width: 0;
-}
-/* Room separation (Must-Keep): each room block starts a new grid row, and the
-   spacing before it reads as "you are now in another room". */
-.skin-host-model-grid > .skin-host-group-start {
-  grid-column-start: 1;
-}
-.skin-host-model-grid > .skin-host-group-start:not(:first-child) {
-  margin-top: var(--vz-room-gap, 22px);
 }
 
 /* Surface background: paint the active theme's photo/gradient/colour on the
