@@ -12,6 +12,6 @@
 export const CONTRACT_PACKAGE = "@obs/visu-contract" as const;
 
 /** Vertrags-Zielversion, auf die die Skins in diesem Repo zielen (`targetsContract`). */
-export const TARGET_CONTRACT_VERSION = "1.0" as const;
+export const TARGET_CONTRACT_VERSION = "1.1" as const;
 
 export type ContractPackageName = typeof CONTRACT_PACKAGE;

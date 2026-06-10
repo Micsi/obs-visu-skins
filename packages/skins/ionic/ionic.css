@@ -1,0 +1,1637 @@
+/* ===========================================================================
+   @obs-visu-skins/ionic — ionic.css  (I5 #8)
+   Der vollständige Look des Ionic-Skins: Visu-Design-Tokens auf Ionic-CSS-Variablen.
+   Treibt DREI Stile (Stil): glass · ios · md  ×  DREI Themes: light · dark · image.
+
+   Verdrahtung mit src/tweaks.ts (applyTweaks → Wurzelelement):
+     data-stil="glass|ios|md"        Kachel-Optik
+     data-theme="light|dark|image"   Surface-Tokens
+     data-acc-style="bar|glow|ring"  Akzent-Darstellung
+     data-room-group="off|gap|labels" Raumtrennung
+     data-titlebar="1|0"             Titelleiste sichtbar
+   plus CSS-Custom-Properties: --vz-accent · --vz-blur · --vz-tile-alpha ·
+   --vz-cell · --vz-glow · --vz-room-gap · --vz-photo.
+
+   Quelle (1:1 Port): reference/vue-ionic/visu-ionic.css.
+   Goldene Regel: kein State im Skin — Tweaks werden vom Host gesetzt.
+   =========================================================================== */
+
+:root {
+  /* === Type === */
+  --vz-font: "Manrope", "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --vz-font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+
+  --vz-fs-eyebrow: 10px;
+  --vz-fs-label: 13px;
+  --vz-fs-value: 12px;
+  --vz-fs-h1: 22px;
+  --vz-fs-num-l: 28px;
+  --vz-fs-num-xl: 44px;
+
+  /* === Spacing & shape === */
+  --vz-cell: 112px;
+  --vz-gap: 7px;
+  --vz-pad: 14px;
+  --vz-radius: 16px;
+  --vz-radius-sm: 8px;
+  --vz-radius-lg: 22px;
+  --vz-bar-h: 4px;
+
+  /* === Glass (Tweaks: glassBlur → --vz-blur, tileAlpha → --vz-tile-alpha) === */
+  --vz-blur: 22px;
+  --vz-saturate: 160%;
+  --vz-tile-alpha: 0.55;
+
+  /* === Glow (Tweak: glow → --vz-glow) === */
+  --vz-glow: 1;
+
+  /* === Raumtrennung (Tweak: roomGap → --vz-room-gap) === */
+  --vz-room-gap: 22px;
+
+  /* === Accent palette (Token-Boden; --vz-accent vom Host je Gerät gesetzt) === */
+  --vz-acc-orange: #ec8b3a;
+  --vz-acc-teal: #45b1ae;
+  --vz-acc-violet: #a489d9;
+  --vz-acc-green: #6fbf6a;
+  --vz-acc-blue: #5a93dd;
+  --vz-acc-rose: #d97a8d;
+  --vz-acc-amber: #e8b441;
+  --vz-acc-slate: #7e8696;
+  --vz-accent: var(--vz-acc-orange);
+
+  --vz-on: #6fbf6a;
+  --vz-off: #79808d;
+  --vz-warn: #e8b441;
+  --vz-bad: #e36767;
+  --vz-good: #5cb568;
+}
+
+/* ===========================================================================
+   THEME: surface tokens  (applied via [data-theme] on the .visu-root wrapper)
+   AA-sichere Vorder-/Hintergrundpaare je Theme.
+   =========================================================================== */
+
+/* ---- Light ---- */
+.visu-root[data-theme="light"] {
+  --vz-bg: #e9ecef;
+  --vz-bg-grad: radial-gradient(120% 90% at 0% 0%, #cfd6df 0%, #e9ecef 55%, #f2f4f7 100%);
+  --vz-bg-image: none;
+  --vz-fg: #1a1d23;
+  --vz-fg-mute: #4a5160;
+  --vz-fg-soft: #79808d;
+
+  --vz-tile-bg: rgba(255, 255, 255, var(--vz-tile-alpha));
+  --vz-tile-bg-strong: rgba(255, 255, 255, 0.82);
+  --vz-tile-border: rgba(255, 255, 255, 0.55);
+  --vz-tile-shadow: 0 1px 0 rgba(255, 255, 255, 0.45) inset, 0 6px 20px rgba(0, 0, 0, 0.1);
+  --vz-chip-bg: rgba(255, 255, 255, 0.85);
+  --vz-divider: rgba(0, 0, 0, 0.08);
+  --vz-hairline: rgba(0, 0, 0, 0.06);
+  --vz-solid: #ffffff; /* opaque card surface for ios/md looks */
+  --vz-solid-2: #f4f6f8;
+}
+
+/* ---- Dark ---- */
+.visu-root[data-theme="dark"] {
+  --vz-bg: #0e1116;
+  --vz-bg-grad: radial-gradient(120% 90% at 0% 0%, #1a2030 0%, #11141b 55%, #0a0c11 100%);
+  --vz-bg-image: none;
+  --vz-fg: #eef0f4;
+  --vz-fg-mute: #aeb4c0;
+  --vz-fg-soft: #7a808d;
+
+  --vz-tile-bg: rgba(255, 255, 255, calc(var(--vz-tile-alpha) * 0.34));
+  --vz-tile-bg-strong: rgba(255, 255, 255, 0.12);
+  --vz-tile-border: rgba(255, 255, 255, 0.12);
+  --vz-tile-shadow: 0 1px 0 rgba(255, 255, 255, 0.06) inset, 0 8px 24px rgba(0, 0, 0, 0.45);
+  --vz-chip-bg: rgba(255, 255, 255, 0.12);
+  --vz-divider: rgba(255, 255, 255, 0.1);
+  --vz-hairline: rgba(255, 255, 255, 0.08);
+  --vz-solid: #171b22;
+  --vz-solid-2: #1f242d;
+}
+
+/* ---- Image (glass over photo) ---- */
+.visu-root[data-theme="image"] {
+  --vz-bg: #2b2f3a;
+  --vz-bg-grad: linear-gradient(180deg, rgba(0, 0, 0, 0.18), rgba(0, 0, 0, 0.45));
+  --vz-bg-image: var(
+    --vz-photo,
+    url("https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=1600&auto=format&fit=crop&q=70")
+  );
+  --vz-fg: #f4f5f8;
+  --vz-fg-mute: #d8dbe3;
+  --vz-fg-soft: #aeb3bf;
+
+  --vz-tile-bg: rgba(255, 255, 255, calc(var(--vz-tile-alpha) * 0.62));
+  --vz-tile-bg-strong: rgba(255, 255, 255, 0.3);
+  --vz-tile-border: rgba(255, 255, 255, 0.34);
+  --vz-tile-shadow: 0 1px 0 rgba(255, 255, 255, 0.2) inset, 0 8px 28px rgba(0, 0, 0, 0.3);
+  --vz-chip-bg: rgba(255, 255, 255, 0.3);
+  --vz-divider: rgba(255, 255, 255, 0.18);
+  --vz-hairline: rgba(255, 255, 255, 0.14);
+  --vz-solid: rgba(28, 32, 40, 0.62);
+  --vz-solid-2: rgba(40, 46, 56, 0.55);
+}
+
+/* ===========================================================================
+   IONIC VARIABLE BRIDGE — feed Visu tokens into Ionic so native components blend
+   =========================================================================== */
+.visu-root {
+  --ion-font-family: var(--vz-font);
+  --ion-background-color: var(--vz-bg);
+  --ion-text-color: var(--vz-fg);
+  --ion-color-step-150: var(--vz-fg-soft);
+  --ion-toolbar-background: transparent;
+  --ion-toolbar-color: var(--vz-fg);
+  --ion-item-background: transparent;
+
+  /* primary = current app accent */
+  --ion-color-primary: var(--vz-accent);
+  --ion-color-primary-rgb: 236, 139, 58;
+  --ion-color-primary-contrast: #ffffff;
+  --ion-color-primary-contrast-rgb: 255, 255, 255;
+  --ion-color-primary-shade: var(
+    --vz-accent-shade,
+    color-mix(in oklab, var(--vz-accent) 86%, #000)
+  );
+  --ion-color-primary-tint: var(--vz-accent-tint, color-mix(in oklab, var(--vz-accent) 80%, #fff));
+
+  --ion-color-success: var(--vz-on);
+  --ion-color-success-rgb: 111, 191, 106;
+  --ion-color-warning: var(--vz-warn);
+  --ion-color-danger: var(--vz-bad);
+}
+
+/* Ionic toggle / range tuned to Visu (checked = accent, not stock green) */
+.visu-root ion-toggle {
+  --track-background: color-mix(in oklab, var(--vz-fg-soft) 22%, transparent);
+  --track-background-checked: var(--vz-accent);
+  --handle-background: #fff;
+  --handle-background-checked: #fff;
+}
+.visu-root ion-range {
+  --bar-background: var(--vz-divider);
+  --bar-background-active: var(--acc, var(--vz-accent));
+  --knob-background: var(--acc, var(--vz-accent));
+  --bar-height: 6px;
+  --knob-size: 24px;
+  padding: 0;
+}
+.visu-root ion-segment {
+  --background: var(--vz-tile-bg-strong);
+}
+
+/* ===========================================================================
+   APP SHELL
+   =========================================================================== */
+.visu-root,
+.visu-app {
+  font-family: var(--vz-font);
+  color: var(--vz-fg);
+}
+.visu-app {
+  position: relative;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--vz-bg);
+  background-image: var(--vz-bg-grad), var(--vz-bg-image);
+  background-size: cover, cover;
+  background-position: center, center;
+  isolation: isolate;
+}
+ion-content.visu-content {
+  --background: transparent;
+}
+
+/* ---- Titlebar (Tweak: showTitlebar → data-titlebar) ---- */
+.vz-appbar {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px var(--vz-edge, 12px) 10px;
+  flex-shrink: 0;
+}
+.visu-root[data-titlebar="0"] .vz-titlebar {
+  display: none;
+}
+/* header scrim — guarantees brand/clock contrast over photo / dark surfaces */
+.visu-root[data-theme="image"] .vz-appbar {
+  background: linear-gradient(
+    180deg,
+    rgba(0, 0, 0, 0.46) 0%,
+    rgba(0, 0, 0, 0.18) 68%,
+    transparent 100%
+  );
+}
+.visu-root[data-theme="dark"] .vz-appbar {
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.3) 0%, transparent 100%);
+}
+.vz-appbar-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.vz-iconbtn {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  background: var(--vz-chip-bg);
+  border: 0.5px solid var(--vz-tile-border);
+  color: var(--vz-fg);
+  cursor: pointer;
+}
+[data-stil="glass"] .vz-iconbtn {
+  backdrop-filter: blur(var(--vz-blur)) saturate(var(--vz-saturate));
+  -webkit-backdrop-filter: blur(var(--vz-blur)) saturate(var(--vz-saturate));
+}
+
+.vz-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  position: relative;
+  z-index: 1;
+}
+
+.vz-brand {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  padding-left: 6px;
+  white-space: nowrap;
+}
+.vz-brand .word {
+  font-size: 20px;
+  color: var(--vz-fg);
+  letter-spacing: 0.01em;
+}
+
+/* custom segmented control */
+.vz-seg {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 11px;
+  width: min(320px, 100%);
+  margin: 0 auto;
+  background: var(--vz-tile-bg-strong);
+  border: 0.5px solid var(--vz-tile-border);
+}
+.vz-seg button {
+  flex: 1;
+  border: 0;
+  background: transparent;
+  color: var(--vz-fg);
+  font-family: var(--vz-font);
+  font-weight: 600;
+  font-size: 13px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background 0.15s,
+    color 0.15s;
+}
+.vz-seg button:hover:not(.on) {
+  background: color-mix(in oklab, var(--vz-fg) 8%, transparent);
+}
+.vz-seg button.on {
+  background: var(--vz-accent);
+  color: var(--vz-accent-ink, #fff);
+  box-shadow: 0 1px 5px color-mix(in oklab, var(--vz-accent) 42%, transparent);
+}
+
+/* ---- Room bar ---- */
+.vz-room-bar {
+  margin: 4px var(--vz-edge, 10px) 12px;
+  padding: 13px 18px;
+  border-radius: var(--vz-radius);
+  background: var(--vz-tile-bg);
+  border: 0.5px solid var(--vz-tile-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-weight: 600;
+  position: relative;
+}
+
+/* ===========================================================================
+   GRID + TILES   (cellScale → --vz-cell)
+   =========================================================================== */
+.vz-grid {
+  display: grid;
+  grid-template-columns: repeat(var(--vz-cols, 3), 1fr);
+  grid-auto-rows: var(--vz-cell);
+  gap: var(--vz-gap);
+  padding: 0 var(--vz-edge, 10px) 28px;
+}
+
+.vz-tile {
+  position: relative;
+  border-radius: var(--vz-radius);
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  overflow: hidden;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  transition:
+    transform 0.14s ease,
+    box-shadow 0.14s ease,
+    background 0.2s ease;
+  --acc: var(--vz-accent);
+}
+.vz-tile::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: var(--vz-bar-h);
+  background: var(--acc);
+  border-top-left-radius: inherit;
+  border-top-right-radius: inherit;
+}
+.vz-tile:active {
+  transform: scale(0.975);
+}
+.vz-tile.span-2 {
+  grid-column: span 2;
+}
+.vz-tile.span-3 {
+  grid-column: span 3;
+}
+.vz-tile.span-4 {
+  grid-column: span 4;
+}
+.vz-tile.row-2 {
+  grid-row: span 2;
+}
+.vz-tile.row-3 {
+  grid-row: span 3;
+}
+
+/* --- glass surface (Stil = glass) --- */
+[data-stil="glass"] .vz-tile {
+  background: var(--vz-tile-bg);
+  border: 0.5px solid var(--vz-tile-border);
+  backdrop-filter: blur(var(--vz-blur)) saturate(var(--vz-saturate));
+  -webkit-backdrop-filter: blur(var(--vz-blur)) saturate(var(--vz-saturate));
+  box-shadow: var(--vz-tile-shadow);
+}
+[data-stil="glass"] .vz-tile:hover {
+  transform: translateY(-1px);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.5) inset,
+    0 12px 26px rgba(0, 0, 0, 0.16);
+}
+[data-stil="glass"] .vz-tile.is-on {
+  background: color-mix(in oklab, var(--acc) 13%, var(--vz-tile-bg));
+}
+
+/* --- ios surface (Stil = ios): soft solid card, subtle accent-tinted material --- */
+[data-stil="ios"] .vz-tile {
+  background: color-mix(in oklab, var(--acc) 11%, var(--vz-solid));
+  border: 0.5px solid var(--vz-hairline);
+  border-radius: 18px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+}
+[data-stil="ios"] .vz-tile.is-on {
+  background: color-mix(in oklab, var(--acc) 24%, var(--vz-solid));
+}
+
+/* --- md surface (Stil = md): tonal Material-You surface (accent-tinted) --- */
+[data-stil="md"] .vz-tile {
+  background: color-mix(in oklab, var(--acc) 14%, var(--vz-solid));
+  border: none;
+  border-radius: 12px;
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.2),
+    0 2px 6px rgba(0, 0, 0, 0.12);
+}
+[data-stil="md"] .vz-tile::before {
+  height: 3px;
+}
+[data-stil="md"] .vz-tile.is-on {
+  background: color-mix(in oklab, var(--acc) 28%, var(--vz-solid));
+}
+
+/* ===========================================================================
+   AKZENT-STIL  — three ways a tile expresses its accent / state
+   data-acc-style:  'bar' (original) · 'glow' (Leuchten) · 'ring' (Rahmen)
+   =========================================================================== */
+
+/* ── BALKEN (bar): the legacy accent bar is the default .vz-tile::before. ──── */
+
+/* ── LEUCHTEN (glow): retire the bar, let the tile emit accent light ─────── */
+[data-acc-style="glow"] .vz-tile::before,
+[data-acc-style="ring"] .vz-tile::before {
+  display: none;
+}
+
+[data-acc-style="glow"] .vz-tile > *:not(.vz-lock):not(.vz-lockveil) {
+  position: relative;
+  z-index: 1;
+}
+[data-acc-style="glow"] .vz-tile > .vz-lock {
+  z-index: 6;
+}
+
+[data-acc-style="glow"] .vz-tile::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 0;
+  background: radial-gradient(
+    118% 82% at 50% 116%,
+    color-mix(in oklab, var(--acc) 58%, transparent) 0%,
+    color-mix(in oklab, var(--acc) 14%, transparent) 32%,
+    transparent 56%
+  );
+  opacity: calc(var(--vz-glow, 1) * 0.05);
+  transition: opacity 0.34s ease;
+}
+[data-acc-style="glow"] .vz-tile.is-on::after,
+[data-acc-style="glow"] .vz-tile.scene-flash::after {
+  opacity: calc(var(--vz-glow, 1) * 0.5);
+}
+
+[data-acc-style="glow"][data-stil="glass"] .vz-tile {
+  background: color-mix(in oklab, var(--acc) 4%, var(--vz-tile-bg));
+}
+[data-acc-style="glow"][data-stil="glass"] .vz-tile.is-on {
+  background: color-mix(in oklab, var(--acc) 18%, var(--vz-tile-bg));
+}
+
+[data-acc-style="glow"] .vz-tile.is-on {
+  border-color: color-mix(in oklab, var(--acc) 50%, var(--vz-tile-border));
+  box-shadow:
+    var(--vz-tile-shadow),
+    0 0 0 0.5px color-mix(in oklab, var(--acc) 30%, transparent),
+    0 6px 22px color-mix(in oklab, var(--acc) calc(var(--vz-glow, 1) * 30%), transparent);
+}
+[data-acc-style="glow"][data-stil="ios"] .vz-tile.is-on,
+[data-acc-style="glow"][data-stil="md"] .vz-tile.is-on {
+  box-shadow:
+    0 4px 16px rgba(0, 0, 0, 0.1),
+    0 6px 22px color-mix(in oklab, var(--acc) calc(var(--vz-glow, 1) * 30%), transparent);
+}
+[data-acc-style="glow"] .vz-tile.is-on:hover {
+  transform: translateY(-1px);
+}
+
+[data-acc-style="glow"] .vz-tile.is-on .vz-tile-body svg {
+  filter: drop-shadow(
+    0 0 13px color-mix(in oklab, var(--acc) calc(var(--vz-glow, 1) * 70%), transparent)
+  );
+}
+
+/* ── RAHMEN (ring): a quiet accent outline instead of a bar ──────────────── */
+[data-acc-style="ring"][data-stil="glass"] .vz-tile {
+  box-shadow:
+    var(--vz-tile-shadow),
+    inset 0 0 0 1px color-mix(in oklab, var(--acc) 24%, transparent);
+}
+[data-acc-style="ring"][data-stil="ios"] .vz-tile,
+[data-acc-style="ring"][data-stil="md"] .vz-tile {
+  box-shadow:
+    0 4px 16px rgba(0, 0, 0, 0.08),
+    inset 0 0 0 1px color-mix(in oklab, var(--acc) 26%, transparent);
+}
+[data-acc-style="ring"] .vz-tile.is-on {
+  border-color: transparent;
+  box-shadow:
+    var(--vz-tile-shadow),
+    inset 0 0 0 2px var(--acc),
+    0 6px 22px color-mix(in oklab, var(--acc) 22%, transparent);
+}
+
+/* ── scene-flash: brief accent bloom on scene activation (all styles) ────── */
+.vz-tile.scene-flash {
+  border-color: color-mix(in oklab, var(--acc) 60%, var(--vz-tile-border));
+  box-shadow:
+    var(--vz-tile-shadow),
+    0 12px 40px color-mix(in oklab, var(--acc) 50%, transparent);
+}
+
+/* ===========================================================================
+   RAUMTRENNUNG — room blocks on the overview  (data-room-group + --vz-room-gap)
+   off    → blocks collapse to the base grid gap (no extra spacing, no label)
+   gap    → spacer between room blocks (--vz-room-gap), no label
+   labels → spacer + quiet room head label (default)
+   =========================================================================== */
+.vz-rooms {
+  display: flex;
+  flex-direction: column;
+  gap: var(--vz-room-gap, 22px);
+  padding-bottom: 28px;
+}
+.vz-grid-group {
+  padding: 0 var(--vz-edge, 10px);
+}
+
+/* off: no room separation at all */
+.visu-root[data-room-group="off"] .vz-rooms {
+  gap: var(--vz-gap);
+}
+.visu-root[data-room-group="off"] .vz-room-head {
+  display: none;
+}
+/* gap: spacer only, head hidden */
+.visu-root[data-room-group="gap"] .vz-room-head {
+  display: none;
+}
+
+.vz-room-head {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  padding: 0 calc(var(--vz-edge, 10px) + 3px) 9px;
+}
+.vz-room-head::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 3px;
+  align-self: center;
+  background: var(--vz-accent);
+  box-shadow: 0 0 9px color-mix(in oklab, var(--vz-accent) 60%, transparent);
+}
+.vz-room-name {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--vz-fg);
+}
+.vz-room-meta {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--vz-fg-soft);
+  font-variant-numeric: tabular-nums;
+  margin-left: auto;
+  padding-right: 1px;
+}
+
+/* ===========================================================================
+   TILE CONTENT — eyebrow · label · body · foot · lock
+   =========================================================================== */
+.vz-eyebrow {
+  font-size: 9.5px;
+  line-height: 1.1;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--vz-fg-mute);
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  flex-shrink: 0;
+}
+.vz-label {
+  font-size: 11.5px;
+  line-height: 1.18;
+  font-weight: 600;
+  color: var(--vz-fg);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: break-word;
+  hyphens: auto;
+  -webkit-hyphens: auto;
+  hyphenate-limit-chars: 6 3 3;
+  flex-shrink: 0;
+}
+.vz-label.chip {
+  align-self: stretch;
+  background: var(--vz-chip-bg);
+  padding: 2px 6px;
+  border-radius: 7px;
+  border: 0.5px solid var(--vz-hairline);
+}
+.vz-tile-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-height: 0;
+  overflow: hidden;
+}
+.vz-tile-foot {
+  text-align: center;
+  color: var(--vz-fg-mute);
+  font-size: 11px;
+  line-height: 1.1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-shrink: 0;
+}
+.vz-tile-foot b {
+  color: var(--vz-fg);
+  font-weight: 700;
+}
+
+.vz-lock {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 6;
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
+  display: grid;
+  place-items: center;
+  background: var(--acc, var(--vz-accent));
+  color: #fff;
+  box-shadow: 0 2px 7px color-mix(in oklab, var(--acc, var(--vz-accent)) 45%, transparent);
+}
+.vz-lockveil {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  border-radius: inherit;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    45deg,
+    transparent,
+    transparent 9px,
+    color-mix(in oklab, var(--vz-fg) 7%, transparent) 9px,
+    color-mix(in oklab, var(--vz-fg) 7%, transparent) 18px
+  );
+}
+.vz-tile.locked .vz-blind-ctl {
+  opacity: 0.5;
+}
+.vz-tile.locked .vz-tile-body,
+.vz-tile.locked .vz-tile-foot {
+  opacity: 0.7;
+}
+
+/* category row (eyebrow) toggle */
+[data-cats="0"] .vz-eyebrow,
+[data-cats="0"] .jal-eyebrow {
+  display: none;
+}
+
+/* glyphs */
+.vz-bulb {
+  color: var(--vz-fg-mute);
+}
+.vz-tile.is-on .vz-bulb {
+  color: var(--acc);
+  filter: drop-shadow(0 0 10px color-mix(in oklab, var(--acc) 65%, transparent));
+}
+.vz-blind-svg {
+  color: var(--vz-fg-mute);
+}
+
+/* blind chevrons row */
+.vz-blind-ctl {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  gap: 2px;
+}
+.vz-chev {
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  border: 0;
+  background: transparent;
+  color: var(--vz-fg-mute);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition:
+    background 0.14s,
+    color 0.14s,
+    transform 0.1s;
+}
+.vz-chev:hover {
+  background: var(--vz-chip-bg);
+  color: var(--vz-fg);
+}
+.vz-chev:active {
+  transform: scale(0.86);
+}
+
+/* big numbers + auto-fitting value groups (sensor) */
+.vz-num {
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--vz-fg);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.vz-num.l {
+  font-size: 23px;
+}
+.vz-num.xl {
+  font-size: 33px;
+}
+.vz-unit {
+  color: var(--vz-fg-mute);
+  font-weight: 600;
+  font-size: 11px;
+}
+.vz-unit.lg {
+  font-size: 14px;
+}
+.vz-val {
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+  white-space: nowrap;
+}
+.vz-valrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+/* range slider (custom control) */
+.vz-range {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--vz-divider);
+  outline: none;
+  margin: 8px 0;
+}
+.vz-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--acc, var(--vz-accent));
+  border: 2px solid #fff;
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.28);
+  cursor: pointer;
+}
+.vz-range::-moz-range-thumb {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--acc, var(--vz-accent));
+  border: 2px solid #fff;
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.28);
+  cursor: pointer;
+}
+
+/* toggle (custom control) */
+.vz-toggle {
+  --w: 50px;
+  --h: 28px;
+  width: var(--w);
+  height: var(--h);
+  border-radius: 999px;
+  border: 1.5px solid var(--vz-fg-soft);
+  background: transparent;
+  position: relative;
+  cursor: pointer;
+  padding: 0;
+  transition:
+    border-color 0.18s,
+    background 0.18s;
+  flex-shrink: 0;
+}
+.vz-toggle i {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: calc(var(--h) - 8px);
+  height: calc(var(--h) - 8px);
+  border-radius: 50%;
+  background: var(--vz-fg-soft);
+  transition:
+    transform 0.18s,
+    background 0.18s;
+}
+.vz-toggle.on {
+  border-color: var(--vz-accent);
+  background: color-mix(in oklab, var(--vz-accent) 18%, transparent);
+}
+.vz-toggle.on i {
+  background: var(--vz-accent);
+  transform: translateX(calc(var(--w) - var(--h)));
+}
+
+/* ===========================================================================
+   JALOUSIE WIDGET (type 'jalousie') — position + Lamellenwinkel zugleich
+   =========================================================================== */
+.jal-tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 11px 11px 12px;
+  border-radius: var(--vz-radius);
+  overflow: hidden;
+  background: var(--vz-tile-bg);
+  border: 0.5px solid var(--vz-tile-border);
+  box-shadow: var(--vz-tile-shadow);
+  color: var(--vz-fg);
+  min-height: 0;
+  --acc: var(--vz-accent);
+}
+[data-stil="glass"] .jal-tile {
+  backdrop-filter: blur(var(--vz-blur)) saturate(var(--vz-saturate));
+  -webkit-backdrop-filter: blur(var(--vz-blur)) saturate(var(--vz-saturate));
+}
+[data-stil="ios"] .jal-tile {
+  background: color-mix(in oklab, var(--acc) 9%, var(--vz-solid));
+  border: 0.5px solid var(--vz-hairline);
+  border-radius: 18px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+}
+[data-stil="md"] .jal-tile {
+  background: color-mix(in oklab, var(--acc) 12%, var(--vz-solid));
+  border: none;
+  border-radius: 12px;
+}
+.jal-tile.span-2 {
+  grid-column: span 2;
+}
+.jal-tile.span-3 {
+  grid-column: span 3;
+}
+.jal-tile.row-2 {
+  grid-row: span 2;
+}
+.jal-tile.row-3 {
+  grid-row: span 3;
+}
+[data-acc-style="ring"][data-stil="glass"] .jal-tile {
+  box-shadow:
+    var(--vz-tile-shadow),
+    inset 0 0 0 1px color-mix(in oklab, var(--acc) 24%, transparent);
+}
+[data-acc-style="glow"] .jal-tile {
+  box-shadow:
+    var(--vz-tile-shadow),
+    0 8px 26px color-mix(in oklab, var(--acc) calc(var(--vz-glow, 1) * 16%), transparent);
+}
+
+.jal-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.jal-title {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+.jal-eyebrow {
+  font-size: 9.5px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--vz-fg-mute);
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.jal-label {
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.15;
+  color: var(--vz-fg);
+  overflow-wrap: break-word;
+  hyphens: auto;
+  -webkit-hyphens: auto;
+}
+.jal-statuses {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+  flex-shrink: 0;
+  padding-top: 2px;
+}
+.jal-dot {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.jal-dot i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: block;
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--vz-fg) 8%, transparent);
+}
+.jal-dot em {
+  font-style: normal;
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--vz-fg-mute);
+  display: none;
+}
+.jal-dot.is-true i {
+  background: var(--vz-bad);
+  box-shadow: 0 0 7px color-mix(in oklab, var(--vz-bad) 60%, transparent);
+}
+.jal-dot.is-false i {
+  background: var(--vz-good);
+}
+.jal-dot.is-unknown i {
+  background: var(--vz-fg-soft);
+  opacity: 0.6;
+}
+.jal-tile.span-3 .jal-dot em {
+  display: inline;
+}
+.jal-lock {
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  border: 0.5px solid var(--vz-tile-border);
+  background: var(--vz-chip-bg);
+  color: var(--vz-fg-mute);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    color 0.15s,
+    border-color 0.15s;
+}
+.jal-lock:hover {
+  color: var(--vz-fg);
+}
+.jal-lock.on {
+  background: var(--acc);
+  border-color: transparent;
+  color: #fff;
+  box-shadow: 0 2px 9px color-mix(in oklab, var(--acc) 45%, transparent);
+}
+
+.jal-body {
+  flex: 1;
+  display: flex;
+  gap: 9px;
+  min-height: 86px;
+}
+.jal-window {
+  position: relative;
+  flex: 1;
+  border-radius: 12px;
+  overflow: hidden;
+  cursor: pointer;
+  border: 1px solid color-mix(in oklab, var(--vz-fg) 14%, transparent);
+  background: linear-gradient(180deg, #b9d8ee 0%, #d8e7f0 52%, #e9eef1 100%);
+  box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.18);
+}
+.jal-sky {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(120% 80% at 78% 14%, rgba(255, 243, 201, 0.85), transparent 46%);
+}
+.jal-headrail {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 6px;
+  background: linear-gradient(180deg, #eef1f4, #c4c9cf);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  z-index: 3;
+}
+.jal-blind {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  perspective: 360px;
+  transition: height 0.35s cubic-bezier(0.3, 0.7, 0.3, 1);
+}
+.jal-slat {
+  flex: 1 1 0;
+  display: flex;
+  align-items: center;
+  min-height: 0;
+}
+.jal-louver {
+  width: 100%;
+  height: 100%;
+  transform-origin: center center;
+  background: linear-gradient(180deg, #fbfcfd 0%, #e2e5e9 42%, #c3c8ce 70%, #d6dadf 100%);
+  border-top: 0.5px solid rgba(255, 255, 255, 0.85);
+  border-bottom: 0.5px solid rgba(0, 0, 0, 0.22);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.16);
+  transition: transform 0.3s ease;
+}
+.jal-readout {
+  position: absolute;
+  left: 9px;
+  bottom: 8px;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  line-height: 1;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
+}
+.jal-pct {
+  font-size: 21px;
+  font-weight: 800;
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+}
+.jal-pct small {
+  font-size: 11px;
+  font-weight: 700;
+  margin-left: 1px;
+  opacity: 0.9;
+}
+.jal-sub {
+  font-size: 10px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.92);
+  letter-spacing: 0.02em;
+  margin-top: 1px;
+}
+.jal-moving {
+  position: absolute;
+  right: 8px;
+  top: 8px;
+  z-index: 4;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 9.5px;
+  font-weight: 700;
+  color: #fff;
+  background: color-mix(in oklab, var(--acc) 82%, #000 8%);
+  padding: 3px 7px;
+  border-radius: 999px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+.jal-window.moving {
+  animation: jal-pulse 1.6s ease-in-out infinite;
+}
+@keyframes jal-pulse {
+  0%,
+  100% {
+    box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.18);
+  }
+  50% {
+    box-shadow:
+      inset 0 2px 10px rgba(0, 0, 0, 0.18),
+      0 0 0 2px color-mix(in oklab, var(--acc) 40%, transparent);
+  }
+}
+
+.jal-posrail {
+  position: relative;
+  width: 34px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.jal-vtrack {
+  position: relative;
+  flex: 1;
+  width: 14px;
+  border-radius: 999px;
+  cursor: pointer;
+  touch-action: none;
+  background: color-mix(in oklab, var(--vz-fg) 15%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--vz-fg) 10%, transparent);
+  overflow: visible;
+}
+.jal-vtrack.disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+.jal-vfill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  border-radius: 999px 999px 6px 6px;
+  background: linear-gradient(180deg, color-mix(in oklab, var(--acc) 78%, transparent), var(--acc));
+  transition: height 0.12s ease;
+}
+.jal-vthumb {
+  position: absolute;
+  left: 50%;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  background: #fff;
+  border: 3px solid var(--acc);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  transition: top 0.12s ease;
+  pointer-events: none;
+}
+.jal-rail-cap {
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--vz-fg-mute);
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+
+.jal-slatctl {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.jal-slatbtn {
+  flex-shrink: 0;
+  width: 30px;
+  height: 28px;
+  border-radius: 8px;
+  border: 0.5px solid var(--vz-tile-border);
+  background: var(--vz-chip-bg);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: background 0.14s;
+}
+.jal-slatbtn:hover:not(:disabled) {
+  background: color-mix(in oklab, var(--acc) 16%, var(--vz-chip-bg));
+}
+.jal-slatglyph {
+  display: block;
+  width: 16px;
+  height: 12px;
+  position: relative;
+}
+.jal-slatglyph::before,
+.jal-slatglyph::after {
+  content: "";
+  position: absolute;
+  left: 1px;
+  right: 1px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--vz-fg);
+}
+.jal-slatglyph.open::before {
+  top: 2px;
+}
+.jal-slatglyph.open::after {
+  bottom: 2px;
+}
+.jal-slatglyph.close::before {
+  top: 3px;
+  height: 3px;
+  background: var(--vz-fg);
+}
+.jal-slatglyph.close::after {
+  bottom: 3px;
+  height: 3px;
+}
+.jal-slattrack {
+  position: relative;
+  flex: 1;
+  display: flex;
+  align-items: center;
+}
+.jal-hslider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 8px;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    color-mix(in oklab, var(--acc) 55%, transparent),
+    color-mix(in oklab, var(--vz-fg) 16%, transparent)
+  );
+  cursor: pointer;
+}
+.jal-hslider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  border: 3px solid var(--acc);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.26);
+}
+.jal-hslider::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  border: 3px solid var(--acc);
+}
+.jal-slatval {
+  position: absolute;
+  right: 4px;
+  top: -16px;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--vz-fg-mute);
+  font-variant-numeric: tabular-nums;
+}
+
+.jal-btns {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 6px;
+}
+.jal-btn {
+  height: 40px;
+  border-radius: 11px;
+  border: 0.5px solid var(--vz-tile-border);
+  background: var(--vz-chip-bg);
+  color: var(--vz-fg);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition:
+    background 0.14s,
+    transform 0.08s,
+    box-shadow 0.14s;
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: none;
+}
+.jal-btn:hover:not(:disabled) {
+  background: color-mix(in oklab, var(--acc) 14%, var(--vz-chip-bg));
+}
+.jal-btn:active:not(:disabled) {
+  transform: scale(0.94);
+}
+.jal-btn.active {
+  background: var(--acc);
+  color: #fff;
+  border-color: transparent;
+  box-shadow: 0 3px 12px color-mix(in oklab, var(--acc) 45%, transparent);
+}
+.jal-stopsq {
+  width: 13px;
+  height: 13px;
+  border-radius: 3px;
+  background: currentColor;
+}
+.jal-btn.stop {
+  color: var(--vz-fg-mute);
+}
+.jal-btn.stop:hover:not(:disabled) {
+  color: var(--vz-bad);
+  background: color-mix(in oklab, var(--vz-bad) 12%, var(--vz-chip-bg));
+}
+
+.jal-tile.locked .jal-body,
+.jal-tile.locked .jal-slatctl,
+.jal-tile.locked .jal-btns,
+.jal-tile.readonly .jal-body,
+.jal-tile.readonly .jal-slatctl,
+.jal-tile.readonly .jal-btns {
+  opacity: 0.55;
+}
+.jal-tile.locked .jal-window::after,
+.jal-tile.readonly .jal-window::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  background: repeating-linear-gradient(
+    45deg,
+    transparent,
+    transparent 9px,
+    color-mix(in oklab, var(--vz-fg) 6%, transparent) 9px,
+    color-mix(in oklab, var(--vz-fg) 6%, transparent) 18px
+  );
+}
+.jal-btn:disabled,
+.jal-slatbtn:disabled,
+.jal-hslider:disabled {
+  cursor: not-allowed;
+}
+.jal-locktag {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  z-index: 6;
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
+  display: grid;
+  place-items: center;
+  background: var(--acc);
+  color: #fff;
+  box-shadow: 0 2px 7px rgba(0, 0, 0, 0.32);
+}
+
+/* COMPACT jalousie (2×2 / row-2) */
+.jal-tile.row-2 {
+  gap: 6px;
+  padding: 9px 9px 10px;
+}
+.jal-tile.row-2 .jal-body {
+  min-height: 56px;
+  gap: 7px;
+}
+.jal-tile.row-2 .jal-rail-cap {
+  display: none;
+}
+.jal-tile.row-2 .jal-posrail {
+  width: 26px;
+}
+.jal-tile.row-2 .jal-vtrack {
+  width: 12px;
+}
+.jal-tile.row-2 .jal-vthumb {
+  width: 20px;
+  height: 20px;
+  border-width: 2.5px;
+}
+.jal-tile.row-2 .jal-pct {
+  font-size: 16px;
+}
+.jal-tile.row-2 .jal-pct small {
+  font-size: 9px;
+}
+.jal-tile.row-2 .jal-sub {
+  font-size: 9px;
+}
+.jal-tile.row-2 .jal-label {
+  font-size: 12px;
+}
+.jal-tile.row-2 .jal-slatbtn {
+  height: 26px;
+  width: 28px;
+}
+.jal-tile.row-2 .jal-btn {
+  height: 33px;
+}
+.jal-tile.row-2 .jal-lock {
+  width: 27px;
+  height: 27px;
+}
+.jal-tile.row-2 .jal-readout {
+  left: 7px;
+  bottom: 6px;
+}
+
+/* ===========================================================================
+   DETAIL / DIALOG surfaces (detail renderers)
+   =========================================================================== */
+.vz-dialog {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--vz-bg);
+  background-image: var(--vz-bg-grad), var(--vz-bg-image);
+  background-size: cover;
+  color: var(--vz-fg);
+}
+.vz-dialog-head {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: start;
+  gap: 12px;
+  padding: 18px 16px 8px;
+}
+.vz-dialog-bar {
+  height: 5px;
+  background: var(--acc, var(--vz-accent));
+}
+.vz-dialog-crumb {
+  font-family: var(--vz-font-mono);
+  font-size: 11.5px;
+  background: var(--vz-tile-bg-strong);
+  border: 0.5px solid var(--vz-hairline);
+  padding: 5px 9px;
+  border-radius: 8px;
+  color: var(--vz-fg);
+  display: inline-block;
+  margin-bottom: 8px;
+}
+.vz-dialog-title {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+.vz-dialog-val {
+  color: var(--acc, var(--vz-accent));
+  font-weight: 700;
+  font-size: 15px;
+  margin-top: 2px;
+}
+.vz-dialog-body {
+  padding: 8px 16px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  overflow-y: auto;
+}
+.vz-hero {
+  display: grid;
+  place-items: center;
+  padding: 10px 0;
+}
+.vz-section-h {
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--vz-fg);
+  margin-bottom: 8px;
+  letter-spacing: 0.01em;
+}
+.vz-action-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  background: var(--vz-divider);
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--vz-divider);
+}
+.vz-action {
+  background: var(--vz-tile-bg-strong);
+  padding: 14px 12px;
+  text-align: center;
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--vz-fg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  border: 0;
+  font-family: var(--vz-font);
+}
+.vz-action:active {
+  background: color-mix(in oklab, var(--acc, var(--vz-accent)) 14%, var(--vz-tile-bg-strong));
+}
+.vz-action.full {
+  grid-column: 1 / -1;
+}
+.vz-preset-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1px;
+  background: var(--vz-divider);
+  border: 1px solid var(--vz-divider);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.vz-preset {
+  background: var(--vz-tile-bg-strong);
+  padding: 14px 8px;
+  text-align: center;
+  font-weight: 600;
+  cursor: pointer;
+  border: 0;
+  color: var(--vz-fg);
+  font-family: var(--vz-font);
+  font-size: 13px;
+}
+.vz-preset:active {
+  background: color-mix(in oklab, var(--acc, var(--vz-accent)) 14%, var(--vz-tile-bg-strong));
+}
+.vz-lockrow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--vz-fg);
+}
+.vz-status-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px 16px;
+}
+.vz-status-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--vz-fg);
+}
+.vz-status-item small {
+  color: var(--vz-fg-mute);
+  font-weight: 600;
+}
+
+/* ===========================================================================
+   MOTION — respect reduced-motion at every tweak extreme
+   =========================================================================== */
+@media (prefers-reduced-motion: reduce) {
+  .jal-window.moving {
+    animation: none;
+  }
+  .vz-tile,
+  [data-stil="glass"] .vz-tile:hover,
+  [data-acc-style="glow"] .vz-tile.is-on:hover {
+    transition: none;
+  }
+}
+
+/* ===========================================================================
+   M2 integration: skin-host container grid + surface background.
+   The host (apps/visu/src/skin-host/SkinHost) emits .skin-host /
+   .skin-host-model-grid|list, a per-cell .skin-host-cell (with
+   .skin-host-group-start on the first cell of each room), and the column count
+   as --skin-host-columns. The skin owns the raster, so the grid lives here.
+   =========================================================================== */
+.skin-host {
+  width: 100%;
+  box-sizing: border-box;
+}
+/* One grid PER room block: the host renders .skin-host-grouped wrapping one
+   .skin-host-model-grid per room. Blocks stack with the room gap between them
+   (Must-Keep: the gap reads as "another room"); within a block the rows are
+   uniform via align-items + grid-auto-rows. Edge padding insets it cleanly. */
+.skin-host-grouped {
+  display: flex;
+  flex-direction: column;
+  gap: var(--vz-room-gap, 22px);
+  padding: var(--vz-edge, 12px);
+  box-sizing: border-box;
+}
+.skin-host-model-grid {
+  display: grid;
+  /* Fixed square cells: a small widget is a fixed 1×1 unit (--vz-cell), NOT
+     stretched to fill the column width. Spans build wider/taller tiles from the
+     same unit (wide = 2×1, feature = 2×2, …). The grid centres any leftover. */
+  grid-template-columns: repeat(var(--skin-host-columns, 3), var(--vz-cell, 112px));
+  /* Fixed square field. The row NEVER grows — a tall control (jalousie) claims
+     more fields via its span (e.g. 2×3), so a 1×1 widget beside it keeps its
+     own size instead of being stretched to the tall tile's height. */
+  grid-auto-rows: var(--vz-cell, 112px);
+  gap: var(--vz-gap, 7px);
+  justify-content: center;
+  align-content: start;
+  align-items: stretch;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+}
+.skin-host-model-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--vz-gap, 7px);
+  padding: var(--vz-edge, 12px);
+  box-sizing: border-box;
+}
+.skin-host-cell {
+  display: flex;
+  min-height: 0; /* the grid row track defines the height; the tile fills it */
+}
+.skin-host-cell > .vz-tile {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Surface background: paint the active theme's photo/gradient/colour on the
+   .visu-root wrapper so it covers the page (otherwise the bare Ionic content
+   shows through → light-on-light, unreadable). */
+.visu-root {
+  min-height: 100%;
+  background-color: var(--vz-bg);
+  background-image: var(--vz-bg-image, none), var(--vz-bg-grad, none);
+  background-size: cover, cover;
+  background-position: center, center;
+  background-repeat: no-repeat, no-repeat;
+  background-attachment: fixed, fixed;
+  color: var(--vz-fg);
+}

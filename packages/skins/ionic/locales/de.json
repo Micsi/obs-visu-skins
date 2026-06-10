@@ -1,0 +1,73 @@
+{
+  "$comment": "Skin-Namespace 'skin.ionic.*' — Ionic-eigene Texte (CONTRACT-v1.md §5, Ctx.t). Kern-Statustexte kommen aus core; hier nur skin-spezifische Strings. Befüllung mit den Renderer-Wellen.",
+  "skin": {
+    "ionic": {
+      "light": {
+        "brightness": "Helligkeit",
+        "scenes": "Szenen",
+        "off": "Aus",
+        "full": "Voll",
+        "cozy": "Gemütlich",
+        "read": "Lesen",
+        "work": "Arbeit"
+      },
+      "fan": {
+        "label": "Lüfter",
+        "active": "Lüftersteuerung aktiv",
+        "inactive": "Lüftersteuerung aus",
+        "voc": "● VOC",
+        "control": "● Lüftersteuerung"
+      },
+      "common": {
+        "close": "schließen",
+        "lock": "Sperre",
+        "lockedHint": "Gesperrt – Bedienung im Widget blockiert",
+        "unlocked": "Entsperrt"
+      },
+      "blind": {
+        "open": "Öffnen",
+        "close": "Schließen",
+        "stepOpen": "Schritt auf",
+        "stepClose": "Schritt zu",
+        "stop": "Stopp",
+        "position": "Position",
+        "presets": "Vorgabepositionen",
+        "presetMorning": "Guten Morgen!",
+        "presetSlit": "Spalt offen",
+        "presetSlats": "Schlitze",
+        "posOpen": "Offen",
+        "posClosed": "Zu",
+        "posPartial": "Teil"
+      },
+      "jalousie": {
+        "open": "Öffnen",
+        "close": "Schließen",
+        "position": "Position",
+        "posHint": "· 0 %=auf, 100 %=zu",
+        "slatAngle": "Lamellenwinkel",
+        "slatOpen": "Lamelle öffnen",
+        "slatClose": "Lamelle schließen",
+        "driveUp": "hoch (halten)",
+        "driveDown": "runter (halten)",
+        "stop": "Stop",
+        "moving": "fährt …",
+        "railTop": "auf",
+        "railBot": "zu",
+        "detailHint": "Details · Sperre",
+        "status": "Status",
+        "statusActive": "aktiv",
+        "statusOk": "ok",
+        "statusUnknown": "unbek.",
+        "posOpen": "Offen",
+        "posClosed": "Geschlossen",
+        "posPartial": "Teilweise"
+      },
+      "sensor": {
+        "aria": "Sensor"
+      },
+      "scene": {
+        "activate": "Szene aktivieren"
+      }
+    }
+  }
+}
