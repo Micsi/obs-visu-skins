@@ -42,6 +42,8 @@ export interface IonicTweaks {
   tileAlpha?: number;
   /** Raster-Dichte als Faktor (0.8–1.4) — skaliert die Zellhöhe. */
   cellScale?: number;
+  /** Außenabstand des Rasters zum Bildschirmrand in px (0–24). */
+  edge?: number;
   /** Leuchtkraft-Multiplikator für accentStyle=glow (0–1.6). */
   glow?: number;
   /** Raumtrennung auf der Übersicht. */
@@ -68,6 +70,7 @@ export const TWEAK_DEFAULTS = {
   glassBlur: 22,
   tileAlpha: 0.55,
   cellScale: 1,
+  edge: 12,
   glow: 1,
   roomGroup: "labels",
   roomGap: 22,
@@ -81,6 +84,7 @@ export const TWEAK_DEFAULTS = {
     | "glassBlur"
     | "tileAlpha"
     | "cellScale"
+    | "edge"
     | "glow"
     | "roomGroup"
     | "roomGap"
@@ -96,6 +100,7 @@ const RANGES = {
   glassBlur: { min: 0, max: 40 },
   tileAlpha: { min: 0.3, max: 0.9 },
   cellScale: { min: 0.8, max: 1.4 },
+  edge: { min: 0, max: 24 },
   glow: { min: 0, max: 1.6 },
 } as const;
 
@@ -134,12 +139,14 @@ export function applyTweaks(tweaks: IonicTweaks = {}): RootTweakStyle {
   const glassBlur = clamp(t.glassBlur, RANGES.glassBlur.min, RANGES.glassBlur.max);
   const tileAlpha = clamp(t.tileAlpha, RANGES.tileAlpha.min, RANGES.tileAlpha.max);
   const cellScale = clamp(t.cellScale, RANGES.cellScale.min, RANGES.cellScale.max);
+  const edge = clamp(t.edge, RANGES.edge.min, RANGES.edge.max);
   const glow = clamp(t.glow, RANGES.glow.min, RANGES.glow.max);
 
   const style: Record<string, string> = {
     "--vz-blur": `${glassBlur}px`,
     "--vz-tile-alpha": `${tileAlpha}`,
     "--vz-cell": `${Math.round(BASE_CELL_PX * cellScale)}px`,
+    "--vz-edge": `${edge}px`,
     "--vz-glow": `${glow}`,
     "--vz-room-gap": `${t.roomGroup === "off" ? 0 : t.roomGap}px`,
   };
