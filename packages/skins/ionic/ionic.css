@@ -1575,21 +1575,35 @@ ion-content.visu-content {
    =========================================================================== */
 .skin-host {
   width: 100%;
+  box-sizing: border-box;
+}
+.skin-host-model-grid,
+.skin-host-model-list {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
 }
 .skin-host-model-grid {
   display: grid;
   grid-template-columns: repeat(var(--skin-host-columns, 3), minmax(0, 1fr));
+  /* Uniform row tracks: every 1×1 cell is at least the square cell height, so
+     tiles in a row line up; taller controls (blind/jalousie) may grow. */
+  grid-auto-rows: minmax(var(--vz-cell, 112px), auto);
   gap: var(--vz-gap, 7px);
   align-content: start;
+  align-items: stretch;
+  /* Clean inset from the screen edges (the edge tweak; falls back to 12px). */
+  padding: var(--vz-edge, 12px);
 }
 .skin-host-model-list {
   display: flex;
   flex-direction: column;
   gap: var(--vz-gap, 7px);
+  padding: var(--vz-edge, 12px);
 }
 .skin-host-cell {
   display: flex;
-  min-height: var(--vz-cell, 112px);
+  min-height: 0; /* the grid row track defines the height; the tile fills it */
 }
 .skin-host-cell > .vz-tile {
   flex: 1;
