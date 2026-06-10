@@ -1594,8 +1594,10 @@ ion-content.visu-content {
      stretched to fill the column width. Spans build wider/taller tiles from the
      same unit (wide = 2×1, feature = 2×2, …). The grid centres any leftover. */
   grid-template-columns: repeat(var(--skin-host-columns, 3), var(--vz-cell, 112px));
-  /* Square base unit; tall controls (jalousie) grow downward instead of clipping. */
-  grid-auto-rows: minmax(var(--vz-cell, 112px), auto);
+  /* Fixed square field. The row NEVER grows — a tall control (jalousie) claims
+     more fields via its span (e.g. 2×3), so a 1×1 widget beside it keeps its
+     own size instead of being stretched to the tall tile's height. */
+  grid-auto-rows: var(--vz-cell, 112px);
   gap: var(--vz-gap, 7px);
   justify-content: center;
   align-content: start;
