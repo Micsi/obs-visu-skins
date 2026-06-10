@@ -11,6 +11,7 @@
 import { h, type VNode } from "vue";
 import type { BlindDevice, Ctx, Device, Tokens } from "@obs/visu-contract";
 import { blindGlyph } from "../glyphs/BlindGlyph.js";
+import { svgIcon } from "../icon.js";
 import { tt } from "../i18n.js";
 
 const STEP = 10;
@@ -63,7 +64,7 @@ export function blindDetail(d: Device, t: Tokens, ctx: Ctx): VNode {
           "data-action": "close",
           "aria-label": tt(ctx, "skin.ionic.common.close", "schließen"),
         },
-        ctx.icon(dev, "x"),
+        svgIcon(ctx, dev, "x", 20),
       ),
     ]),
     h("div", { class: "vz-dialog-body" }, [

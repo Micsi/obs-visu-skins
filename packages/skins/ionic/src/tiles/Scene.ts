@@ -8,6 +8,7 @@
 
 import { h, type VNode } from "vue";
 import type { Ctx, Device, Renderer, SceneDevice, Tokens } from "@obs/visu-contract";
+import { svgIcon } from "../icon.js";
 
 /** Übersetzt einen Skin-Locale-Key mit Fallback (ctx.t ist optional, v1.1). */
 const tr = (ctx: Ctx, key: string, fallback: string): string =>
@@ -41,7 +42,7 @@ export const SceneTile: Renderer = (d: Device, t: Tokens, ctx: Ctx): VNode => {
       h("div", { class: "vz-eyebrow" }, dev.room),
       h("div", { class: "vz-label chip" }, ctx.hyphenate(dev.label)),
       h("div", { class: "vz-tile-body" }, [
-        h("span", { class: "vz-scene-icon", style: { color: "var(--acc)" } }, ctx.icon(dev, dev.icon)),
+        h("span", { class: "vz-scene-icon", style: { color: "var(--acc)" } }, svgIcon(ctx, dev, dev.icon, 28)),
       ]),
       foot,
     ],

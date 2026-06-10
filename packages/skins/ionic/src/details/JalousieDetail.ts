@@ -12,6 +12,7 @@ import { h, type VNode } from "vue";
 import type { Ctx, Device, JalousieDevice, JalousieStatus, Tokens } from "@obs/visu-contract";
 import { blindGlyph } from "../glyphs/BlindGlyph.js";
 import { slatAngleDeg } from "../glyphs/JalousieGlyph.js";
+import { svgIcon } from "../icon.js";
 import { tt } from "../i18n.js";
 
 function dotClass(val: boolean | null): string {
@@ -168,7 +169,7 @@ export function jalousieDetail(d: Device, t: Tokens, ctx: Ctx): VNode {
           "data-action": "close",
           "aria-label": tt(ctx, "skin.ionic.common.close", "schließen"),
         },
-        ctx.icon(dev, "x"),
+        svgIcon(ctx, dev, "x", 20),
       ),
     ]),
     h("div", { class: "vz-dialog-body" }, body),

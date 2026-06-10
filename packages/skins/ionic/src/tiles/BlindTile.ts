@@ -12,6 +12,7 @@
 import { h, type VNode } from "vue";
 import type { BlindDevice, Ctx, Device, Tokens } from "@obs/visu-contract";
 import { blindGlyph } from "../glyphs/BlindGlyph.js";
+import { svgIcon } from "../icon.js";
 import { tt } from "../i18n.js";
 
 const STEP = 20;
@@ -25,7 +26,7 @@ export function blindTile(d: Device, t: Tokens, ctx: Ctx): VNode {
 
   if (locked) {
     children.push(
-      h("span", { class: "vz-lock" }, ctx.icon(dev, "lock")),
+      h("span", { class: "vz-lock" }, svgIcon(ctx, dev, "lock", 14)),
       h("span", { class: "vz-lockveil" }),
     );
   }
@@ -47,7 +48,7 @@ export function blindTile(d: Device, t: Tokens, ctx: Ctx): VNode {
             "data-relative": "1",
             "aria-label": tt(ctx, "skin.ionic.blind.close", "schließen"),
           },
-          ctx.icon(dev, "chev-down"),
+          svgIcon(ctx, dev, "chev-down", 17),
         ),
         blindGlyph({ position: dev.position, w: 44, h: 34 }),
         // chev-up = öffnen (−STEP toward 0/auf)
@@ -62,7 +63,7 @@ export function blindTile(d: Device, t: Tokens, ctx: Ctx): VNode {
             "data-relative": "1",
             "aria-label": tt(ctx, "skin.ionic.blind.open", "öffnen"),
           },
-          ctx.icon(dev, "chev-up"),
+          svgIcon(ctx, dev, "chev-up", 17),
         ),
       ]),
     ]),

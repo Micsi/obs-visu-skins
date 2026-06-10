@@ -1565,3 +1565,55 @@ ion-content.visu-content {
     transition: none;
   }
 }
+
+/* ===========================================================================
+   M2 integration: skin-host container grid + surface background.
+   The host (apps/visu/src/skin-host/SkinHost) emits .skin-host /
+   .skin-host-model-grid|list, a per-cell .skin-host-cell (with
+   .skin-host-group-start on the first cell of each room), and the column count
+   as --skin-host-columns. The skin owns the raster, so the grid lives here.
+   =========================================================================== */
+.skin-host {
+  width: 100%;
+}
+.skin-host-model-grid {
+  display: grid;
+  grid-template-columns: repeat(var(--skin-host-columns, 3), minmax(0, 1fr));
+  gap: var(--vz-gap, 7px);
+  align-content: start;
+}
+.skin-host-model-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--vz-gap, 7px);
+}
+.skin-host-cell {
+  display: flex;
+  min-height: var(--vz-cell, 112px);
+}
+.skin-host-cell > .vz-tile {
+  flex: 1;
+  min-width: 0;
+}
+/* Room separation (Must-Keep): each room block starts a new grid row, and the
+   spacing before it reads as "you are now in another room". */
+.skin-host-model-grid > .skin-host-group-start {
+  grid-column-start: 1;
+}
+.skin-host-model-grid > .skin-host-group-start:not(:first-child) {
+  margin-top: var(--vz-room-gap, 22px);
+}
+
+/* Surface background: paint the active theme's photo/gradient/colour on the
+   .visu-root wrapper so it covers the page (otherwise the bare Ionic content
+   shows through → light-on-light, unreadable). */
+.visu-root {
+  min-height: 100%;
+  background-color: var(--vz-bg);
+  background-image: var(--vz-bg-image, none), var(--vz-bg-grad, none);
+  background-size: cover, cover;
+  background-position: center, center;
+  background-repeat: no-repeat, no-repeat;
+  background-attachment: fixed, fixed;
+  color: var(--vz-fg);
+}

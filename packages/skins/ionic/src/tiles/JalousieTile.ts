@@ -14,6 +14,7 @@
 import { h, type VNode } from "vue";
 import type { Ctx, Device, JalousieDevice, JalousieStatus, Tokens } from "@obs/visu-contract";
 import { jalousieGlyph, slatAngleDeg } from "../glyphs/JalousieGlyph.js";
+import { svgIcon } from "../icon.js";
 import { tt } from "../i18n.js";
 
 const SLAT_STEP = 10;
@@ -61,7 +62,7 @@ export function jalousieTile(d: Device, t: Tokens, ctx: Ctx): VNode {
   // ── body: live window glyph + vertical position rail ──
   const windowChildren: VNode[] = [jalousieGlyph({ position: dev.position, slat: dev.slat })];
   if (locked) {
-    windowChildren.push(h("span", { class: "jal-locktag" }, ctx.icon(dev, "lock")));
+    windowChildren.push(h("span", { class: "jal-locktag" }, svgIcon(ctx, dev, "lock", 14)));
   }
   windowChildren.push(
     h("div", { class: "jal-readout" }, [
@@ -72,7 +73,7 @@ export function jalousieTile(d: Device, t: Tokens, ctx: Ctx): VNode {
   if (moving) {
     windowChildren.push(
       h("div", { class: "jal-moving" }, [
-        ctx.icon(dev, moving === "up" ? "chev-up" : "chev-down"),
+        svgIcon(ctx, dev, moving === "up" ? "chev-up" : "chev-down"),
         ` ${tt(ctx, "skin.ionic.jalousie.moving", "fährt …")}`,
       ]),
     );
@@ -163,7 +164,7 @@ export function jalousieTile(d: Device, t: Tokens, ctx: Ctx): VNode {
         "data-arg": interactive ? "0" : undefined,
         "aria-label": tt(ctx, "skin.ionic.jalousie.driveUp", "hoch (halten)"),
       },
-      ctx.icon(dev, "chev-up"),
+      svgIcon(ctx, dev, "chev-up"),
     ),
     h(
       "button",
@@ -186,7 +187,7 @@ export function jalousieTile(d: Device, t: Tokens, ctx: Ctx): VNode {
         "data-arg": interactive ? "100" : undefined,
         "aria-label": tt(ctx, "skin.ionic.jalousie.driveDown", "runter (halten)"),
       },
-      ctx.icon(dev, "chev-down"),
+      svgIcon(ctx, dev, "chev-down"),
     ),
   ]);
 

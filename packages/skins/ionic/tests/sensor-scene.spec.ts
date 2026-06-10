@@ -104,8 +104,11 @@ describe("ionic scene tile (I4 #7) — Icon-Slot + activateScene", () => {
 
     const icon = flatten(vnode).find((n) => (n.props as Record<string, unknown>)?.class === "vz-scene-icon");
     expect(icon).toBeDefined();
-    // ctx.icon-Stub gibt den Slot zurück; film-Fixture nutzt 'sparkle'.
-    expect(icon?.children).toBe("sparkle");
+    // The icon body is injected as <svg> innerHTML (not a raw text child — that
+    // was the "<polyline …" leak). The ctx.icon stub returns the slot; the film
+    // fixture uses 'sparkle'.
+    const svg = flatten(vnode).find((n) => n.type === "svg");
+    expect((svg?.props as Record<string, unknown>)?.innerHTML).toBe("sparkle");
 
     const sub = flatten(vnode).find((n) => (n.props as Record<string, unknown>)?.class === "vz-sub");
     expect(sub?.children).toBe("Licht · Rollladen · TV");
