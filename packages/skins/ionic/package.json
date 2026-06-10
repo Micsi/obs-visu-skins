@@ -9,7 +9,9 @@
   "exports": {
     ".": "./renderers.ts",
     "./manifest.json": "./manifest.json",
-    "./ionic.css": "./ionic.css"
+    "./ionic.css": "./ionic.css",
+    "./locales/de.json": "./locales/de.json",
+    "./locales/en.json": "./locales/en.json"
   },
   "scripts": {
     "test": "vitest run --typecheck"
