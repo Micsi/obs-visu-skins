@@ -15,8 +15,6 @@ import { blindGlyph } from "../glyphs/BlindGlyph.js";
 import { svgIcon } from "../icon.js";
 import { tt } from "../i18n.js";
 
-const STEP = 20;
-
 export function blindTile(d: Device, t: Tokens, ctx: Ctx): VNode {
   const dev = d as BlindDevice;
   const locked = !!dev.locked;
@@ -36,7 +34,8 @@ export function blindTile(d: Device, t: Tokens, ctx: Ctx): VNode {
     h("div", { class: "vz-label chip" }, ctx.hyphenate(dev.label)),
     h("div", { class: "vz-tile-body" }, [
       h("div", { class: "vz-blind-ctl" }, [
-        // chev-down = schließen (+STEP toward 100/zu)
+        // Doppel-Chevron unten = ganz schließen (setPosition 100/zu). Ganzfahrt auf
+        // der Kachel; die ±-Feinschritte leben im Detail (Schritt auf/zu).
         h(
           "button",
           {
@@ -44,14 +43,13 @@ export function blindTile(d: Device, t: Tokens, ctx: Ctx): VNode {
             type: "button",
             disabled: locked,
             "data-action": locked ? undefined : "setPosition",
-            "data-arg": locked ? undefined : String(STEP),
-            "data-relative": "1",
+            "data-arg": locked ? undefined : "100",
             "aria-label": tt(ctx, "skin.ionic.blind.close", "schließen"),
           },
-          svgIcon(ctx, dev, "chev-down", 17),
+          svgIcon(ctx, dev, "chev-dd", 17),
         ),
         blindGlyph({ position: dev.position, w: 44, h: 34 }),
-        // chev-up = öffnen (−STEP toward 0/auf)
+        // Doppel-Chevron oben = ganz öffnen (setPosition 0/auf).
         h(
           "button",
           {
@@ -59,11 +57,10 @@ export function blindTile(d: Device, t: Tokens, ctx: Ctx): VNode {
             type: "button",
             disabled: locked,
             "data-action": locked ? undefined : "setPosition",
-            "data-arg": locked ? undefined : String(-STEP),
-            "data-relative": "1",
+            "data-arg": locked ? undefined : "0",
             "aria-label": tt(ctx, "skin.ionic.blind.open", "öffnen"),
           },
-          svgIcon(ctx, dev, "chev-up", 17),
+          svgIcon(ctx, dev, "chev-uu", 17),
         ),
       ]),
     ]),

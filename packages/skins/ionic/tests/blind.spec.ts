@@ -32,13 +32,15 @@ describe("blind tile", () => {
     expect(text(find(v, "div", "vz-tile-foot"))).toContain("Teil");
   });
 
-  it("offers a ±20 chevron stepper as setPosition intents when unlocked", () => {
+  it("offers full open/close (setPosition 0/100, absolute) on the tile when unlocked", () => {
     const v = blindTile(dev("half"), tokensStub, ctxStub());
     const chevs = findAll(v, "button", "vz-chev");
     expect(chevs).toHaveLength(2);
     const args = chevs.map((b) => b.props?.["data-arg"]);
-    expect(args).toContain("20"); // schließen
-    expect(args).toContain("-20"); // öffnen
+    expect(args).toContain("0"); // ganz auf
+    expect(args).toContain("100"); // ganz zu
+    // full-open/close is absolute, not a relative step (fine ±-stepping is in the detail)
+    expect(chevs.every((b) => b.props?.["data-relative"] === undefined)).toBe(true);
     expect(actions(v)).toContain("setPosition");
   });
 

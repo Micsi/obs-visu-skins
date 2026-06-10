@@ -1,15 +1,16 @@
 // Ionic-Skin · Detail-Renderer für `light` (I2 · #5).
 //
 // Reine Funktion `(d, t, ctx) => VNode`. Quelle: reference/vue-ionic/dialogs.js
-// (kind === 'light'). Helligkeits-Slider (ion-range) + Schnellaktionen (Aus/Voll)
-// + Szenen-Presets (Gemütlich/Lesen/Arbeit). Kein State im Skin: der Slider trägt
-// data-action="setDim" und die Buttons data-action="setDim"/"toggle" mit
-// data-value; der Host übersetzt das auf die kanonischen Aktionen und besitzt den
-// State (Goldene Regel 4 — niemals `d.x = …`). User-Strings über `ctx.t` mit
-// deutschem Fallback (skin.ionic.light.*).
+// (kind === 'light'). Kopf (Raum · Titel · Wert · Schließen) + Helligkeits-Slider
+// (ion-range) + Schnellaktionen (Aus/Voll) + Szenen-Presets (Gemütlich/Lesen/Arbeit).
+// Kein State im Skin: der Slider trägt data-action="setDim" und die Buttons
+// data-action="setDim"/"close" mit data-value; der Host übersetzt das auf die
+// kanonischen Aktionen und besitzt den State (Goldene Regel 4 — niemals `d.x = …`).
+// User-Strings über `ctx.t` mit deutschem Fallback (skin.ionic.light.*).
 
 import { h, type VNode } from "vue";
 import type { Ctx, LightDevice, Renderer, Tokens } from "@obs/visu-contract";
+import { svgIcon } from "../icon.js";
 
 /** ctx.t mit Fallback — wenn kein Übersetzer injiziert ist, gilt der deutsche Literal. */
 function tr(ctx: Ctx, key: string, fallback: string): string {
@@ -32,29 +33,42 @@ function preset(ctx: Ctx, key: string, fallback: string, value: number): VNode {
 export const LightDetail: Renderer = (d: Readonly<unknown>, t: Tokens, ctx: Ctx): unknown => {
   const dev = d as LightDevice;
   const dim = dev.dim ?? (dev.on ? 100 : 0);
-  return h(
-    "div",
-    { class: "vz-dialog", style: { "--acc": t.accent(dev.accent) }, "data-type": "light" },
-    [
+  const val = dev.dim != null ? `${dev.dim} %` : tr(ctx, dev.on ? "skin.ionic.light.on" : "skin.ionic.light.off", dev.on ? "Ein" : "Aus");
+  return h("div", { class: "vz-dialog", style: { "--acc": t.accent(dev.accent) }, "data-type": "light" }, [
+    h("div", { class: "vz-dialog-bar" }),
+    h("div", { class: "vz-dialog-head" }, [
+      h("div", null, [
+        h("div", { class: "vz-dialog-crumb" }, dev.room),
+        h("h2", { class: "vz-dialog-title" }, dev.label),
+        h("div", { class: "vz-dialog-val" }, val),
+      ]),
+      h(
+        "button",
+        {
+          class: "vz-iconbtn",
+          type: "button",
+          "data-action": "close",
+          "aria-label": tr(ctx, "skin.ionic.common.close", "schließen"),
+        },
+        svgIcon(ctx, dev, "x", 20),
+      ),
+    ]),
+    h("div", { class: "vz-dialog-body" }, [
       // Hero-Glühbirne
       h("div", { class: "vz-hero" }, [
-        h(
-          "svg",
-          { width: 64, height: 64, viewBox: "0 0 24 24", fill: "none", "aria-hidden": "true" },
-          [
-            h("path", {
-              d: "M9 18h6M10 21h4M12 3a6 6 0 0 0-3.6 10.8c.6.45 1 1.15 1.1 1.9l.1.8h4.8l.1-.8c.1-.75.5-1.45 1.1-1.9A6 6 0 0 0 12 3Z",
-              stroke: "currentColor",
-              "stroke-width": 1.6,
-              "stroke-linecap": "round",
-              "stroke-linejoin": "round",
-              style:
-                dim > 0
-                  ? "color:var(--acc);filter:drop-shadow(0 0 18px var(--acc))"
-                  : "color:var(--vz-fg-mute)",
-            }),
-          ],
-        ),
+        h("svg", { width: 64, height: 64, viewBox: "0 0 24 24", fill: "none", "aria-hidden": "true" }, [
+          h("path", {
+            d: "M9 18h6M10 21h4M12 3a6 6 0 0 0-3.6 10.8c.6.45 1 1.15 1.1 1.9l.1.8h4.8l.1-.8c.1-.75.5-1.45 1.1-1.9A6 6 0 0 0 12 3Z",
+            stroke: "currentColor",
+            "stroke-width": 1.6,
+            "stroke-linecap": "round",
+            "stroke-linejoin": "round",
+            style:
+              dim > 0
+                ? "color:var(--acc);filter:drop-shadow(0 0 18px var(--acc))"
+                : "color:var(--vz-fg-mute)",
+          }),
+        ]),
       ]),
       // Helligkeit
       h("div", {}, [
@@ -90,6 +104,6 @@ export const LightDetail: Renderer = (d: Readonly<unknown>, t: Tokens, ctx: Ctx)
           preset(ctx, "skin.ionic.light.work", "Arbeit", 100),
         ]),
       ]),
-    ],
-  );
+    ]),
+  ]);
 };

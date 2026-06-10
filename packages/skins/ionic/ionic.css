@@ -999,10 +999,13 @@ ion-content.visu-content {
 }
 
 .jal-body {
-  flex: 1;
+  flex: 1 1 auto;
   display: flex;
   gap: 9px;
-  min-height: 86px;
+  /* Cap the window so it doesn't flood the tall (2×3) tile and push the slat
+     control + drive buttons off-screen; it stays the dominant element, balanced. */
+  min-height: 110px;
+  max-height: 200px;
 }
 .jal-window {
   position: relative;
@@ -1633,5 +1636,39 @@ ion-content.visu-content {
   background-position: center, center;
   background-repeat: no-repeat, no-repeat;
   background-attachment: fixed, fixed;
+  color: var(--vz-fg);
+}
+
+/* ===========================================================================
+   Detail-pane pieces not yet ported from the prototype: the fan/VOC chart box +
+   legend, the inline section note (jalousie slat angle) and the lock-toggle row.
+   The rest of the dialog (.vz-dialog*, .vz-action*, .vz-preset*, .vz-hero,
+   .vz-section-h, .vz-status-*) is already defined above.
+   =========================================================================== */
+.vz-chart-box {
+  background: var(--vz-tile-bg-strong);
+  border: 1px solid var(--vz-hairline);
+  border-radius: 14px;
+  padding: 14px;
+}
+.vz-legend {
+  display: flex;
+  justify-content: center;
+  gap: 18px;
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--vz-fg-mute);
+}
+.vz-section-note {
+  color: var(--vz-fg-mute);
+  font-weight: 600;
+  font-size: 12.5px;
+}
+.vz-lock-toggle {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-weight: 600;
+  font-size: 14px;
   color: var(--vz-fg);
 }
