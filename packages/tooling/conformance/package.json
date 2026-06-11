@@ -1,0 +1,25 @@
+{
+  "name": "@obs-visu-skins/conformance",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Konformitäts-Generator: prüft einen Skin (manifest.json + Renderer-Map) gegen die Vertrags-Kern-Typen und erzeugt support.json. Bei undeklarierter `gap` Exit-Code != 0 (ARCHITECTURE.md §2).",
+  "type": "module",
+  "main": "index.ts",
+  "types": "index.ts",
+  "exports": {
+    ".": "./index.ts"
+  },
+  "bin": {
+    "obs-visu-conformance": "./cli.ts"
+  },
+  "scripts": {
+    "test": "vitest run --typecheck"
+  },
+  "dependencies": {
+    "@obs/visu-contract": "link:/Volumes/Daten/Projekte/openbridge/openbridgeserver-visu-integrate/packages/contract"
+  },
+  "devDependencies": {
+    "@obs-visu-skins/ionic": "workspace:*",
+    "vitest": "^2.1.8"
+  }
+}
