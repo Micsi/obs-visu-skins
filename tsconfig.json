@@ -7,6 +7,9 @@
   "files": [],
   "references": [
     { "path": "./packages/tooling/contract-ref" },
-    { "path": "./packages/skins/ionic" }
+    { "path": "./packages/skins/ionic" },
+    { "path": "./packages/skins/terminal" },
+    { "path": "./packages/tooling/conformance" },
+    { "path": "./packages/tooling/fixture-wand" }
   ]
 }

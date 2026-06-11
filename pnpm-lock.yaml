@@ -49,7 +49,52 @@ importers:
         specifier: ^3.5.0
         version: 3.5.35(typescript@5.9.3)
 
+  packages/skins/terminal:
+    dependencies:
+      '@obs/visu-contract':
+        specifier: link:/Volumes/Daten/Projekte/openbridge/openbridgeserver-visu-integrate/packages/contract
+        version: link:../../../../openbridgeserver-visu-integrate/packages/contract
+    devDependencies:
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.19.20)
+      vue:
+        specifier: ^3.5.0
+        version: 3.5.35(typescript@5.9.3)
+
+  packages/tooling/conformance:
+    dependencies:
+      '@obs/visu-contract':
+        specifier: link:/Volumes/Daten/Projekte/openbridge/openbridgeserver-visu-integrate/packages/contract
+        version: link:../../../../openbridgeserver-visu-integrate/packages/contract
+    devDependencies:
+      '@obs-visu-skins/ionic':
+        specifier: workspace:*
+        version: link:../../skins/ionic
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.19.20)
+
   packages/tooling/contract-ref: {}
+
+  packages/tooling/fixture-wand:
+    dependencies:
+      '@obs-visu-skins/ionic':
+        specifier: workspace:*
+        version: link:../../skins/ionic
+      '@obs/visu-contract':
+        specifier: link:/Volumes/Daten/Projekte/openbridge/openbridgeserver-visu-integrate/packages/contract
+        version: link:../../../../openbridgeserver-visu-integrate/packages/contract
+    devDependencies:
+      vite:
+        specifier: ^5.4.11
+        version: 5.4.21(@types/node@22.19.20)
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.19.20)
+      vue:
+        specifier: ^3.5.0
+        version: 3.5.35(typescript@5.9.3)
 
 packages:
 
