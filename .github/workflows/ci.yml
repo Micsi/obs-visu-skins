@@ -1,0 +1,76 @@
+name: ci
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build-test-conform:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Cross-repo dev-link (CONTRIBUTING-visu.md → "Dev-Link"): every skin depends on
+      # the contract via an ABSOLUTE `link:` path
+      # (/Volumes/.../openbridgeserver-visu-integrate/packages/contract). That path does
+      # not exist on the runner, so — mirroring the app CI in reverse — check out the
+      # contract's workspace and symlink the absolute path onto the runner. Removed at
+      # release, when the link becomes a published npm version.
+      - uses: actions/checkout@v4
+        with:
+          repository: Micsi/openbridgeserver
+          ref: feat/visu-mobile-skins
+          path: .obs-visu-integrate
+
+      - name: Recreate dev-link path
+        run: |
+          WORK_PARENT="$(dirname "$GITHUB_WORKSPACE")"
+          mv "$GITHUB_WORKSPACE/.obs-visu-integrate" "$WORK_PARENT/openbridgeserver-visu-integrate"
+          sudo mkdir -p /Volumes/Daten/Projekte/openbridge
+          sudo ln -s "$WORK_PARENT/openbridgeserver-visu-integrate" /Volumes/Daten/Projekte/openbridge/openbridgeserver-visu-integrate
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      # The skins import the contract as built JS (@obs/visu-contract → dist/src/index.js),
+      # so the contract must be installed and built before the skins install resolves its
+      # `link:` dependency.
+      - name: Build contract
+        working-directory: /Volumes/Daten/Projekte/openbridge/openbridgeserver-visu-integrate
+        run: |
+          pnpm --filter @obs/visu-contract install
+          pnpm --filter @obs/visu-contract build
+
+      # No --frozen-lockfile: the lockfile is regenerated canonically by the orchestrator
+      # and is not committed with workspace-dep changes.
+      - name: Install (skins)
+        run: pnpm install
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Test (Vitest)
+        run: pnpm -r test
+
+      # Conformance gate (golden rule 3): run the generator over EVERY skin. It writes
+      # support.json per skin and exits non-zero on any undeclared gap → red CI.
+      - name: Conformance gate (all skins)
+        run: pnpm --filter @obs-visu-skins/conformance gate

@@ -13,13 +13,15 @@
     "obs-visu-conformance": "./cli.ts"
   },
   "scripts": {
-    "test": "vitest run --typecheck"
+    "test": "vitest run --typecheck",
+    "gate": "vitest run --config vitest.gate.config.ts"
   },
   "dependencies": {
     "@obs/visu-contract": "link:/Volumes/Daten/Projekte/openbridge/openbridgeserver-visu-integrate/packages/contract"
   },
   "devDependencies": {
     "@obs-visu-skins/ionic": "workspace:*",
+    "@obs-visu-skins/terminal": "workspace:*",
     "vitest": "^2.1.8"
   }
 }
