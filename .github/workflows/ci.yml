@@ -56,11 +56,12 @@ jobs:
           pnpm --filter @obs/visu-contract install
           pnpm --filter @obs/visu-contract build
 
-      # --no-frozen-lockfile: CI defaults to frozen, but pnpm-lock.yaml is not committed
-      # with workspace-dep changes (the orchestrator regenerates it canonically), so the
-      # lockfile must be resolved here. Only workspace links change — no registry fetch.
+      # frozen-lockfile: pnpm-lock.yaml is committed and kept current with every
+      # workspace-dep change. Frozen here guarantees the lockfile never drifts —
+      # which also keeps the app's visu-ci green, since that workflow does a
+      # `--frozen-lockfile` install against this very skins workspace.
       - name: Install (skins)
-        run: pnpm install --no-frozen-lockfile
+        run: pnpm install --frozen-lockfile
 
       - name: Lint
         run: pnpm lint
