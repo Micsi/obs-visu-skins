@@ -1,0 +1,26 @@
+{
+  "name": "@obs-visu-skins/terminal",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Terminal-Skin für obs Visu — schlichte Listendarstellung mit reduzierter Bedienung auf dem v1-Kern (light · switch · blind · jalousie · sensor · scene). Renderer pro Typ; kein State, kein Datenfork.",
+  "type": "module",
+  "main": "renderers.ts",
+  "types": "renderers.ts",
+  "exports": {
+    ".": "./renderers.ts",
+    "./manifest.json": "./manifest.json"
+  },
+  "scripts": {
+    "test": "vitest run --typecheck"
+  },
+  "dependencies": {
+    "@obs/visu-contract": "link:/Volumes/Daten/Projekte/openbridge/openbridgeserver-visu-integrate/packages/contract"
+  },
+  "peerDependencies": {
+    "vue": "^3.5.0"
+  },
+  "devDependencies": {
+    "vitest": "^2.1.8",
+    "vue": "^3.5.0"
+  }
+}

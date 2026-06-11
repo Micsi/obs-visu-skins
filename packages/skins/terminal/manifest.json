@@ -1,0 +1,27 @@
+{
+  "name": "terminal",
+  "targetsContract": "1.1",
+  "renderers": "./renderers.ts",
+  "unsupported": ["camera", "media"],
+
+  "widgets": {
+    "light": { "actions": ["toggle"] },
+    "switch": { "actions": ["toggle"] },
+    "blind": { "actions": ["setPosition", "lock", "unlock"] },
+    "jalousie": { "actions": ["setPosition", "lock", "unlock"] },
+    "sensor": { "actions": [] },
+    "scene": { "actions": ["activateScene"] }
+  },
+
+  "layout": {
+    "model": "list",
+    "list": {
+      "row": { "minPx": 44 },
+      "gutter": 0,
+      "flow": "column"
+    },
+    "honors": ["order", "grouping", "role"]
+  },
+
+  "themes": ["light", "dark"]
+}
