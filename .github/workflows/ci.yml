@@ -37,9 +37,9 @@ jobs:
           sudo mkdir -p /Volumes/Daten/Projekte/openbridge
           sudo ln -s "$WORK_PARENT/openbridgeserver-visu-integrate" /Volumes/Daten/Projekte/openbridge/openbridgeserver-visu-integrate
 
+      # pnpm version comes from "packageManager" in package.json (pnpm@10.33.0);
+      # do not also set `version` here or action-setup errors on the mismatch.
       - uses: pnpm/action-setup@v4
-        with:
-          version: 10
 
       - uses: actions/setup-node@v4
         with:
