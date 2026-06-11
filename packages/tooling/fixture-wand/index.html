@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>obs Visu — Fixture-Wand</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        font-family: system-ui, sans-serif;
+      }
+      body {
+        margin: 0;
+        background: #0f1115;
+        color: #e7e9ee;
+      }
+      .fw-head {
+        padding: 16px 20px;
+      }
+      .fw-head h1 {
+        margin: 0;
+        font-size: 18px;
+      }
+      .fw-sub {
+        margin: 4px 0 0;
+        opacity: 0.6;
+        font-size: 13px;
+      }
+      .fw-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+        gap: 16px;
+        padding: 20px;
+        align-items: start;
+      }
+      .fw-cell {
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 12px;
+        padding: 12px;
+        background: rgba(255, 255, 255, 0.02);
+      }
+      .fw-cell-head {
+        display: flex;
+        gap: 8px;
+        align-items: baseline;
+        margin-bottom: 10px;
+        font-size: 12px;
+      }
+      .fw-type {
+        font-weight: 600;
+      }
+      .fw-state {
+        opacity: 0.55;
+      }
+      .fw-gap {
+        color: #ff8a8a;
+        font-size: 13px;
+        padding: 12px;
+        border: 1px dashed rgba(255, 138, 138, 0.5);
+        border-radius: 8px;
+        text-align: center;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

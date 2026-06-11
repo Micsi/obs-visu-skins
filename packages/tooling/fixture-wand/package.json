@@ -1,0 +1,21 @@
+{
+  "name": "@obs-visu-skins/fixture-wand",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Dev-Seite (Vite): rendert JEDE Vertrags-Fixture (jeder Typ × jeder Zustand aus @obs/visu-contract) durch die Renderer eines gewählten Skins — eine visuelle Vollständigkeits-Wand. Kein State, reine Renderer-Aufrufe; fehlende Renderer werden sichtbar als gap markiert.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "test": "vitest run --typecheck"
+  },
+  "dependencies": {
+    "@obs-visu-skins/ionic": "workspace:*",
+    "@obs/visu-contract": "link:/Volumes/Daten/Projekte/openbridge/openbridgeserver-visu-integrate/packages/contract"
+  },
+  "devDependencies": {
+    "vite": "^5.4.11",
+    "vitest": "^2.1.8",
+    "vue": "^3.5.0"
+  }
+}
