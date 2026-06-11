@@ -71,6 +71,9 @@ importers:
       '@obs-visu-skins/ionic':
         specifier: workspace:*
         version: link:../../skins/ionic
+      '@obs-visu-skins/terminal':
+        specifier: workspace:*
+        version: link:../../skins/terminal
       vitest:
         specifier: ^2.1.8
         version: 2.1.9(@types/node@22.19.20)
