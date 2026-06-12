@@ -16,6 +16,16 @@
    Goldene Regel: kein State im Skin — Tweaks werden vom Host gesetzt.
    =========================================================================== */
 
+/* Manrope (variable, latin, wght 200–800) — SIL OFL 1.1, mitgeliefert unter
+   ./fonts/ (Manrope.woff2 + OFL.txt + NOTICE). src relativ zu DIESER CSS-Datei. */
+@font-face {
+  font-family: "Manrope";
+  src: url("./fonts/Manrope.woff2") format("woff2");
+  font-weight: 200 800;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
   /* === Type === */
   --vz-font: "Manrope", "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
@@ -58,6 +68,22 @@
   --vz-acc-amber: #e8b441;
   --vz-acc-slate: #7e8696;
   --vz-accent: var(--vz-acc-orange);
+
+  /* AA-Ink je Palette-Akzent (#19): akzentgefüllter Text fiel bisher auf Weiß
+     zurück — gegen JEDEN dieser hellen Akzente unter WCAG AA (Weiß erreicht max.
+     3.66:1). Dunkle Ink (#10131a) erfüllt AA gegen alle acht (min. 5.08:1). Der
+     Host liefert die zum Akzent passende Ink via t.accentInk(token) → var(--ink-<token>). */
+  --ink-orange: #10131a;
+  --ink-teal: #10131a;
+  --ink-violet: #10131a;
+  --ink-green: #10131a;
+  --ink-blue: #10131a;
+  --ink-rose: #10131a;
+  --ink-amber: #10131a;
+  --ink-slate: #10131a;
+  /* Globaler Ink-Default, gepaart mit dem Default-Akzent (orange). Ein vom Host
+     gesetztes --vz-accent-ink gewinnt (Element-Style schlägt :root in der Kaskade). */
+  --vz-accent-ink: var(--ink-orange);
 
   --vz-on: #6fbf6a;
   --vz-off: #79808d;

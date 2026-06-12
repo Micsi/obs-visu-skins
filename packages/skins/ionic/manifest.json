@@ -1,9 +1,8 @@
 {
   "name": "ionic",
   "targetsContract": "1.1",
-  "font": { "family": "Manrope", "src": "./Manrope.woff2" },
+  "font": { "family": "Manrope", "src": "./fonts/Manrope.woff2" },
   "renderers": "./renderers.ts",
-  "icons": "./icons.ts",
   "unsupported": ["camera", "media"],
 
   "widgets": {
