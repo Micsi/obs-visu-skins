@@ -18,6 +18,8 @@ import { blindTile } from "./src/tiles/BlindTile.js";
 import { jalousieTile } from "./src/tiles/JalousieTile.js";
 import { SensorTile } from "./src/tiles/Sensor.js";
 import { SceneTile } from "./src/tiles/Scene.js";
+import { MediaTile } from "./src/tiles/Media.js";
+import { CameraTile } from "./src/tiles/Camera.js";
 
 import { LightDetail } from "./src/details/LightDetail.js";
 import { SwitchDetail } from "./src/details/SwitchDetail.js";
@@ -32,7 +34,8 @@ export type RendererMap = Partial<Record<IonicWidgetType, Renderer>>;
 
 /**
  * Kachel-Renderer je Kern-Typ — reine `Renderer`-Funktionen (Glass/iOS/MD nach Tweak `stil`).
- * Vollständig für alle sechs v1-Kern-Typen: light · switch · blind · jalousie · sensor · scene.
+ * Vollständig für alle acht v1.2-Kern-Typen: light · switch · blind · jalousie · sensor ·
+ * scene · media · camera.
  */
 export const tiles: RendererMap = {
   light: LightTile,
@@ -41,6 +44,8 @@ export const tiles: RendererMap = {
   jalousie: jalousieTile,
   sensor: SensorTile,
   scene: SceneTile,
+  media: MediaTile,
+  camera: CameraTile,
 };
 
 /**
