@@ -12,6 +12,7 @@
   "scripts": {
     "typecheck": "tsc --build",
     "test": "pnpm -r --if-present test",
+    "new-skin": "node packages/tooling/create-skin/bin.mjs",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",

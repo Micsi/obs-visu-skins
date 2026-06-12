@@ -8,5 +8,13 @@ export default tseslint.config(
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,
+  {
+    // Plain ESM Node scripts (z. B. create-skin/bin.mjs) laufen direkt in Node:
+    // process/URL/etc. sind globale Node-Runtime-Symbole.
+    files: ["**/*.mjs"],
+    languageOptions: {
+      globals: { process: "readonly", URL: "readonly" },
+    },
+  },
   prettier,
 );

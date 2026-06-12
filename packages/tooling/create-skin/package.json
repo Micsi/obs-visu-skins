@@ -1,0 +1,28 @@
+{
+  "name": "@obs-visu-skins/create-skin",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Scaffold-CLI: create-obs-skin <name> [--layout grid|list] erzeugt ein konformitäts-grünes Skin-Skelett unter packages/skins/<name> (alle 6 Kern-Typen mit Platzhalter-Renderern) und pflegt die Root-tsconfig.references idempotent.",
+  "type": "module",
+  "main": "index.ts",
+  "types": "index.ts",
+  "exports": {
+    ".": "./index.ts"
+  },
+  "bin": {
+    "create-obs-skin": "./bin.mjs"
+  },
+  "scripts": {
+    "test": "vitest run --typecheck"
+  },
+  "dependencies": {
+    "@obs/visu-contract": "link:/Volumes/Daten/Projekte/openbridge/openbridgeserver-visu-integrate/packages/contract"
+  },
+  "devDependencies": {
+    "@obs-visu-skins/conformance": "workspace:*",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8",
+    "vue": "^3.5.0"
+  }
+}
