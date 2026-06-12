@@ -123,10 +123,16 @@ describe("ionic scene tile (I4 #7) — Icon-Slot + activateScene", () => {
   });
 
   it("löst Locale-Keys über ctx.t auf, mit Fallback wenn ctx.t fehlt", () => {
+    // The accessible name names the scene (room · label) so multiple scene tiles do
+    // not collapse to the same a11y label; the action verb still comes from ctx.t.
     const withT = SceneTile(asScene(sceneFx.film), tokens, makeCtx({ t: (k) => `T:${k}` })) as VNode;
-    expect((withT.props as Record<string, unknown>)["aria-label"]).toBe("T:skin.ionic.scene.activate");
+    expect((withT.props as Record<string, unknown>)["aria-label"]).toBe(
+      "T:skin.ionic.scene.activate: Szenen · Filmabend",
+    );
 
     const noT = SceneTile(asScene(sceneFx.film), tokens, makeCtx()) as VNode;
-    expect((noT.props as Record<string, unknown>)["aria-label"]).toBe("Szene aktivieren");
+    expect((noT.props as Record<string, unknown>)["aria-label"]).toBe(
+      "Szene aktivieren: Szenen · Filmabend",
+    );
   });
 });

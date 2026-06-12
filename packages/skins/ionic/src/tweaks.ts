@@ -106,6 +106,24 @@ const RANGES = {
 
 const clamp = (v: number, min: number, max: number): number => (v < min ? min : v > max ? max : v);
 
+/** Erlaubte Select-Werte (Spiegel von manifest.json → `tweaks`/`themes`). */
+const SELECT_OPTIONS = {
+  stil: ["glass", "ios", "md"],
+  accentStyle: ["bar", "glow", "ring"],
+  theme: ["light", "dark", "image"],
+  roomGroup: ["off", "gap", "labels"],
+} as const;
+
+/**
+ * Wählt einen Select-Wert nur, wenn er zu den Manifest-Optionen gehört — sonst den
+ * Default. So führen veraltete/ungültige Werte aus persistiertem JSON oder einem
+ * älteren Host nicht zu unbekannten `data-*`-Selektoren, bei denen ionic.css keine
+ * Flächen-/Token-Regeln liefert (analog zum Klemmen der numerischen Slider).
+ */
+function pick<T extends string>(value: T, options: readonly T[], fallback: T): T {
+  return options.includes(value) ? value : fallback;
+}
+
 /** Wurzel-Datenattribute, die `ionic.css` als Selektoren auswertet. */
 export interface RootAttrs {
   "data-stil": IonicStil;
@@ -142,29 +160,44 @@ export function applyTweaks(tweaks: IonicTweaks = {}): RootTweakStyle {
   const edge = clamp(t.edge, RANGES.edge.min, RANGES.edge.max);
   const glow = clamp(t.glow, RANGES.glow.min, RANGES.glow.max);
 
+  const stil = pick(t.stil, SELECT_OPTIONS.stil, TWEAK_DEFAULTS.stil);
+  const accentStyle = pick(t.accentStyle, SELECT_OPTIONS.accentStyle, TWEAK_DEFAULTS.accentStyle);
+  const theme = pick(t.theme, SELECT_OPTIONS.theme, TWEAK_DEFAULTS.theme);
+  const roomGroup = pick(t.roomGroup, SELECT_OPTIONS.roomGroup, TWEAK_DEFAULTS.roomGroup);
+
   const style: Record<string, string> = {
     "--vz-blur": `${glassBlur}px`,
     "--vz-tile-alpha": `${tileAlpha}`,
     "--vz-cell": `${Math.round(BASE_CELL_PX * cellScale)}px`,
     "--vz-edge": `${edge}px`,
     "--vz-glow": `${glow}`,
-    "--vz-room-gap": `${t.roomGroup === "off" ? 0 : t.roomGap}px`,
+    "--vz-room-gap": `${roomGroup === "off" ? 0 : t.roomGap}px`,
   };
   // Akzentfarbe und Hintergrundbild sind optional — nur setzen, wenn der Host sie
   // liefert, sonst greifen die Boden-Tokens aus ionic.css (--vz-accent / --vz-photo).
   if (tweaks.accent !== undefined) style["--vz-accent"] = tweaks.accent;
-  if (tweaks.photo !== undefined) style["--vz-photo"] = `url('${tweaks.photo}')`;
+  if (tweaks.photo !== undefined) style["--vz-photo"] = `url('${cssUrlEscape(tweaks.photo)}')`;
 
   return {
     attrs: {
-      "data-stil": t.stil,
-      "data-theme": t.theme,
-      "data-acc-style": t.accentStyle,
-      "data-room-group": t.roomGroup,
+      "data-stil": stil,
+      "data-theme": theme,
+      "data-acc-style": accentStyle,
+      "data-room-group": roomGroup,
       "data-titlebar": t.showTitlebar ? "1" : "0",
     },
     style,
   };
+}
+
+/**
+ * Maskiert `\` und `'` in host-gelieferten Foto-URLs, bevor sie in eine
+ * `url('…')`-CSS-Zeichenkette eingebettet werden. Ohne das würde z. B. ein Pfad wie
+ * `Kid's room.jpg` die CSS-Zeichenkette vorzeitig schließen und `--vz-photo` ungültig
+ * machen (Daten=JSON, Verhalten=Code — host-Daten nie ungeprüft in CSS spiegeln).
+ */
+function cssUrlEscape(url: string): string {
+  return url.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
 }
 
 /** Entfernt `undefined`-Felder, damit `...spread` die Defaults nicht überschreibt. */

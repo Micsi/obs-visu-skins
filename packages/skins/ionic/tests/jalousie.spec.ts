@@ -115,6 +115,18 @@ describe("jalousie detail", () => {
     expect(actions(jalousieDetail(dev("locked"), tokensStub, ctxStub()))).toContain("unlock");
   });
 
+  it("locked detail emits no movement intents — only unlock stays actionable", () => {
+    const v = jalousieDetail(dev("locked"), tokensStub, ctxStub());
+    const acts = actions(v);
+    expect(acts).not.toContain("setPosition");
+    expect(acts).not.toContain("setSlat");
+    expect(acts).toContain("unlock");
+    // the position/slat ranges are present but disabled
+    const ranges = findAll(v, "input", "vz-range");
+    expect(ranges.length).toBeGreaterThan(0);
+    expect(ranges.every((r) => r.props?.disabled === true)).toBe(true);
+  });
+
   it("open fixture has no slat slider hidden away — slat control present for jalousie mode", () => {
     const v = jalousieDetail(dev("open"), tokensStub, ctxStub());
     const acts = findAll(v, "input", "vz-range").map((r) => r.props?.["data-action"]);

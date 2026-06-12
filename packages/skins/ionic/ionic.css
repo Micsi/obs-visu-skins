@@ -776,6 +776,19 @@ ion-content.visu-content {
   white-space: nowrap;
 }
 
+/* Warned sensors (ctx.warn(dev) → .is-warn on the tile + footer status) must read
+   distinctly from an OK sensor, otherwise the host's warning signal is invisible. */
+.vz-tile--sensor.is-warn {
+  border-color: color-mix(in oklab, var(--vz-warn) 55%, var(--vz-hairline));
+}
+.vz-tile--sensor.is-warn .vz-num {
+  color: var(--vz-warn);
+}
+.vz-status.is-warn {
+  color: var(--vz-warn);
+  font-weight: 700;
+}
+
 /* range slider (custom control) */
 .vz-range {
   -webkit-appearance: none;
@@ -1620,7 +1633,8 @@ ion-content.visu-content {
   display: flex;
   min-height: 0; /* the grid row track defines the height; the tile fills it */
 }
-.skin-host-cell > .vz-tile {
+.skin-host-cell > .vz-tile,
+.skin-host-cell > .jal-tile {
   flex: 1;
   min-width: 0;
 }
@@ -1631,7 +1645,10 @@ ion-content.visu-content {
 .visu-root {
   min-height: 100%;
   background-color: var(--vz-bg);
-  background-image: var(--vz-bg-image, none), var(--vz-bg-grad, none);
+  /* Reihenfolge wie bei .visu-app: Kontrast-Overlay (--vz-bg-grad) zuerst = oben,
+     das Foto (--vz-bg-image) dahinter — sonst verdeckt ein deckendes Foto den
+     Overlay und der Text wird unlesbar. */
+  background-image: var(--vz-bg-grad, none), var(--vz-bg-image, none);
   background-size: cover, cover;
   background-position: center, center;
   background-repeat: no-repeat, no-repeat;

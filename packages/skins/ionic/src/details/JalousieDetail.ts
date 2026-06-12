@@ -10,8 +10,7 @@
 
 import { h, type VNode } from "vue";
 import type { Ctx, Device, JalousieDevice, JalousieStatus, Tokens } from "@obs/visu-contract";
-import { blindGlyph } from "../glyphs/BlindGlyph.js";
-import { slatAngleDeg } from "../glyphs/JalousieGlyph.js";
+import { jalousieGlyph, slatAngleDeg } from "../glyphs/JalousieGlyph.js";
 import { svgIcon } from "../icon.js";
 import { tt } from "../i18n.js";
 
@@ -36,10 +35,14 @@ export function jalousieDetail(d: Device, t: Tokens, ctx: Ctx): VNode {
   const dev = d as JalousieDevice;
   const acc = t.accent(dev.accent);
   const locked = !!dev.locked;
+  // Gesperrt = nur Entsperren ist erlaubt; Bewegungs-Intents (setPosition/setSlat)
+  // dürfen die Sperre nicht umgehen — die Detailfläche enforced dieselbe Sperre wie
+  // das Widget. Steuerelemente werden disabled und tragen kein data-action.
+  const interactive = !locked;
   const statuses: readonly JalousieStatus[] = dev.statuses ?? [];
 
   const body: VNode[] = [
-    h("div", { class: "vz-hero" }, [blindGlyph({ position: dev.position, w: 60, h: 50 })]),
+    h("div", { class: "vz-hero" }, [jalousieGlyph({ position: dev.position, slat: dev.slat })]),
     // Position
     section(
       h("div", { class: "vz-section-h" }, [
@@ -56,7 +59,8 @@ export function jalousieDetail(d: Device, t: Tokens, ctx: Ctx): VNode {
         min: 0,
         max: 100,
         value: dev.position,
-        "data-action": "setPosition",
+        disabled: !interactive,
+        "data-action": interactive ? "setPosition" : undefined,
         "aria-label": tt(ctx, "skin.ionic.jalousie.position", "Position"),
       }),
     ),
@@ -76,7 +80,8 @@ export function jalousieDetail(d: Device, t: Tokens, ctx: Ctx): VNode {
           min: 0,
           max: 100,
           value: dev.slat,
-          "data-action": "setSlat",
+          disabled: !interactive,
+          "data-action": interactive ? "setSlat" : undefined,
           "aria-label": tt(ctx, "skin.ionic.jalousie.slatAngle", "Lamellenwinkel"),
         }),
       ),
@@ -91,8 +96,9 @@ export function jalousieDetail(d: Device, t: Tokens, ctx: Ctx): VNode {
         {
           class: "vz-action",
           type: "button",
-          "data-action": "setPosition",
-          "data-arg": "0",
+          disabled: !interactive,
+          "data-action": interactive ? "setPosition" : undefined,
+          "data-arg": interactive ? "0" : undefined,
         },
         tt(ctx, "skin.ionic.jalousie.open", "Öffnen"),
       ),
@@ -101,8 +107,9 @@ export function jalousieDetail(d: Device, t: Tokens, ctx: Ctx): VNode {
         {
           class: "vz-action",
           type: "button",
-          "data-action": "setPosition",
-          "data-arg": "100",
+          disabled: !interactive,
+          "data-action": interactive ? "setPosition" : undefined,
+          "data-arg": interactive ? "100" : undefined,
         },
         tt(ctx, "skin.ionic.jalousie.close", "Schließen"),
       ),

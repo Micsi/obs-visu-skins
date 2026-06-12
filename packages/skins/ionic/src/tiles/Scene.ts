@@ -27,6 +27,12 @@ export const SceneTile: Renderer = (d: Device, t: Tokens, ctx: Ctx): VNode => {
     ? h("div", { class: "vz-tile-foot" }, [h("span", { class: "vz-sub" }, dev.sub)])
     : null;
 
+  // Akzent: aria-label muss die Szene benennen — sonst tragen mehrere Szenen-Kacheln
+  // denselben Namen und assistive Technik kann sie nicht unterscheiden (das aria-label
+  // überschreibt den sichtbaren Kindtext bei role="button").
+  const sceneName = [dev.room, dev.label].filter(Boolean).join(" · ");
+  const ariaLabel = `${tr(ctx, "skin.ionic.scene.activate", "Szene aktivieren")}: ${sceneName}`;
+
   return h(
     "div",
     {
@@ -36,7 +42,7 @@ export const SceneTile: Renderer = (d: Device, t: Tokens, ctx: Ctx): VNode => {
       tabindex: "0",
       "data-action": "activateScene",
       "data-flash-ms": "600",
-      "aria-label": tr(ctx, "skin.ionic.scene.activate", "Szene aktivieren"),
+      "aria-label": ariaLabel,
     },
     [
       h("div", { class: "vz-eyebrow" }, dev.room),

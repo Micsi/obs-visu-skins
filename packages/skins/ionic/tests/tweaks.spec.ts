@@ -68,6 +68,33 @@ describe("ionic skin — applyTweaks (I5)", () => {
     expect(set.style["--vz-photo"]).toBe("url('p.jpg')");
   });
 
+  it("maskiert Anführungszeichen/Backslashes in der Foto-URL (kein CSS-Bruch)", () => {
+    expect(applyTweaks({ photo: "Kid's room.jpg" }).style["--vz-photo"]).toBe(
+      "url('Kid\\'s room.jpg')",
+    );
+    expect(applyTweaks({ photo: "a\\b.jpg" }).style["--vz-photo"]).toBe("url('a\\\\b.jpg')");
+  });
+
+  it("validiert Select-Tweaks gegen die Manifest-Optionen (Fallback auf Default)", () => {
+    const bogus = applyTweaks({
+      // ungültige/veraltete Werte (z. B. aus persistiertem JSON eines älteren Hosts)
+      stil: "neon" as never,
+      theme: "midnight" as never,
+      accentStyle: "halo" as never,
+      roomGroup: "stacked" as never,
+    });
+    expect(bogus.attrs["data-stil"]).toBe(TWEAK_DEFAULTS.stil);
+    expect(bogus.attrs["data-theme"]).toBe(TWEAK_DEFAULTS.theme);
+    expect(bogus.attrs["data-acc-style"]).toBe(TWEAK_DEFAULTS.accentStyle);
+    expect(bogus.attrs["data-room-group"]).toBe(TWEAK_DEFAULTS.roomGroup);
+    // gültige Werte werden weiterhin durchgereicht
+    const ok = applyTweaks({ stil: "md", theme: "dark", accentStyle: "ring", roomGroup: "gap" });
+    expect(ok.attrs["data-stil"]).toBe("md");
+    expect(ok.attrs["data-theme"]).toBe("dark");
+    expect(ok.attrs["data-acc-style"]).toBe("ring");
+    expect(ok.attrs["data-room-group"]).toBe("gap");
+  });
+
   it("ist rein — gleiche Eingabe liefert gleiches Ergebnis und mutiert nicht", () => {
     const input = { stil: "ios" as const, glow: 1.2 };
     const a = applyTweaks(input);

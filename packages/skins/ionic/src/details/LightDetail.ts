@@ -4,18 +4,14 @@
 // (kind === 'light'). Kopf (Raum · Titel · Wert · Schließen) + Helligkeits-Slider
 // (ion-range) + Schnellaktionen (Aus/Voll) + Szenen-Presets (Gemütlich/Lesen/Arbeit).
 // Kein State im Skin: der Slider trägt data-action="setDim" und die Buttons
-// data-action="setDim"/"close" mit data-value; der Host übersetzt das auf die
+// data-action="setDim"/"close" mit data-arg; der Host übersetzt das auf die
 // kanonischen Aktionen und besitzt den State (Goldene Regel 4 — niemals `d.x = …`).
 // User-Strings über `ctx.t` mit deutschem Fallback (skin.ionic.light.*).
 
 import { h, type VNode } from "vue";
 import type { Ctx, LightDevice, Renderer, Tokens } from "@obs/visu-contract";
 import { svgIcon } from "../icon.js";
-
-/** ctx.t mit Fallback — wenn kein Übersetzer injiziert ist, gilt der deutsche Literal. */
-function tr(ctx: Ctx, key: string, fallback: string): string {
-  return ctx.t ? ctx.t(key) : fallback;
-}
+import { tt } from "../i18n.js";
 
 function preset(ctx: Ctx, key: string, fallback: string, value: number): VNode {
   return h(
@@ -24,16 +20,16 @@ function preset(ctx: Ctx, key: string, fallback: string, value: number): VNode {
       class: "vz-preset",
       type: "button",
       "data-action": "setDim",
-      "data-value": String(value),
+      "data-arg": String(value),
     },
-    tr(ctx, key, fallback),
+    tt(ctx, key, fallback),
   );
 }
 
 export const LightDetail: Renderer = (d: Readonly<unknown>, t: Tokens, ctx: Ctx): unknown => {
   const dev = d as LightDevice;
   const dim = dev.dim ?? (dev.on ? 100 : 0);
-  const val = dev.dim != null ? `${dev.dim} %` : tr(ctx, dev.on ? "skin.ionic.light.on" : "skin.ionic.light.off", dev.on ? "Ein" : "Aus");
+  const val = dev.dim != null ? `${dev.dim} %` : tt(ctx, dev.on ? "skin.ionic.light.on" : "skin.ionic.light.off", dev.on ? "Ein" : "Aus");
   return h("div", { class: "vz-dialog", style: { "--acc": t.accent(dev.accent) }, "data-type": "light" }, [
     h("div", { class: "vz-dialog-bar" }),
     h("div", { class: "vz-dialog-head" }, [
@@ -48,7 +44,7 @@ export const LightDetail: Renderer = (d: Readonly<unknown>, t: Tokens, ctx: Ctx)
           class: "vz-iconbtn",
           type: "button",
           "data-action": "close",
-          "aria-label": tr(ctx, "skin.ionic.common.close", "schließen"),
+          "aria-label": tt(ctx, "skin.ionic.common.close", "schließen"),
         },
         svgIcon(ctx, dev, "x", 20),
       ),
@@ -72,32 +68,32 @@ export const LightDetail: Renderer = (d: Readonly<unknown>, t: Tokens, ctx: Ctx)
       ]),
       // Helligkeit
       h("div", {}, [
-        h("div", { class: "vz-section-h" }, tr(ctx, "skin.ionic.light.brightness", "Helligkeit")),
+        h("div", { class: "vz-section-h" }, tt(ctx, "skin.ionic.light.brightness", "Helligkeit")),
         h("ion-range", {
           value: dim,
           min: 0,
           max: 100,
           pin: true,
           "data-action": "setDim",
-          "aria-label": tr(ctx, "skin.ionic.light.brightness", "Helligkeit"),
+          "aria-label": tt(ctx, "skin.ionic.light.brightness", "Helligkeit"),
         }),
       ]),
       // Aus / Voll
       h("div", { class: "vz-action-grid" }, [
         h(
           "button",
-          { class: "vz-action", type: "button", "data-action": "setDim", "data-value": "0" },
-          tr(ctx, "skin.ionic.light.off", "Aus"),
+          { class: "vz-action", type: "button", "data-action": "setDim", "data-arg": "0" },
+          tt(ctx, "skin.ionic.light.off", "Aus"),
         ),
         h(
           "button",
-          { class: "vz-action", type: "button", "data-action": "setDim", "data-value": "100" },
-          tr(ctx, "skin.ionic.light.full", "Voll"),
+          { class: "vz-action", type: "button", "data-action": "setDim", "data-arg": "100" },
+          tt(ctx, "skin.ionic.light.full", "Voll"),
         ),
       ]),
       // Szenen-Presets
       h("div", {}, [
-        h("div", { class: "vz-section-h" }, tr(ctx, "skin.ionic.light.scenes", "Szenen")),
+        h("div", { class: "vz-section-h" }, tt(ctx, "skin.ionic.light.scenes", "Szenen")),
         h("div", { class: "vz-preset-row" }, [
           preset(ctx, "skin.ionic.light.cozy", "Gemütlich", 20),
           preset(ctx, "skin.ionic.light.read", "Lesen", 60),

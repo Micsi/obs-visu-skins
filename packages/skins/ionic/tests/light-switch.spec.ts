@@ -71,6 +71,14 @@ function hasTag(root: unknown, tag: string): boolean {
   return flatten(root).some((n) => n.type === tag);
 }
 
+/** Existiert irgendwo im Baum ein VNode mit dieser Klasse? */
+function hasClass(root: unknown, cls: string): boolean {
+  return flatten(root).some((n) => {
+    const c = n.props?.class;
+    return Array.isArray(c) ? c.includes(cls) : c === cls;
+  });
+}
+
 /** Erster Textinhalt unter einer Klasse. */
 function textOfClass(root: unknown, cls: string): string | undefined {
   const hit = flatten(root).find((n) => {
@@ -156,14 +164,16 @@ describe("SwitchTile", () => {
 /* ============================= SWITCH DETAIL ============================= */
 
 describe("SwitchDetail", () => {
-  it("renders a fan toggle + VOC chart (svg path) for every switch fixture", () => {
+  it("renders a fan toggle for every switch fixture (no fabricated telemetry)", () => {
     for (const name of Object.keys(F.switch) as (keyof typeof F.switch)[]) {
       const root = SwitchDetail(sw(name), tokens, ctx);
       expect(isVNode(root)).toBe(true);
       expect(hasTag(root, "ion-toggle")).toBe(true);
-      expect(hasTag(root, "svg")).toBe(true);
-      expect(hasTag(root, "path")).toBe(true);
       expect(actions(root)).toContain("toggle");
+      // SwitchDevice carries no VOC/history in the contract — the detail must not
+      // synthesize a chart from hard-coded demo data (the close-button icon svg is
+      // fine; the fabricated VOC chart container must be absent).
+      expect(hasClass(root, "vz-chart-box")).toBe(false);
     }
   });
 
