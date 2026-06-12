@@ -8,8 +8,12 @@
 import type { Ctx, Device, Tokens } from "@obs/visu-contract";
 
 export const tokensStub: Tokens = {
-  accent: (token) => `var(--acc-${token})`,
-  accentInk: (token) => `var(--ink-${token})`,
+  // Ionic-Palette: ionic.css definiert --vz-acc-<token> / --vz-accent-ink, nicht
+  // --acc-<token>/--ink-<token>. Die Renderer setzen den Rückgabewert als --acc auf
+  // die Kachel — damit die Wand echte Akzentfarben zeigt, müssen das die realen
+  // Ionic-Variablen sein, sonst zeigen alle akzentabhängigen Flächen Fallback/leer.
+  accent: (token) => `var(--vz-acc-${token})`,
+  accentInk: () => `var(--vz-accent-ink, var(--vz-fg))`,
   font: "Manrope",
   space: (step) => `${step * 4}px`,
 };
