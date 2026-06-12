@@ -92,4 +92,17 @@ describe("blind detail", () => {
     expect(actions(blindDetail(dev("half"), tokensStub, ctxStub()))).toContain("lock");
     expect(actions(blindDetail(dev("locked"), tokensStub, ctxStub()))).toContain("unlock");
   });
+
+  it("locked detail emits no movement intents — only unlock stays actionable", () => {
+    const v = blindDetail(dev("locked"), tokensStub, ctxStub());
+    const acts = actions(v);
+    // no movement leaks past the lock — neither slider/step/open/close nor stop
+    expect(acts).not.toContain("setPosition");
+    expect(acts).not.toContain("stop");
+    expect(acts).toContain("unlock");
+    // controls are present but disabled (slider, action-grid buttons, presets)
+    expect(find(v, "input", "vz-range")?.props?.disabled).toBe(true);
+    expect(findAll(v, "button", "vz-action").every((b) => b.props?.disabled === true)).toBe(true);
+    expect(findAll(v, "button", "vz-preset").every((b) => b.props?.disabled === true)).toBe(true);
+  });
 });

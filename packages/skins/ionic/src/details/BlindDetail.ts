@@ -43,10 +43,18 @@ function actionBtn(label: string, attrs: Record<string, unknown>, extraClass?: s
   );
 }
 
+// Gesperrt = nur Entsperren ist erlaubt; Bewegungs-Intents (setPosition/stop) dürfen die
+// Sperre nicht umgehen. Im locked-Zustand werden die Intent-Attribute weggelassen und das
+// Control disabled — die Detailfläche enforced dieselbe Sperre wie das Widget.
+function move(interactive: boolean, attrs: Record<string, unknown>): Record<string, unknown> {
+  return interactive ? attrs : { disabled: true };
+}
+
 export function blindDetail(d: Device, t: Tokens, ctx: Ctx): VNode {
   const dev = d as BlindDevice;
   const acc = t.accent(dev.accent);
   const locked = !!dev.locked;
+  const interactive = !locked;
 
   return h("div", { class: "vz-dialog", style: { "--acc": acc } }, [
     h("div", { class: "vz-dialog-bar" }),
@@ -78,31 +86,48 @@ export function blindDetail(d: Device, t: Tokens, ctx: Ctx): VNode {
           min: 0,
           max: 100,
           value: dev.position,
-          "data-action": "setPosition",
+          disabled: !interactive,
+          "data-action": interactive ? "setPosition" : undefined,
           "aria-label": tt(ctx, "skin.ionic.blind.position", "Position"),
         }),
       ),
       // Action grid
       h("div", { class: "vz-action-grid" }, [
-        actionBtn(tt(ctx, "skin.ionic.blind.stepOpen", "Schritt auf"), {
-          "data-action": "setPosition",
-          "data-arg": String(-STEP),
-          "data-relative": "1",
-        }),
-        actionBtn(tt(ctx, "skin.ionic.blind.open", "Öffnen"), {
-          "data-action": "setPosition",
-          "data-arg": "0",
-        }),
-        actionBtn(tt(ctx, "skin.ionic.blind.stop", "Stopp"), { "data-action": "stop" }, "full"),
-        actionBtn(tt(ctx, "skin.ionic.blind.stepClose", "Schritt zu"), {
-          "data-action": "setPosition",
-          "data-arg": String(STEP),
-          "data-relative": "1",
-        }),
-        actionBtn(tt(ctx, "skin.ionic.blind.close", "Schließen"), {
-          "data-action": "setPosition",
-          "data-arg": "100",
-        }),
+        actionBtn(
+          tt(ctx, "skin.ionic.blind.stepOpen", "Schritt auf"),
+          move(interactive, {
+            "data-action": "setPosition",
+            "data-arg": String(-STEP),
+            "data-relative": "1",
+          }),
+        ),
+        actionBtn(
+          tt(ctx, "skin.ionic.blind.open", "Öffnen"),
+          move(interactive, {
+            "data-action": "setPosition",
+            "data-arg": "0",
+          }),
+        ),
+        actionBtn(
+          tt(ctx, "skin.ionic.blind.stop", "Stopp"),
+          move(interactive, { "data-action": "stop" }),
+          "full",
+        ),
+        actionBtn(
+          tt(ctx, "skin.ionic.blind.stepClose", "Schritt zu"),
+          move(interactive, {
+            "data-action": "setPosition",
+            "data-arg": String(STEP),
+            "data-relative": "1",
+          }),
+        ),
+        actionBtn(
+          tt(ctx, "skin.ionic.blind.close", "Schließen"),
+          move(interactive, {
+            "data-action": "setPosition",
+            "data-arg": "100",
+          }),
+        ),
       ]),
       // Vorgabepositionen
       section(
@@ -117,8 +142,10 @@ export function blindDetail(d: Device, t: Tokens, ctx: Ctx): VNode {
                 key: p.key,
                 class: "vz-preset",
                 type: "button",
-                "data-action": "setPosition",
-                "data-arg": String(p.pos),
+                ...move(interactive, {
+                  "data-action": "setPosition",
+                  "data-arg": String(p.pos),
+                }),
               },
               tt(ctx, p.key, p.fallback),
             ),
