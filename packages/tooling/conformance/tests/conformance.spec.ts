@@ -18,21 +18,21 @@ import {
 const ionic = ionicManifest as unknown as SkinManifest;
 
 describe("generateSupport — ionic (vollständig)", () => {
-  it("meldet keine gap und deckt alle sechs Kern-Typen als supported", () => {
+  it("meldet keine gap und deckt alle acht Kern-Typen als supported", () => {
     const { report, hasGap } = generateSupport({ manifest: ionic, tiles });
 
     expect(hasGap).toBe(false);
     expect(report.skin).toBe("ionic");
-    expect(report.targetsContract).toBe("1.1");
+    expect(report.targetsContract).toBe("1.2");
 
-    // support.json deckt genau die sechs Kern-Typen ab.
+    // support.json deckt genau die acht Kern-Typen ab.
     expect(Object.keys(report.widgets).sort()).toEqual([...CORE_WIDGET_TYPES].sort());
 
-    // Alle sechs sind "full" (supported) — keiner unsupported, keine gap.
+    // Alle acht sind "full" (supported) — keiner unsupported, keine gap.
     for (const type of CORE_WIDGET_TYPES) {
       expect(report.widgets[type]?.level).toBe("full");
     }
-    expect(report.summary.full).toBe(6);
+    expect(report.summary.full).toBe(8);
     expect(report.summary.gap).toBe(0);
     expect(report.summary.unsupported).toBe(0);
   });
@@ -138,7 +138,8 @@ describe("generateSupport — gap-hart", () => {
     expect(hasGap).toBe(false);
     expect(report.widgets.sensor?.level).toBe("unsupported");
     expect(report.widgets.scene?.level).toBe("unsupported");
-    expect(report.summary.unsupported).toBe(2);
+    // camera + media + sensor + scene sind als unsupported deklariert (v1.2: 8 Kern-Typen).
+    expect(report.summary.unsupported).toBe(4);
     expect(report.summary.full).toBe(4);
   });
 });

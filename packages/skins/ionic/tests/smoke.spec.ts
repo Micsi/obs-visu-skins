@@ -29,25 +29,26 @@ function contrast(aHex: string, bHex: string): number {
 }
 
 describe("ionic skin scaffold", () => {
-  it("declares a contract-shaped manifest targeting v1.1", () => {
+  it("declares a contract-shaped manifest targeting v1.2", () => {
     const m = manifest as unknown as SkinManifest;
     expect(m.name).toBe("ionic");
-    expect(m.targetsContract).toBe("1.1");
+    expect(m.targetsContract).toBe("1.2");
     expect(m.layout.model).toBe("grid");
-    expect(m.unsupported).toContain("camera");
-    expect(m.unsupported).toContain("media");
+    // v1.2: media + camera sind jetzt unterstützt — nichts mehr unsupported.
+    expect(m.unsupported).not.toContain("camera");
+    expect(m.unsupported).not.toContain("media");
     // Kern-Typen sind im Manifest deklariert (sonst meldet der Generator gap).
     expect(Object.keys(m.widgets).sort()).toEqual(
-      ["blind", "jalousie", "light", "scene", "sensor", "switch"].sort(),
+      ["blind", "camera", "jalousie", "light", "media", "scene", "sensor", "switch"].sort(),
     );
   });
 
-  it("exposes typed renderer maps wired by the M2 renderer waves", () => {
+  it("exposes typed renderer maps wired by the renderer waves", () => {
     expect(tiles).toBeTypeOf("object");
     expect(details).toBeTypeOf("object");
-    // Alle sechs v1-Kern-Typen haben einen Kachel-Renderer.
+    // Alle acht v1.2-Kern-Typen haben einen Kachel-Renderer.
     expect(Object.keys(tiles).sort()).toEqual(
-      ["blind", "jalousie", "light", "scene", "sensor", "switch"].sort(),
+      ["blind", "camera", "jalousie", "light", "media", "scene", "sensor", "switch"].sort(),
     );
     // Detail-Flächen für die bedienbaren Typen (sensor read-only, scene one-shot).
     expect(Object.keys(details).sort()).toEqual(["blind", "jalousie", "light", "switch"].sort());

@@ -815,6 +815,164 @@ ion-content.visu-content {
   font-weight: 700;
 }
 
+/* ===========================================================================
+   MEDIA WIDGET (type 'media') — Player-Kachel: Cover · Titel · Transport · Volume
+   =========================================================================== */
+.vz-media-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.vz-media-cover {
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  object-fit: cover;
+  background: var(--vz-chip-bg);
+  border: 0.5px solid var(--vz-hairline);
+}
+.vz-media-cover--ph {
+  display: grid;
+  place-items: center;
+  color: var(--acc);
+}
+.vz-media-meta {
+  min-width: 0;
+  flex: 1;
+}
+.vz-media-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--vz-fg);
+  line-height: 1.15;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.vz-media-sub {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--vz-fg-mute);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.vz-media-transport {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+.vz-media-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  border: 0;
+  background: transparent;
+  color: var(--vz-fg-mute);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition:
+    background 0.14s,
+    color 0.14s,
+    transform 0.1s;
+}
+.vz-media-btn:hover {
+  background: var(--vz-chip-bg);
+  color: var(--vz-fg);
+}
+.vz-media-btn:active {
+  transform: scale(0.9);
+}
+.vz-media-btn--prev,
+.vz-media-prev svg {
+  transform: scaleX(-1);
+}
+.vz-media-btn--playPause {
+  background: var(--acc);
+  color: #fff;
+  box-shadow: 0 2px 8px color-mix(in oklab, var(--acc) 42%, transparent);
+}
+.vz-media-btn--playPause:hover {
+  background: var(--acc);
+  color: #fff;
+}
+.vz-media-volrow {
+  display: flex;
+  align-items: center;
+  padding: 0 2px;
+}
+.vz-media-vol {
+  margin: 4px 0;
+}
+
+/* ===========================================================================
+   CAMERA WIDGET (type 'camera') — Standbild · online-Indikator · refresh
+   =========================================================================== */
+.vz-cam-view {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  border-radius: 10px;
+  overflow: hidden;
+  background: color-mix(in oklab, var(--vz-fg) 10%, transparent);
+}
+.vz-cam-feed {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.vz-cam-placeholder {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--vz-fg-soft);
+  background: repeating-linear-gradient(
+    45deg,
+    transparent,
+    transparent 9px,
+    color-mix(in oklab, var(--vz-fg) 6%, transparent) 9px,
+    color-mix(in oklab, var(--vz-fg) 6%, transparent) 18px
+  );
+}
+.vz-cam-refresh {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  z-index: 2;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  border: 0.5px solid var(--vz-tile-border);
+  background: var(--vz-chip-bg);
+  color: var(--vz-fg);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+.vz-cam-refresh:hover {
+  background: var(--acc);
+  color: #fff;
+  border-color: transparent;
+}
+.vz-cam-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--vz-off);
+  vertical-align: middle;
+}
+.vz-cam-dot.is-online {
+  background: var(--vz-on);
+  box-shadow: 0 0 7px color-mix(in oklab, var(--vz-on) 60%, transparent);
+}
+
 /* range slider (custom control) */
 .vz-range {
   -webkit-appearance: none;

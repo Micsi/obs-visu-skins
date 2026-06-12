@@ -68,6 +68,22 @@
       },
       "scene": {
         "activate": "Szene aktivieren"
+      },
+      "media": {
+        "aria": "Medienspieler",
+        "noTitle": "Kein Titel",
+        "play": "Wiedergabe",
+        "pause": "Pause",
+        "stop": "Stopp",
+        "next": "Weiter",
+        "previous": "Zurück",
+        "volume": "Lautstärke"
+      },
+      "camera": {
+        "aria": "Kamera",
+        "online": "Live",
+        "offline": "Offline",
+        "refresh": "Aktualisieren"
       }
     }
   }
