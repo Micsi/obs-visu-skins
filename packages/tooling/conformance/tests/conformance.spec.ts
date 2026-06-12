@@ -23,7 +23,7 @@ describe("generateSupport — ionic (vollständig)", () => {
 
     expect(hasGap).toBe(false);
     expect(report.skin).toBe("ionic");
-    expect(report.targetsContract).toBe("1.2");
+    expect(report.targetsContract).toBe("1.3");
 
     // support.json deckt genau die acht Kern-Typen ab.
     expect(Object.keys(report.widgets).sort()).toEqual([...CORE_WIDGET_TYPES].sort());
