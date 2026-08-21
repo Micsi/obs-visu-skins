@@ -10,28 +10,32 @@
 import { h, type VNode } from "vue";
 import type { Ctx, LightDevice, Renderer, Tokens } from "@obs/visu-contract";
 
-/** Glühbirnen-Glyph (bulb) — color/Glow folgen dem Akzent, wenn die Lampe „an" ist. */
-function bulbGlyph(on: boolean): VNode {
+/**
+ * Glühbirnen-Glyph (bulb) — Größe/Geometrie 1:1 aus der Design-System-Vorlage
+ * (24×24, drei Pfade). Farbe/Glow steuert allein die CSS (`.vz-bulb` bzw.
+ * `.vz-tile.is-on .vz-bulb`); der Renderer setzt kein Inline-Styling — der
+ * `is-on`-Zustand kommt über die Kachel-Klasse (Goldene Regel: kein State im Skin).
+ */
+function bulbGlyph(): VNode {
   return h(
     "svg",
     {
       class: "vz-bulb",
-      width: 26,
-      height: 26,
+      width: 24,
+      height: 24,
       viewBox: "0 0 24 24",
       fill: "none",
+      stroke: "currentColor",
+      "stroke-width": 1.6,
+      "stroke-linecap": "round",
+      "stroke-linejoin": "round",
       "aria-hidden": "true",
     },
     [
+      h("path", { d: "M9 18h6" }),
+      h("path", { d: "M10 21h4" }),
       h("path", {
-        d: "M9 18h6M10 21h4M12 3a6 6 0 0 0-3.6 10.8c.6.45 1 1.15 1.1 1.9l.1.8h4.8l.1-.8c.1-.75.5-1.45 1.1-1.9A6 6 0 0 0 12 3Z",
-        stroke: "currentColor",
-        "stroke-width": 1.6,
-        "stroke-linecap": "round",
-        "stroke-linejoin": "round",
-        style: on
-          ? "color:var(--acc);filter:drop-shadow(0 0 10px var(--acc))"
-          : "color:var(--vz-fg-mute)",
+        d: "M12 3a6 6 0 0 0-3.5 10.9c.8.6 1.5 1.5 1.5 2.5v.6h4v-.6c0-1 .7-1.9 1.5-2.5A6 6 0 0 0 12 3z",
       }),
     ],
   );
@@ -43,7 +47,7 @@ export const LightTile: Renderer = (d: Readonly<unknown>, t: Tokens, ctx: Ctx): 
     "div",
     {
       class: ["vz-tile", dev.on && "is-on"].filter(Boolean),
-      style: { "--acc": t.accent(dev.accent) },
+      style: { "--acc": t.accent(dev.accent), "--acc-bar": `var(--vz-acc-${dev.accent})` },
       "data-type": "light",
       "data-action": "toggle",
       role: "button",
@@ -54,7 +58,7 @@ export const LightTile: Renderer = (d: Readonly<unknown>, t: Tokens, ctx: Ctx): 
     [
       h("div", { class: "vz-eyebrow" }, dev.room),
       h("div", { class: "vz-label chip" }, ctx.hyphenate(dev.label)),
-      h("div", { class: "vz-tile-body" }, [bulbGlyph(dev.on)]),
+      h("div", { class: "vz-tile-body" }, [bulbGlyph()]),
       h("div", { class: "vz-tile-foot" }, ctx.stateText(dev)),
     ],
   );

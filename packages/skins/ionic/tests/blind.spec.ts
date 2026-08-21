@@ -32,16 +32,15 @@ describe("blind tile", () => {
     expect(text(find(v, "div", "vz-tile-foot"))).toContain("Teil");
   });
 
-  it("offers full open/close (setPosition 0/100, absolute) on the tile when unlocked", () => {
+  it("is a pure display tile (Vorlage): glyph + foot, opens the detail, no on-tile stepper", () => {
     const v = blindTile(dev("half"), tokensStub, ctxStub());
-    const chevs = findAll(v, "button", "vz-chev");
-    expect(chevs).toHaveLength(2);
-    const args = chevs.map((b) => b.props?.["data-arg"]);
-    expect(args).toContain("0"); // ganz auf
-    expect(args).toContain("100"); // ganz zu
-    // full-open/close is absolute, not a relative step (fine ±-stepping is in the detail)
-    expect(chevs.every((b) => b.props?.["data-relative"] === undefined)).toBe(true);
-    expect(actions(v)).toContain("setPosition");
+    // Design-System-Vorlage „Rollladen (Slider, Lock)": keine Chevron-Stepper auf
+    // der Kachel — der Rollladen-Glyph zeigt die Position, Bedienung liegt im Detail.
+    expect(findAll(v, "button", "vz-chev")).toHaveLength(0);
+    expect(find(v, "svg", "vz-blind-svg")).toBeDefined();
+    // Tap/Long-press öffnet das Detail; keine Ganzfahrt-/setPosition-Intents auf der Kachel.
+    expect(v.props?.["data-action"]).toBe("openDetail");
+    expect(actions(v)).not.toContain("setPosition");
   });
 
   it("open=Offen, locked=Zu in the foot label", () => {
@@ -53,12 +52,13 @@ describe("blind tile", () => {
     ).toContain("Zu");
   });
 
-  it("locked blocks operation: buttons disabled, no setPosition intent, lock veil shown", () => {
+  it("locked shows lock icon + veil but still opens the detail (where unlock lives)", () => {
     const v = blindTile(dev("locked"), tokensStub, ctxStub());
     expect(classOf(v)).toContain("locked");
     expect(find(v, "span", "vz-lockveil")).toBeDefined();
-    const chevs = findAll(v, "button", "vz-chev");
-    expect(chevs.every((b) => b.props?.disabled === true)).toBe(true);
+    expect(find(v, "span", "vz-lock")).toBeDefined();
+    // openDetail bleibt erreichbar (Detail entsperrt), aber kein Bewegungs-Intent leakt.
+    expect(actions(v)).toContain("openDetail");
     expect(actions(v)).not.toContain("setPosition");
   });
 

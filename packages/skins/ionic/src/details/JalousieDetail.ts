@@ -88,7 +88,7 @@ export function jalousieDetail(d: Device, t: Tokens, ctx: Ctx): VNode {
     );
   }
 
-  // Öffnen / Schließen
+  // Öffnen / Schließen — Icon + Label wie im Rollladen-Detail (Design-System-Parität).
   body.push(
     h("div", { class: "vz-action-grid" }, [
       h(
@@ -100,7 +100,7 @@ export function jalousieDetail(d: Device, t: Tokens, ctx: Ctx): VNode {
           "data-action": interactive ? "setPosition" : undefined,
           "data-arg": interactive ? "0" : undefined,
         },
-        tt(ctx, "skin.ionic.jalousie.open", "Öffnen"),
+        [svgIcon(ctx, dev, "chev-uu", 18), tt(ctx, "skin.ionic.jalousie.open", "Öffnen")],
       ),
       h(
         "button",
@@ -111,7 +111,7 @@ export function jalousieDetail(d: Device, t: Tokens, ctx: Ctx): VNode {
           "data-action": interactive ? "setPosition" : undefined,
           "data-arg": interactive ? "100" : undefined,
         },
-        tt(ctx, "skin.ionic.jalousie.close", "Schließen"),
+        [svgIcon(ctx, dev, "chev-dd", 18), tt(ctx, "skin.ionic.jalousie.close", "Schließen")],
       ),
     ]),
   );

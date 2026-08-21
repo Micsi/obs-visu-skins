@@ -24,7 +24,7 @@ export const SensorTile: Renderer = (d: Device, t: Tokens, ctx: Ctx): VNode => {
 
   const body = h("div", { class: "vz-val", "data-fit": "" }, [
     h("span", { class: "vz-num l" }, ctx.nf(dev.value)),
-    h("span", { class: "vz-unit" }, dev.unit),
+    h("span", { class: "vz-unit lg" }, dev.unit),
   ]);
 
   const foot = dev.status
@@ -37,7 +37,7 @@ export const SensorTile: Renderer = (d: Device, t: Tokens, ctx: Ctx): VNode => {
     "div",
     {
       class: ["vz-tile", "vz-tile--sensor", warn && "is-warn"].filter(Boolean),
-      style: { "--acc": t.accent(dev.accent) },
+      style: { "--acc": t.accent(dev.accent), "--acc-bar": `var(--vz-acc-${dev.accent})` },
       role: "group",
       "aria-label": tr(ctx, "skin.ionic.sensor.aria", "Sensor"),
     },

@@ -2,12 +2,12 @@
 //
 // Pure Renderer: (d, t, ctx) => VNode. Golden rules — the skin owns no state and
 // never writes `d.x`; operation is offered exclusively via host intents carried on
-// `data-action` (+ `data-arg`). Port of reference/vue-ionic widgets.js (blind arm).
-//
-// Layout: eyebrow (room) · label · body = chevron stepper ±20 around the blind
-// glyph (chev-down = schließen/+20, chev-up = öffnen/−20) · foot = position % and
-// Offen/Zu/Teil. `locked` blocks operation in the widget (buttons disabled + lock
-// veil); unlock happens only on the detail surface.
+// `data-action`. Quelle: Design-System-Vorlage (Widget-Bibliothek → „Rollladen
+// (Slider, Lock)"): die Kachel ist rein anzeigend — eyebrow (room) · label · body =
+// Rollladen-Glyph (Shade-Füllung ∝ position) · foot = position % und Offen/Zu/Teil.
+// Alle Bedienelemente (Slider, Schritt/Öffnen/Schließen, Sperre) leben im Detail;
+// die Kachel öffnet es via data-action="openDetail" (Long-press bzw. Tap). `locked`
+// zeigt Schloss-Icon + Sperr-Schraffur; entsperrt wird nur auf der Detailfläche.
 
 import { h, type VNode } from "vue";
 import type { BlindDevice, Ctx, Device, Tokens } from "@obs/visu-contract";
@@ -32,38 +32,7 @@ export function blindTile(d: Device, t: Tokens, ctx: Ctx): VNode {
   children.push(
     h("div", { class: "vz-eyebrow" }, dev.room),
     h("div", { class: "vz-label chip" }, ctx.hyphenate(dev.label)),
-    h("div", { class: "vz-tile-body" }, [
-      h("div", { class: "vz-blind-ctl" }, [
-        // Doppel-Chevron unten = ganz schließen (setPosition 100/zu). Ganzfahrt auf
-        // der Kachel; die ±-Feinschritte leben im Detail (Schritt auf/zu).
-        h(
-          "button",
-          {
-            class: "vz-chev",
-            type: "button",
-            disabled: locked,
-            "data-action": locked ? undefined : "setPosition",
-            "data-arg": locked ? undefined : "100",
-            "aria-label": tt(ctx, "skin.ionic.blind.close", "schließen"),
-          },
-          svgIcon(ctx, dev, "chev-dd", 17),
-        ),
-        blindGlyph({ position: dev.position, w: 44, h: 34 }),
-        // Doppel-Chevron oben = ganz öffnen (setPosition 0/auf).
-        h(
-          "button",
-          {
-            class: "vz-chev",
-            type: "button",
-            disabled: locked,
-            "data-action": locked ? undefined : "setPosition",
-            "data-arg": locked ? undefined : "0",
-            "aria-label": tt(ctx, "skin.ionic.blind.open", "öffnen"),
-          },
-          svgIcon(ctx, dev, "chev-uu", 17),
-        ),
-      ]),
-    ]),
+    h("div", { class: "vz-tile-body" }, [blindGlyph({ position: dev.position, w: 44, h: 34 })]),
     h("div", { class: "vz-tile-foot" }, [
       h("b", null, String(dev.position)),
       h("span", { class: "vz-unit" }, "%"),
@@ -75,7 +44,13 @@ export function blindTile(d: Device, t: Tokens, ctx: Ctx): VNode {
     "div",
     {
       class: ["vz-tile", "blind", locked && "locked"].filter(Boolean),
-      style: { "--acc": acc },
+      style: { "--acc": acc, "--acc-bar": `var(--vz-acc-${dev.accent})` },
+      // Anzeige-Kachel: Tap/Long-press öffnet das Detail (auch gesperrt — dort wird
+      // entsperrt). Kein setPosition auf der Kachel (Ganzfahrt lebt im Detail).
+      "data-action": "openDetail",
+      role: "button",
+      tabindex: 0,
+      "aria-label": dev.label,
     },
     children,
   );

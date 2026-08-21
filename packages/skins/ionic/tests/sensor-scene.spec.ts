@@ -50,7 +50,8 @@ function findByProp(root: unknown, key: string, value?: string): VNode | undefin
 const sensorFx = fixtures.sensor as Record<"ok" | "warn", Omit<SensorDevice, "type">>;
 const sceneFx = fixtures.scene as Record<"film" | "morgen", Omit<SceneDevice, "type">>;
 
-const asSensor = (raw: Omit<SensorDevice, "type">): Device => ({ type: "sensor", ...raw }) as Device;
+const asSensor = (raw: Omit<SensorDevice, "type">): Device =>
+  ({ type: "sensor", ...raw }) as Device;
 const asScene = (raw: Omit<SceneDevice, "type">): Device => ({ type: "scene", ...raw }) as Device;
 
 describe("ionic sensor tile (I4 #7) — reine Anzeige", () => {
@@ -66,19 +67,25 @@ describe("ionic sensor tile (I4 #7) — reine Anzeige", () => {
     const num = all.find((n) => (n.props as Record<string, unknown>)?.class === "vz-num l");
     expect(num?.children).toBe("20.4");
 
-    const unit = all.find((n) => (n.props as Record<string, unknown>)?.class === "vz-unit");
+    const unit = all.find((n) => (n.props as Record<string, unknown>)?.class === "vz-unit lg");
     expect(unit?.children).toBe("°C");
   });
 
   it("formatiert den Wert über ctx.nf", () => {
     const nf = (v: number | string) => `NF(${v})`;
     const vnode = SensorTile(asSensor(sensorFx.warn), tokens, makeCtx({ nf })) as VNode;
-    const num = flatten(vnode).find((n) => (n.props as Record<string, unknown>)?.class === "vz-num l");
+    const num = flatten(vnode).find(
+      (n) => (n.props as Record<string, unknown>)?.class === "vz-num l",
+    );
     expect(num?.children).toBe("NF(287)");
   });
 
   it("zeigt den Status-Fuß und markiert erhöhte Werte über ctx.warn (is-warn)", () => {
-    const vnode = SensorTile(asSensor(sensorFx.warn), tokens, makeCtx({ warn: () => true })) as VNode;
+    const vnode = SensorTile(
+      asSensor(sensorFx.warn),
+      tokens,
+      makeCtx({ warn: () => true }),
+    ) as VNode;
     const cls = vnode.props?.class as unknown[];
     expect(cls).toContain("is-warn");
 
@@ -102,7 +109,9 @@ describe("ionic scene tile (I4 #7) — Icon-Slot + activateScene", () => {
     const vnode = SceneTile(asScene(sceneFx.film), tokens, makeCtx()) as VNode;
     expect(isVNode(vnode)).toBe(true);
 
-    const icon = flatten(vnode).find((n) => (n.props as Record<string, unknown>)?.class === "vz-scene-icon");
+    const icon = flatten(vnode).find(
+      (n) => (n.props as Record<string, unknown>)?.class === "vz-scene-icon",
+    );
     expect(icon).toBeDefined();
     // The icon body is injected as <svg> innerHTML (not a raw text child — that
     // was the "<polyline …" leak). The ctx.icon stub returns the slot; the film
@@ -110,7 +119,9 @@ describe("ionic scene tile (I4 #7) — Icon-Slot + activateScene", () => {
     const svg = flatten(vnode).find((n) => n.type === "svg");
     expect((svg?.props as Record<string, unknown>)?.innerHTML).toBe("sparkle");
 
-    const sub = flatten(vnode).find((n) => (n.props as Record<string, unknown>)?.class === "vz-sub");
+    const sub = flatten(vnode).find(
+      (n) => (n.props as Record<string, unknown>)?.class === "vz-sub",
+    );
     expect(sub?.children).toBe("Licht · Rollladen · TV");
   });
 
@@ -125,7 +136,11 @@ describe("ionic scene tile (I4 #7) — Icon-Slot + activateScene", () => {
   it("löst Locale-Keys über ctx.t auf, mit Fallback wenn ctx.t fehlt", () => {
     // The accessible name names the scene (room · label) so multiple scene tiles do
     // not collapse to the same a11y label; the action verb still comes from ctx.t.
-    const withT = SceneTile(asScene(sceneFx.film), tokens, makeCtx({ t: (k) => `T:${k}` })) as VNode;
+    const withT = SceneTile(
+      asScene(sceneFx.film),
+      tokens,
+      makeCtx({ t: (k) => `T:${k}` }),
+    ) as VNode;
     expect((withT.props as Record<string, unknown>)["aria-label"]).toBe(
       "T:skin.ionic.scene.activate: Szenen · Filmabend",
     );

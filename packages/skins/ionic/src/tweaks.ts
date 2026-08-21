@@ -65,7 +65,7 @@ export interface IonicTweaks {
  */
 export const TWEAK_DEFAULTS = {
   stil: "glass",
-  accentStyle: "glow",
+  accentStyle: "bar",
   theme: "image",
   glassBlur: 22,
   tileAlpha: 0.55,

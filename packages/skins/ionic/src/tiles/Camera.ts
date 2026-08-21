@@ -40,7 +40,7 @@ export const CameraTile: Renderer = (d: Device, t: Tokens, ctx: Ctx): VNode => {
     "div",
     {
       class: ["vz-tile", "vz-tile--camera", dev.online && "is-online"].filter(Boolean),
-      style: { "--acc": acc },
+      style: { "--acc": acc, "--acc-bar": `var(--vz-acc-${dev.accent})` },
       role: "group",
       "aria-label": `${tt(ctx, "skin.ionic.camera.aria", "Kamera")}: ${[dev.room, dev.label].filter(Boolean).join(" · ")}`,
     },

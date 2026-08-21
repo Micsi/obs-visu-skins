@@ -142,22 +142,45 @@ describe("LightDetail", () => {
 
 /* ============================== SWITCH TILE =============================== */
 
+/** Klassen-Tokens eines VNode (Vue normalisiert Klassen-Arrays zu Strings). */
+function classTokens(n: VNode | undefined): string[] {
+  const c = n?.props?.class;
+  if (typeof c === "string") return c.split(/\s+/).filter(Boolean);
+  if (Array.isArray(c)) return c.filter((x): x is string => typeof x === "string");
+  return [];
+}
+/** Erster VNode, dessen Klassen-Tokens `cls` enthalten. */
+function nodeOfClass(root: unknown, cls: string): VNode | undefined {
+  return flatten(root).find((n) => classTokens(n).includes(cls));
+}
+
 describe("SwitchTile", () => {
-  it("renders a real ion-toggle for every switch fixture", () => {
+  it("renders a CSS vz-toggle stellelement (no ion-toggle) for every switch fixture", () => {
     for (const name of Object.keys(F.switch) as (keyof typeof F.switch)[]) {
       const vnode = SwitchTile(sw(name), tokens, ctx);
       expect(isVNode(vnode)).toBe(true);
-      expect(hasTag(vnode, "ion-toggle")).toBe(true);
+      // Design-System-Vorlage nutzt das CSS-gezeichnete .vz-toggle, nicht ion-toggle.
+      expect(nodeOfClass(vnode, "vz-toggle")).toBeDefined();
+      expect(hasTag(vnode, "ion-toggle")).toBe(false);
       expect(textOfClass(vnode, "vz-tile-foot")).toBe(ctx.stateText(sw(name)));
     }
   });
 
-  it("toggle reflects on-state and carries the canonical action", () => {
-    const onTile = SwitchTile(sw("on"), tokens, ctx);
-    const toggle = flatten(onTile).find((n) => n.type === "ion-toggle");
-    expect(toggle?.props?.checked).toBe(true);
-    expect(toggle?.props?.["data-action"]).toBe("toggle");
+  it("toggle reflects on-state and the tile carries the canonical action", () => {
+    const onTile = SwitchTile(sw("on"), tokens, ctx) as VNode;
+    const onToggle = nodeOfClass(onTile, "vz-toggle");
+    expect(classTokens(onToggle)).toContain("on");
+    expect(onToggle?.props?.["aria-checked"]).toBe("true");
+    expect(classTokens(onTile)).toContain("is-on");
+    expect(onTile.props?.["aria-pressed"]).toBe("true");
+    // Kanonische Aktion sitzt am Kachel-Wrapper (Button), Toggle ist dekorativ.
     expect(actions(onTile)).toContain("toggle");
+
+    const offTile = SwitchTile(sw("off"), tokens, ctx) as VNode;
+    const offToggle = nodeOfClass(offTile, "vz-toggle");
+    expect(classTokens(offToggle)).not.toContain("on");
+    expect(offToggle?.props?.["aria-checked"]).toBe("false");
+    expect(offTile.props?.["aria-pressed"]).toBe("false");
   });
 });
 

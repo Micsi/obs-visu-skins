@@ -390,7 +390,11 @@ ion-content.visu-content {
   right: 0;
   top: 0;
   height: var(--vz-bar-h);
-  background: var(--acc);
+  /* Vivid accent (raw palette base) runs ONLY into this decorative 4px bar,
+     which is contrast-exempt (WCAG 1.4.11 excludes purely decorative surfaces).
+     Text/icon/values keep the AA-derived --acc. --acc-bar is set per tile to
+     var(--vz-acc-<key>); the AA --acc is the fallback if a tile omits it. */
+  background: var(--acc-bar, var(--acc));
   border-top-left-radius: inherit;
   border-top-right-radius: inherit;
 }
@@ -708,9 +712,6 @@ ion-content.visu-content {
     color-mix(in oklab, var(--vz-fg) 7%, transparent) 18px
   );
 }
-.vz-tile.locked .vz-blind-ctl {
-  opacity: 0.5;
-}
 .vz-tile.locked .vz-tile-body,
 .vz-tile.locked .vz-tile-foot {
   opacity: 0.7;
@@ -734,38 +735,6 @@ ion-content.visu-content {
   color: var(--vz-fg-mute);
 }
 
-/* blind chevrons row */
-.vz-blind-ctl {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  gap: 2px;
-}
-.vz-chev {
-  flex-shrink: 0;
-  width: 30px;
-  height: 30px;
-  border-radius: 8px;
-  border: 0;
-  background: transparent;
-  color: var(--vz-fg-mute);
-  display: grid;
-  place-items: center;
-  cursor: pointer;
-  transition:
-    background 0.14s,
-    color 0.14s,
-    transform 0.1s;
-}
-.vz-chev:hover {
-  background: var(--vz-chip-bg);
-  color: var(--vz-fg);
-}
-.vz-chev:active {
-  transform: scale(0.86);
-}
-
 /* big numbers + auto-fitting value groups (sensor) */
 .vz-num {
   font-weight: 600;
@@ -776,10 +745,10 @@ ion-content.visu-content {
   white-space: nowrap;
 }
 .vz-num.l {
-  font-size: 23px;
+  font-size: var(--vz-fs-num-l);
 }
 .vz-num.xl {
-  font-size: 33px;
+  font-size: var(--vz-fs-num-xl);
 }
 .vz-unit {
   color: var(--vz-fg-mute);
@@ -1726,6 +1695,26 @@ ion-content.visu-content {
 .vz-preset:active {
   background: color-mix(in oklab, var(--acc, var(--vz-accent)) 14%, var(--vz-tile-bg-strong));
 }
+
+/* Light-Detail: zentrierter Kopf wie in der Design-System-Vorlage
+   (Breadcrumb links · Titel + Wert zentriert · Schließen rechts).
+   Nur auf den Licht-Dialog beschränkt (data-type="light"), damit die übrigen
+   Detail-Renderer ihren linksbündigen Standardkopf behalten. */
+.vz-dialog[data-type="light"] .vz-dialog-head {
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+}
+.vz-dialog[data-type="light"] .vz-dialog-crumb {
+  margin-bottom: 0;
+}
+.vz-dialog[data-type="light"] .vz-light-titlewrap {
+  text-align: center;
+  min-width: 0;
+}
+.vz-dialog[data-type="light"] .vz-dialog-val {
+  margin-top: 4px;
+}
+
 .vz-lockrow {
   display: flex;
   align-items: center;
