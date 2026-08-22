@@ -22,6 +22,7 @@ const tokens: Tokens = {
 /** Minimaler Ctx-Stub — nf/warn/icon/hyphenate; ctx.t optional (hier weggelassen ⇒ Fallback). */
 const makeCtx = (over: Partial<Ctx> = {}): Ctx => ({
   stateText: () => "",
+  stateParts: () => ({ word: "", rest: "" }),
   hyphenate: (s) => s,
   icon: (_d, slot) => slot,
   nf: (v) => String(v),
@@ -81,11 +82,10 @@ describe("ionic sensor tile (I4 #7) — reine Anzeige", () => {
   });
 
   it("zeigt den Status-Fuß und markiert erhöhte Werte über ctx.warn (is-warn)", () => {
-    const vnode = SensorTile(
-      asSensor(sensorFx.warn),
-      tokens,
-      makeCtx({ warn: () => true }),
-    ) as VNode;
+    // Plain-Ausprägung (weder series noch icon) → zentrierter Wert mit Status-Fuß.
+    const plain = { ...sensorFx.warn, status: "erhöht" } as Omit<SensorDevice, "type">;
+    delete (plain as { series?: unknown }).series;
+    const vnode = SensorTile(asSensor(plain), tokens, makeCtx({ warn: () => true })) as VNode;
     const cls = vnode.props?.class as unknown[];
     expect(cls).toContain("is-warn");
 
@@ -101,6 +101,69 @@ describe("ionic sensor tile (I4 #7) — reine Anzeige", () => {
   it("ist reine Anzeige: KEINE data-action irgendwo (Goldene Regel — actions [])", () => {
     const vnode = SensorTile(asSensor(sensorFx.ok), tokens, makeCtx()) as VNode;
     expect(findByProp(vnode, "data-action")).toBeUndefined();
+  });
+});
+
+/** Textinhalt (alle String-Kinder) unter einem Knoten einsammeln. */
+function textAll(node: unknown): string {
+  const parts: string[] = [];
+  const walk = (n: unknown): void => {
+    if (typeof n === "string") parts.push(n);
+    else if (Array.isArray(n)) n.forEach(walk);
+    else if (isVNode(n)) walk((n as VNode).children);
+  };
+  walk(node);
+  return parts.join("");
+}
+function classTokensOf(n: VNode | undefined): string[] {
+  const c = (n?.props as Record<string, unknown>)?.class;
+  if (typeof c === "string") return c.split(/\s+/).filter(Boolean);
+  if (Array.isArray(c)) return c.filter((x): x is string => typeof x === "string");
+  return [];
+}
+function firstOfClass(root: VNode, cls: string): VNode | undefined {
+  return flatten(root).find((n) => classTokensOf(n).includes(cls));
+}
+
+describe("ionic sensor tile (v1.4) — Verlauf/Chart bei SensorDevice.series", () => {
+  it("rendert eine SVG-Sparkline (Linie + Fläche) für die series-Fixture", () => {
+    const vnode = SensorTile(asSensor(sensorFx.warn), tokens, makeCtx()) as VNode;
+    expect(classTokensOf(vnode)).toContain("vz-tile--chart");
+    const line = firstOfClass(vnode, "vz-spark-line");
+    const area = firstOfClass(vnode, "vz-spark-area");
+    expect(line).toBeDefined();
+    expect(area).toBeDefined();
+    // Der Linienpfad beginnt mit einem Move und enthält Punkte aus der Reihe.
+    expect(String((line?.props as Record<string, unknown>)?.d)).toMatch(/^M[\d.]+,[\d.]+/);
+    // Die Fläche schließt zur Grundlinie (…Z).
+    expect(String((area?.props as Record<string, unknown>)?.d)).toMatch(/Z$/);
+  });
+
+  it("zeigt den Fuß „min … · max … {unit}“ aus min/max der Reihe", () => {
+    const vnode = SensorTile(asSensor(sensorFx.warn), tokens, makeCtx()) as VNode;
+    const foot = firstOfClass(vnode, "vz-tile-foot");
+    expect(textAll(foot)).toBe("min 46 · max 288 ppm");
+  });
+
+  it("bleibt reine Anzeige (keine data-action) auch im Chart", () => {
+    const vnode = SensorTile(asSensor(sensorFx.warn), tokens, makeCtx()) as VNode;
+    expect(findByProp(vnode, "data-action")).toBeUndefined();
+  });
+});
+
+describe("ionic sensor tile (v1.4) — Akzent-Icon bei SensorDevice.icon", () => {
+  it("rendert das Akzent-Icon (ctx.icon) neben dem Wert", () => {
+    // ok-Fixture trägt icon:'cloud' und keine series → Icon-Ausprägung.
+    const vnode = SensorTile(asSensor(sensorFx.ok), tokens, makeCtx()) as VNode;
+    expect(classTokensOf(vnode)).toContain("vz-tile--sensor-icon");
+    const iconWrap = firstOfClass(vnode, "vz-sensor-icon");
+    expect(iconWrap).toBeDefined();
+    const svg = flatten(vnode).find((n) => n.type === "svg");
+    // Der ctx.icon-Stub liefert den Slot; die ok-Fixture nutzt 'cloud'.
+    expect((svg?.props as Record<string, unknown>)?.innerHTML).toBe("cloud");
+    // Wert + Einheit bleiben erhalten.
+    const num = firstOfClass(vnode, "vz-num");
+    expect(num?.children).toBe("20.4");
   });
 });
 

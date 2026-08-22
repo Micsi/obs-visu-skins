@@ -27,6 +27,7 @@ const ctx: Ctx = {
     if (d.type === "switch") return d.on ? "An" : "Aus";
     return "";
   },
+  stateParts: (d) => ({ word: ctx.stateText(d), rest: "" }),
   hyphenate: (s) => s,
   icon: (_d, slot) => slot,
   nf: (v) => String(v),

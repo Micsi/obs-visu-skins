@@ -64,7 +64,22 @@
         "posPartial": "Partial"
       },
       "sensor": {
-        "aria": "Sensor"
+        "aria": "Sensor",
+        "min": "min",
+        "max": "max"
+      },
+      "climate": {
+        "setpoint": "Target temperature",
+        "setpointShort": "Set",
+        "current": "Now",
+        "lower": "cooler",
+        "raise": "warmer",
+        "mode": {
+          "heat": "Heating",
+          "cool": "Cooling",
+          "off": "Off",
+          "auto": "Auto"
+        }
       },
       "scene": {
         "activate": "Activate scene"

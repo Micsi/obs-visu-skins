@@ -784,6 +784,139 @@ ion-content.visu-content {
   font-weight: 700;
 }
 
+/* Sensor mit Akzent-Icon (SensorDevice.icon: Wetter=Wolke, Strom=Blitz) — Icon
+   und Wert in einer Zeile, das Icon trägt als einzige Fläche den vollen Akzent. */
+.vz-sensor-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  width: 100%;
+}
+.vz-sensor-icon {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  color: var(--acc);
+}
+
+/* Sensor-Verlauf/Chart (2×2, SensorDevice.series) — Wert oben links, darunter die
+   Sparkline; der Fuß nennt „min … · max … {unit}“. */
+.vz-chart-body {
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: 4px;
+}
+.vz-val--lead {
+  align-self: flex-start;
+}
+.vz-spark {
+  display: block;
+  width: 100%;
+  margin-top: 2px;
+}
+.vz-spark-line {
+  fill: none;
+  stroke: var(--acc);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.vz-spark-area {
+  fill: var(--acc);
+  /* Reine Deko-Fläche (WCAG 1.4.11-exempt): getönter Verlauf unter der Linie. */
+  opacity: 0.12;
+  stroke: none;
+}
+
+/* ===========================================================================
+   CLIMATE WIDGET (type 'climate', v1.4) — Kachel: SOLL-Zahl + Caption · foot=stateText
+   =========================================================================== */
+.vz-climate-set {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+.vz-climate-num {
+  font-size: var(--vz-fs-num-xl);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--vz-fg);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.vz-climate-unit {
+  font-size: 18px;
+  color: var(--vz-fg-mute);
+  font-weight: 500;
+}
+.vz-climate-soll {
+  color: var(--acc);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+/* Climate-Detail: Sollwert-Stepper (−/+) + große SOLL-Zahl, Ist/Modus-Infozeile. */
+.vz-stepper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 22px;
+  margin: 6px 0 10px;
+}
+.vz-step-btn {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--vz-chip-bg);
+  border: 0.5px solid var(--vz-hairline);
+  color: var(--vz-fg);
+  cursor: pointer;
+}
+.vz-step-btn:active {
+  transform: scale(0.94);
+}
+.vz-stepper-val {
+  display: flex;
+  align-items: baseline;
+  gap: 3px;
+  min-width: 120px;
+  justify-content: center;
+}
+.vz-stepper-num {
+  font-size: var(--vz-fs-num-xl);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--vz-fg);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.vz-stepper-unit {
+  font-size: 18px;
+  color: var(--vz-fg-mute);
+  font-weight: 500;
+}
+.vz-climate-info {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 14px;
+  color: var(--vz-fg-mute);
+  font-size: 13px;
+}
+.vz-climate-info b {
+  color: var(--vz-fg);
+  font-weight: 700;
+}
+.vz-climate-mode {
+  color: var(--acc);
+  font-weight: 700;
+}
+
 /* ===========================================================================
    MEDIA WIDGET (type 'media') — Player-Kachel: Cover · Titel · Transport · Volume
    =========================================================================== */

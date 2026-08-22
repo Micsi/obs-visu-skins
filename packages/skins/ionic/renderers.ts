@@ -20,11 +20,13 @@ import { SensorTile } from "./src/tiles/Sensor.js";
 import { SceneTile } from "./src/tiles/Scene.js";
 import { MediaTile } from "./src/tiles/Media.js";
 import { CameraTile } from "./src/tiles/Camera.js";
+import { climateTile } from "./src/tiles/ClimateTile.js";
 
 import { LightDetail } from "./src/details/LightDetail.js";
 import { SwitchDetail } from "./src/details/SwitchDetail.js";
 import { blindDetail } from "./src/details/BlindDetail.js";
 import { jalousieDetail } from "./src/details/JalousieDetail.js";
+import { climateDetail } from "./src/details/ClimateDetail.js";
 
 /** Welche Kern-Typen der Ionic-Skin rendert (Spiegel von manifest.json → widgets). */
 export type IonicWidgetType = CoreWidgetType;
@@ -46,12 +48,13 @@ export const tiles: RendererMap = {
   scene: SceneTile,
   media: MediaTile,
   camera: CameraTile,
+  climate: climateTile,
 };
 
 /**
  * Detail-Flächen-Renderer je Kern-Typ (optional; fehlt das Detail, reicht der Host
  * ein generisches Default-Detail nach — ARCHITECTURE.md §6).
- * Vorhanden für die bedienbaren Typen: light · switch · blind · jalousie.
+ * Vorhanden für die bedienbaren Typen: light · switch · blind · jalousie · climate.
  * sensor (read-only) und scene (one-shot) brauchen keine Detail-Fläche.
  */
 export const details: RendererMap = {
@@ -59,6 +62,7 @@ export const details: RendererMap = {
   switch: SwitchDetail,
   blind: blindDetail,
   jalousie: jalousieDetail,
+  climate: climateDetail,
 };
 
 // Tweaks-Verdrahtung: Root-Attribute/Style aus Daten-Tweaks (Daten=JSON, Verhalten=Code).

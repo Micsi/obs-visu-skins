@@ -29,29 +29,53 @@ function contrast(aHex: string, bHex: string): number {
 }
 
 describe("ionic skin scaffold", () => {
-  it("declares a contract-shaped manifest targeting v1.3", () => {
+  it("declares a contract-shaped manifest targeting v1.4", () => {
     const m = manifest as unknown as SkinManifest;
     expect(m.name).toBe("ionic");
-    expect(m.targetsContract).toBe("1.3");
+    expect(m.targetsContract).toBe("1.4");
     expect(m.layout.model).toBe("grid");
     // v1.2: media + camera sind jetzt unterstützt — nichts mehr unsupported.
     expect(m.unsupported).not.toContain("camera");
     expect(m.unsupported).not.toContain("media");
-    // Kern-Typen sind im Manifest deklariert (sonst meldet der Generator gap).
+    // Kern-Typen sind im Manifest deklariert (sonst meldet der Generator gap);
+    // v1.4 ergänzt climate.
     expect(Object.keys(m.widgets).sort()).toEqual(
-      ["blind", "camera", "jalousie", "light", "media", "scene", "sensor", "switch"].sort(),
+      [
+        "blind",
+        "camera",
+        "climate",
+        "jalousie",
+        "light",
+        "media",
+        "scene",
+        "sensor",
+        "switch",
+      ].sort(),
     );
   });
 
   it("exposes typed renderer maps wired by the renderer waves", () => {
     expect(tiles).toBeTypeOf("object");
     expect(details).toBeTypeOf("object");
-    // Alle acht v1.2-Kern-Typen haben einen Kachel-Renderer.
+    // Alle neun v1.4-Kern-Typen (v1.2 + climate) haben einen Kachel-Renderer.
     expect(Object.keys(tiles).sort()).toEqual(
-      ["blind", "camera", "jalousie", "light", "media", "scene", "sensor", "switch"].sort(),
+      [
+        "blind",
+        "camera",
+        "climate",
+        "jalousie",
+        "light",
+        "media",
+        "scene",
+        "sensor",
+        "switch",
+      ].sort(),
     );
-    // Detail-Flächen für die bedienbaren Typen (sensor read-only, scene one-shot).
-    expect(Object.keys(details).sort()).toEqual(["blind", "jalousie", "light", "switch"].sort());
+    // Detail-Flächen für die bedienbaren Typen (sensor read-only, scene one-shot);
+    // v1.4 ergänzt climate (Sollwert-Steuerung).
+    expect(Object.keys(details).sort()).toEqual(
+      ["blind", "climate", "jalousie", "light", "switch"].sort(),
+    );
     for (const fn of Object.values(tiles)) expect(fn).toBeTypeOf("function");
     for (const fn of Object.values(details)) expect(fn).toBeTypeOf("function");
   });

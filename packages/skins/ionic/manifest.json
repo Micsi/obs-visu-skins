@@ -13,7 +13,8 @@
     "sensor": { "actions": [] },
     "scene": { "actions": ["activateScene"] },
     "media": { "actions": ["playPause", "stop", "next", "previous", "setVolume"] },
-    "camera": { "actions": ["refresh"] }
+    "camera": { "actions": ["refresh"] },
+    "climate": { "actions": ["setSetpoint"] }
   },
 
   "layout": {
