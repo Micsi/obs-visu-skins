@@ -65,6 +65,7 @@ describe("scaffoldSkin (end-to-end against a temporary target)", () => {
       );
       expect(m.unsupported).toContain("camera");
       expect(m.unsupported).toContain("media");
+      expect(m.unsupported).toContain("climate");
     }
   });
 

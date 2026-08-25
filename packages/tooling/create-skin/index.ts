@@ -131,7 +131,7 @@ function manifestJson(name: string, layout: LayoutModel): string {
     name,
     targetsContract: "1.1",
     renderers: "./renderers.ts",
-    unsupported: ["camera", "media"],
+    unsupported: ["camera", "media", "climate"],
     widgets,
     layout: layoutBlock,
     themes: ["light", "dark"],
@@ -249,6 +249,7 @@ describe("${name} skin scaffold", () => {
     // \`unsupported\` ist Pflichtangabe (golden rule 3).
     expect(m.unsupported).toContain("camera");
     expect(m.unsupported).toContain("media");
+    expect(m.unsupported).toContain("climate");
     expect(Object.keys(m.widgets).sort()).toEqual([...CORE_TYPES].sort());
   });
 
