@@ -27,7 +27,13 @@ const ctx: Ctx = {
     if (d.type === "switch") return d.on ? "An" : "Aus";
     return "";
   },
-  stateParts: (d) => ({ word: ctx.stateText(d), rest: "" }),
+  // Host-Zerlegung nachgebildet: Zustandswort (fett) + gemuteter Rest. Trennung am
+  // " — " (z. B. "Ein — 45 %"); ohne Rest ist das ganze stateText das Wort ("An").
+  stateParts: (d) => {
+    const full = ctx.stateText(d);
+    const at = full.indexOf(" — ");
+    return at >= 0 ? { word: full.slice(0, at), rest: full.slice(at) } : { word: full, rest: "" };
+  },
   hyphenate: (s) => s,
   icon: (_d, slot) => slot,
   nf: (v) => String(v),
@@ -80,14 +86,34 @@ function hasClass(root: unknown, cls: string): boolean {
   });
 }
 
-/** Erster Textinhalt unter einer Klasse. */
+/**
+ * Konkatenierter Textinhalt unter einer Klasse — sammelt auch den Text in
+ * Kindelementen (z. B. `<b>` im „fetten Fuß"), damit die Invariante `word+rest ===
+ * stateText` unabhängig von der DOM-Struktur geprüft wird.
+ */
 function textOfClass(root: unknown, cls: string): string | undefined {
   const hit = flatten(root).find((n) => {
     const c = n.props?.class;
     return Array.isArray(c) ? c.includes(cls) : c === cls;
   });
   if (!hit) return undefined;
-  return typeof hit.children === "string" ? hit.children : undefined;
+  const parts: string[] = [];
+  const walk = (n: unknown): void => {
+    if (typeof n === "string") parts.push(n);
+    else if (Array.isArray(n)) n.forEach(walk);
+    else if (isVNode(n)) walk((n as VNode).children as unknown);
+  };
+  walk(hit.children as unknown);
+  return parts.join("");
+}
+
+/** Der `<b>`-Zustandswort-Knoten im „fetten Fuß" (Vorlage: `<b>Ein</b> — 45 %`). */
+function footWord(root: unknown, cls: string): VNode | undefined {
+  const foot = flatten(root).find((n) => {
+    const c = n.props?.class;
+    return Array.isArray(c) ? c.includes(cls) : c === cls;
+  });
+  return foot ? flatten(foot.children).find((n) => n.type === "b") : undefined;
 }
 
 /* ============================== LIGHT TILE ================================ */
@@ -101,8 +127,12 @@ describe("LightTile", () => {
       expect(root.type).toBe("div");
       const cls = root.props?.class as unknown[];
       expect(cls).toContain("vz-tile");
-      // Fuß kommt zentral aus ctx.stateText
+      // Fuß kommt zentral aus ctx.stateParts: fettes Wort + gemuteter Rest, dessen
+      // sichtbarer Gesamttext weiterhin ctx.stateText entspricht (Invariante).
       expect(textOfClass(root, "vz-tile-foot")).toBe(ctx.stateText(light(name)));
+      const b = footWord(root, "vz-tile-foot");
+      expect(b).toBeDefined();
+      expect(b?.children).toBe(ctx.stateParts(light(name)).word);
     }
   });
 
@@ -164,6 +194,9 @@ describe("SwitchTile", () => {
       expect(nodeOfClass(vnode, "vz-toggle")).toBeDefined();
       expect(hasTag(vnode, "ion-toggle")).toBe(false);
       expect(textOfClass(vnode, "vz-tile-foot")).toBe(ctx.stateText(sw(name)));
+      const b = footWord(vnode, "vz-tile-foot");
+      expect(b).toBeDefined();
+      expect(b?.children).toBe(ctx.stateParts(sw(name)).word);
     }
   });
 

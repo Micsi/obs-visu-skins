@@ -13,6 +13,7 @@ import type { Ctx, Device, JalousieDevice, JalousieStatus, Tokens } from "@obs/v
 import { jalousieGlyph, slatAngleDeg } from "../glyphs/JalousieGlyph.js";
 import { svgIcon } from "../icon.js";
 import { tt } from "../i18n.js";
+import { crumbPath } from "../parts.js";
 
 function dotClass(val: boolean | null): string {
   return val === true ? "is-true" : val === false ? "is-false" : "is-unknown";
@@ -164,7 +165,7 @@ export function jalousieDetail(d: Device, t: Tokens, ctx: Ctx): VNode {
     h("div", { class: "vz-dialog-bar" }),
     h("div", { class: "vz-dialog-head" }, [
       h("div", null, [
-        h("div", { class: "vz-dialog-crumb" }, dev.room),
+        h("div", { class: "vz-dialog-crumb" }, crumbPath(dev)),
         h("h2", { class: "vz-dialog-title" }, dev.label),
         h("div", { class: "vz-dialog-val" }, `${dev.position} % · ${slatAngleDeg(dev.slat)}°`),
       ]),

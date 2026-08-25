@@ -27,7 +27,13 @@ const MODE_DE: Record<ClimateDevice["mode"], string> = {
 
 const ctx: Ctx = {
   stateText: (d) => (d.type === "climate" ? `${MODE_DE[d.mode]} — ${d.current}°` : ""),
-  stateParts: (d) => ({ word: ctx.stateText(d), rest: "" }),
+  // Host-Zerlegung nachgebildet: Modus (fett) + gemuteter Rest (Ist-Temp), getrennt
+  // am " — " — der sichtbare Gesamttext bleibt ctx.stateText (Invariante).
+  stateParts: (d) => {
+    const full = ctx.stateText(d);
+    const at = full.indexOf(" — ");
+    return at >= 0 ? { word: full.slice(0, at), rest: full.slice(at) } : { word: full, rest: "" };
+  },
   hyphenate: (s) => s,
   icon: (_d, slot) => `body:${slot}`,
   nf: (v) => String(v),
@@ -101,10 +107,15 @@ describe("climateTile (v1.4)", () => {
     expect(textOfClass(root, "vz-climate-soll")).toBe("Soll");
   });
 
-  it("puts the centralised state text in the foot (mode + current temp)", () => {
+  it("puts the centralised state text in the foot (mode word bold + current temp)", () => {
     const dev = climate("heat");
     const root = climateTile(dev, tokens, ctx);
-    expect(textOfClass(root, "vz-tile-foot")).toBe(ctx.stateText(dev));
+    // Fetter Fuß: sichtbarer Gesamttext == stateText (Invariante), Modus-Wort im <b>.
+    expect(textUnder(root, "vz-tile-foot")).toBe(ctx.stateText(dev));
+    const foot = nodeOfClass(root, "vz-tile-foot");
+    const b = foot ? flatten(foot.children).find((n) => n.type === "b") : undefined;
+    expect(b).toBeDefined();
+    expect(b?.children).toBe(ctx.stateParts(dev).word);
   });
 
   it("is display-only: opens the detail, never writes state on the tile", () => {

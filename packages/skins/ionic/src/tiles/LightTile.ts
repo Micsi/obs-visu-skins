@@ -9,6 +9,7 @@
 
 import { h, type VNode } from "vue";
 import type { Ctx, LightDevice, Renderer, Tokens } from "@obs/visu-contract";
+import { stateFoot } from "../parts.js";
 
 /**
  * Glühbirnen-Glyph (bulb) — Größe/Geometrie 1:1 aus der Design-System-Vorlage
@@ -59,7 +60,7 @@ export const LightTile: Renderer = (d: Readonly<unknown>, t: Tokens, ctx: Ctx): 
       h("div", { class: "vz-eyebrow" }, dev.room),
       h("div", { class: "vz-label chip" }, ctx.hyphenate(dev.label)),
       h("div", { class: "vz-tile-body" }, [bulbGlyph()]),
-      h("div", { class: "vz-tile-foot" }, ctx.stateText(dev)),
+      h("div", { class: "vz-tile-foot" }, stateFoot(ctx, dev)),
     ],
   );
 };

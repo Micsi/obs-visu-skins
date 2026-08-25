@@ -12,6 +12,7 @@ import { h, type VNode } from "vue";
 import type { Ctx, LightDevice, Renderer, Tokens } from "@obs/visu-contract";
 import { svgIcon } from "../icon.js";
 import { tt } from "../i18n.js";
+import { crumbPath } from "../parts.js";
 
 function preset(ctx: Ctx, key: string, fallback: string, value: number): VNode {
   return h(
@@ -41,7 +42,7 @@ export const LightDetail: Renderer = (d: Readonly<unknown>, t: Tokens, ctx: Ctx)
       // Kopf 1:1 aus der Vorlage: Breadcrumb links · zentrierter Titel + Wert ·
       // Schließen rechts (Layout via `.vz-dialog[data-type="light"]`-Regeln, light-scoped).
       h("div", { class: "vz-dialog-head" }, [
-        h("div", { class: "vz-dialog-crumb" }, dev.room),
+        h("div", { class: "vz-dialog-crumb" }, crumbPath(dev)),
         h("div", { class: "vz-light-titlewrap" }, [
           h("h2", { class: "vz-dialog-title" }, dev.label),
           h("div", { class: "vz-dialog-val" }, val),

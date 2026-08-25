@@ -20,7 +20,7 @@ import type {
   SupportWidgetEntry,
 } from "@obs/visu-contract";
 
-/** Die acht stabilen v1.2-Kern-Typen — Prüfgrundlage des Generators. */
+/** Die neun stabilen Kern-Typen (v1.2: + media/camera, v1.4: + climate) — Prüfgrundlage des Generators. */
 export const CORE_WIDGET_TYPES: readonly CoreWidgetType[] = [
   "light",
   "switch",
@@ -30,6 +30,7 @@ export const CORE_WIDGET_TYPES: readonly CoreWidgetType[] = [
   "scene",
   "media",
   "camera",
+  "climate",
 ];
 
 /** Eine partielle Map über Kern-Typen auf reine Renderer-Funktionen (Spiegel von `tiles`). */

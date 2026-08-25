@@ -10,6 +10,7 @@
 import { h, type VNode } from "vue";
 import type { ClimateDevice, Ctx, Device, Tokens } from "@obs/visu-contract";
 import { tt } from "../i18n.js";
+import { stateFoot } from "../parts.js";
 
 /**
  * climate-Kachel (2×2): SOLL-Temperatur groß, darunter die Akzent-Caption „SOLL";
@@ -40,7 +41,7 @@ export function climateTile(d: Device, t: Tokens, ctx: Ctx): VNode {
         ]),
         h("div", { class: "vz-climate-soll" }, tt(ctx, "skin.ionic.climate.setpointShort", "Soll")),
       ]),
-      h("div", { class: "vz-tile-foot" }, ctx.stateText(dev)),
+      h("div", { class: "vz-tile-foot" }, stateFoot(ctx, dev)),
     ],
   );
 }

@@ -1062,6 +1062,31 @@ ion-content.visu-content {
   color: #fff;
   border-color: transparent;
 }
+/* „● LIVE"-Badge (Vorlage): oben links über dem Standbild. Hintergrund ist ein
+   abgedunkeltes --vz-bad-Rot, damit weißer 10-px-Text die AA-Textschwelle hält. */
+.vz-cam-live {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 7px;
+  border-radius: 5px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #fff;
+  background: color-mix(in oklab, var(--vz-bad) 72%, #000);
+}
+.vz-cam-live-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #fff;
+}
 .vz-cam-dot {
   display: inline-block;
   width: 8px;

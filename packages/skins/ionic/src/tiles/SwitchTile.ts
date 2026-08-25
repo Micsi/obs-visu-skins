@@ -12,6 +12,7 @@
 
 import { h } from "vue";
 import type { Ctx, Renderer, SwitchDevice, Tokens } from "@obs/visu-contract";
+import { stateFoot } from "../parts.js";
 
 export const SwitchTile: Renderer = (d: Readonly<unknown>, t: Tokens, ctx: Ctx): unknown => {
   const dev = d as SwitchDevice;
@@ -42,7 +43,7 @@ export const SwitchTile: Renderer = (d: Readonly<unknown>, t: Tokens, ctx: Ctx):
           [h("i")],
         ),
       ]),
-      h("div", { class: "vz-tile-foot" }, ctx.stateText(dev)),
+      h("div", { class: "vz-tile-foot" }, stateFoot(ctx, dev)),
     ],
   );
 };
