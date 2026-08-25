@@ -17,7 +17,7 @@
     "test": "vitest run --typecheck"
   },
   "dependencies": {
-    "@obs/visu-contract": "link:/Volumes/Daten/Projekte/openbridge/openbridgeserver-authz-integ/packages/contract"
+    "@obs/visu-contract": "link:/Volumes/Daten/Projekte/openbridge/openbridgeserver-visu-integrate/packages/contract"
   },
   "peerDependencies": {
     "vue": "^3.5.0",
