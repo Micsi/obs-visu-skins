@@ -27,6 +27,13 @@ const ctx: Ctx = {
     if (d.type === "switch") return d.on ? "An" : "Aus";
     return "";
   },
+  // Host-Zerlegung nachgebildet: Zustandswort (fett) + gemuteter Rest. Trennung am
+  // " — " (z. B. "Ein — 45 %"); ohne Rest ist das ganze stateText das Wort ("An").
+  stateParts: (d) => {
+    const full = ctx.stateText(d);
+    const at = full.indexOf(" — ");
+    return at >= 0 ? { word: full.slice(0, at), rest: full.slice(at) } : { word: full, rest: "" };
+  },
   hyphenate: (s) => s,
   icon: (_d, slot) => slot,
   nf: (v) => String(v),
@@ -79,14 +86,34 @@ function hasClass(root: unknown, cls: string): boolean {
   });
 }
 
-/** Erster Textinhalt unter einer Klasse. */
+/**
+ * Konkatenierter Textinhalt unter einer Klasse — sammelt auch den Text in
+ * Kindelementen (z. B. `<b>` im „fetten Fuß"), damit die Invariante `word+rest ===
+ * stateText` unabhängig von der DOM-Struktur geprüft wird.
+ */
 function textOfClass(root: unknown, cls: string): string | undefined {
   const hit = flatten(root).find((n) => {
     const c = n.props?.class;
     return Array.isArray(c) ? c.includes(cls) : c === cls;
   });
   if (!hit) return undefined;
-  return typeof hit.children === "string" ? hit.children : undefined;
+  const parts: string[] = [];
+  const walk = (n: unknown): void => {
+    if (typeof n === "string") parts.push(n);
+    else if (Array.isArray(n)) n.forEach(walk);
+    else if (isVNode(n)) walk((n as VNode).children as unknown);
+  };
+  walk(hit.children as unknown);
+  return parts.join("");
+}
+
+/** Der `<b>`-Zustandswort-Knoten im „fetten Fuß" (Vorlage: `<b>Ein</b> — 45 %`). */
+function footWord(root: unknown, cls: string): VNode | undefined {
+  const foot = flatten(root).find((n) => {
+    const c = n.props?.class;
+    return Array.isArray(c) ? c.includes(cls) : c === cls;
+  });
+  return foot ? flatten(foot.children).find((n) => n.type === "b") : undefined;
 }
 
 /* ============================== LIGHT TILE ================================ */
@@ -100,8 +127,12 @@ describe("LightTile", () => {
       expect(root.type).toBe("div");
       const cls = root.props?.class as unknown[];
       expect(cls).toContain("vz-tile");
-      // Fuß kommt zentral aus ctx.stateText
+      // Fuß kommt zentral aus ctx.stateParts: fettes Wort + gemuteter Rest, dessen
+      // sichtbarer Gesamttext weiterhin ctx.stateText entspricht (Invariante).
       expect(textOfClass(root, "vz-tile-foot")).toBe(ctx.stateText(light(name)));
+      const b = footWord(root, "vz-tile-foot");
+      expect(b).toBeDefined();
+      expect(b?.children).toBe(ctx.stateParts(light(name)).word);
     }
   });
 
@@ -142,22 +173,48 @@ describe("LightDetail", () => {
 
 /* ============================== SWITCH TILE =============================== */
 
+/** Klassen-Tokens eines VNode (Vue normalisiert Klassen-Arrays zu Strings). */
+function classTokens(n: VNode | undefined): string[] {
+  const c = n?.props?.class;
+  if (typeof c === "string") return c.split(/\s+/).filter(Boolean);
+  if (Array.isArray(c)) return c.filter((x): x is string => typeof x === "string");
+  return [];
+}
+/** Erster VNode, dessen Klassen-Tokens `cls` enthalten. */
+function nodeOfClass(root: unknown, cls: string): VNode | undefined {
+  return flatten(root).find((n) => classTokens(n).includes(cls));
+}
+
 describe("SwitchTile", () => {
-  it("renders a real ion-toggle for every switch fixture", () => {
+  it("renders a CSS vz-toggle stellelement (no ion-toggle) for every switch fixture", () => {
     for (const name of Object.keys(F.switch) as (keyof typeof F.switch)[]) {
       const vnode = SwitchTile(sw(name), tokens, ctx);
       expect(isVNode(vnode)).toBe(true);
-      expect(hasTag(vnode, "ion-toggle")).toBe(true);
+      // Design-System-Vorlage nutzt das CSS-gezeichnete .vz-toggle, nicht ion-toggle.
+      expect(nodeOfClass(vnode, "vz-toggle")).toBeDefined();
+      expect(hasTag(vnode, "ion-toggle")).toBe(false);
       expect(textOfClass(vnode, "vz-tile-foot")).toBe(ctx.stateText(sw(name)));
+      const b = footWord(vnode, "vz-tile-foot");
+      expect(b).toBeDefined();
+      expect(b?.children).toBe(ctx.stateParts(sw(name)).word);
     }
   });
 
-  it("toggle reflects on-state and carries the canonical action", () => {
-    const onTile = SwitchTile(sw("on"), tokens, ctx);
-    const toggle = flatten(onTile).find((n) => n.type === "ion-toggle");
-    expect(toggle?.props?.checked).toBe(true);
-    expect(toggle?.props?.["data-action"]).toBe("toggle");
+  it("toggle reflects on-state and the tile carries the canonical action", () => {
+    const onTile = SwitchTile(sw("on"), tokens, ctx) as VNode;
+    const onToggle = nodeOfClass(onTile, "vz-toggle");
+    expect(classTokens(onToggle)).toContain("on");
+    expect(onToggle?.props?.["aria-checked"]).toBe("true");
+    expect(classTokens(onTile)).toContain("is-on");
+    expect(onTile.props?.["aria-pressed"]).toBe("true");
+    // Kanonische Aktion sitzt am Kachel-Wrapper (Button), Toggle ist dekorativ.
     expect(actions(onTile)).toContain("toggle");
+
+    const offTile = SwitchTile(sw("off"), tokens, ctx) as VNode;
+    const offToggle = nodeOfClass(offTile, "vz-toggle");
+    expect(classTokens(offToggle)).not.toContain("on");
+    expect(offToggle?.props?.["aria-checked"]).toBe("false");
+    expect(offTile.props?.["aria-pressed"]).toBe("false");
   });
 });
 

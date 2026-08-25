@@ -66,7 +66,7 @@ export const MediaTile: Renderer = (d: Device, t: Tokens, ctx: Ctx): VNode => {
     "div",
     {
       class: ["vz-tile", "vz-tile--media", playing && "is-on"].filter(Boolean),
-      style: { "--acc": acc },
+      style: { "--acc": acc, "--acc-bar": `var(--vz-acc-${dev.accent})` },
       role: "group",
       "aria-label": `${tt(ctx, "skin.ionic.media.aria", "Medienspieler")}: ${[dev.room, dev.label].filter(Boolean).join(" · ")}`,
     },

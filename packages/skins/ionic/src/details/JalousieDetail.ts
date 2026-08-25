@@ -13,6 +13,7 @@ import type { Ctx, Device, JalousieDevice, JalousieStatus, Tokens } from "@obs/v
 import { jalousieGlyph, slatAngleDeg } from "../glyphs/JalousieGlyph.js";
 import { svgIcon } from "../icon.js";
 import { tt } from "../i18n.js";
+import { crumbPath } from "../parts.js";
 
 function dotClass(val: boolean | null): string {
   return val === true ? "is-true" : val === false ? "is-false" : "is-unknown";
@@ -88,7 +89,7 @@ export function jalousieDetail(d: Device, t: Tokens, ctx: Ctx): VNode {
     );
   }
 
-  // Öffnen / Schließen
+  // Öffnen / Schließen — Icon + Label wie im Rollladen-Detail (Design-System-Parität).
   body.push(
     h("div", { class: "vz-action-grid" }, [
       h(
@@ -100,7 +101,7 @@ export function jalousieDetail(d: Device, t: Tokens, ctx: Ctx): VNode {
           "data-action": interactive ? "setPosition" : undefined,
           "data-arg": interactive ? "0" : undefined,
         },
-        tt(ctx, "skin.ionic.jalousie.open", "Öffnen"),
+        [svgIcon(ctx, dev, "chev-uu", 18), tt(ctx, "skin.ionic.jalousie.open", "Öffnen")],
       ),
       h(
         "button",
@@ -111,7 +112,7 @@ export function jalousieDetail(d: Device, t: Tokens, ctx: Ctx): VNode {
           "data-action": interactive ? "setPosition" : undefined,
           "data-arg": interactive ? "100" : undefined,
         },
-        tt(ctx, "skin.ionic.jalousie.close", "Schließen"),
+        [svgIcon(ctx, dev, "chev-dd", 18), tt(ctx, "skin.ionic.jalousie.close", "Schließen")],
       ),
     ]),
   );
@@ -164,7 +165,7 @@ export function jalousieDetail(d: Device, t: Tokens, ctx: Ctx): VNode {
     h("div", { class: "vz-dialog-bar" }),
     h("div", { class: "vz-dialog-head" }, [
       h("div", null, [
-        h("div", { class: "vz-dialog-crumb" }, dev.room),
+        h("div", { class: "vz-dialog-crumb" }, crumbPath(dev)),
         h("h2", { class: "vz-dialog-title" }, dev.label),
         h("div", { class: "vz-dialog-val" }, `${dev.position} % · ${slatAngleDeg(dev.slat)}°`),
       ]),

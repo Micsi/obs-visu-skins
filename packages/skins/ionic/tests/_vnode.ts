@@ -87,6 +87,7 @@ export const tokensStub: Tokens = {
 export function ctxStub(overrides: Partial<Ctx> = {}): Ctx {
   return {
     stateText: () => "",
+    stateParts: () => ({ word: "", rest: "" }),
     hyphenate: (s) => s,
     icon: (_d: Device, slot: string) => `icon:${slot}`,
     nf: (v) => String(v),

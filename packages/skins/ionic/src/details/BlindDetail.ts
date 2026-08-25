@@ -13,6 +13,7 @@ import type { BlindDevice, Ctx, Device, Tokens } from "@obs/visu-contract";
 import { blindGlyph } from "../glyphs/BlindGlyph.js";
 import { svgIcon } from "../icon.js";
 import { tt } from "../i18n.js";
+import { crumbPath } from "../parts.js";
 
 const STEP = 10;
 
@@ -35,11 +36,18 @@ function section(title: string, body: VNode | VNode[]): VNode {
   ]);
 }
 
-function actionBtn(label: string, attrs: Record<string, unknown>, extraClass?: string): VNode {
+function actionBtn(
+  ctx: Ctx,
+  dev: Device,
+  icon: string,
+  label: string,
+  attrs: Record<string, unknown>,
+  extraClass?: string,
+): VNode {
   return h(
     "button",
     { class: ["vz-action", extraClass].filter(Boolean), type: "button", ...attrs },
-    label,
+    [svgIcon(ctx, dev, icon, 18), label],
   );
 }
 
@@ -52,7 +60,7 @@ export function blindDetail(d: Device, t: Tokens, ctx: Ctx): VNode {
     h("div", { class: "vz-dialog-bar" }),
     h("div", { class: "vz-dialog-head" }, [
       h("div", null, [
-        h("div", { class: "vz-dialog-crumb" }, dev.room),
+        h("div", { class: "vz-dialog-crumb" }, crumbPath(dev)),
         h("h2", { class: "vz-dialog-title" }, dev.label),
         h("div", { class: "vz-dialog-val" }, `${dev.position} %`),
       ]),
@@ -82,24 +90,31 @@ export function blindDetail(d: Device, t: Tokens, ctx: Ctx): VNode {
           "aria-label": tt(ctx, "skin.ionic.blind.position", "Position"),
         }),
       ),
-      // Action grid
+      // Action grid — Icon + Label je Button (1:1 der Vorlage „Rollladen Ost").
       h("div", { class: "vz-action-grid" }, [
-        actionBtn(tt(ctx, "skin.ionic.blind.stepOpen", "Schritt auf"), {
+        actionBtn(ctx, dev, "chev-up", tt(ctx, "skin.ionic.blind.stepOpen", "Schritt auf"), {
           "data-action": "setPosition",
           "data-arg": String(-STEP),
           "data-relative": "1",
         }),
-        actionBtn(tt(ctx, "skin.ionic.blind.open", "Öffnen"), {
+        actionBtn(ctx, dev, "chev-uu", tt(ctx, "skin.ionic.blind.open", "Öffnen"), {
           "data-action": "setPosition",
           "data-arg": "0",
         }),
-        actionBtn(tt(ctx, "skin.ionic.blind.stop", "Stopp"), { "data-action": "stop" }, "full"),
-        actionBtn(tt(ctx, "skin.ionic.blind.stepClose", "Schritt zu"), {
+        actionBtn(
+          ctx,
+          dev,
+          "stop",
+          tt(ctx, "skin.ionic.blind.stop", "Stopp"),
+          { "data-action": "stop" },
+          "full",
+        ),
+        actionBtn(ctx, dev, "chev-down", tt(ctx, "skin.ionic.blind.stepClose", "Schritt zu"), {
           "data-action": "setPosition",
           "data-arg": String(STEP),
           "data-relative": "1",
         }),
-        actionBtn(tt(ctx, "skin.ionic.blind.close", "Schließen"), {
+        actionBtn(ctx, dev, "chev-dd", tt(ctx, "skin.ionic.blind.close", "Schließen"), {
           "data-action": "setPosition",
           "data-arg": "100",
         }),

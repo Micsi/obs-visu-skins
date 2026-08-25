@@ -390,7 +390,11 @@ ion-content.visu-content {
   right: 0;
   top: 0;
   height: var(--vz-bar-h);
-  background: var(--acc);
+  /* Vivid accent (raw palette base) runs ONLY into this decorative 4px bar,
+     which is contrast-exempt (WCAG 1.4.11 excludes purely decorative surfaces).
+     Text/icon/values keep the AA-derived --acc. --acc-bar is set per tile to
+     var(--vz-acc-<key>); the AA --acc is the fallback if a tile omits it. */
+  background: var(--acc-bar, var(--acc));
   border-top-left-radius: inherit;
   border-top-right-radius: inherit;
 }
@@ -708,9 +712,6 @@ ion-content.visu-content {
     color-mix(in oklab, var(--vz-fg) 7%, transparent) 18px
   );
 }
-.vz-tile.locked .vz-blind-ctl {
-  opacity: 0.5;
-}
 .vz-tile.locked .vz-tile-body,
 .vz-tile.locked .vz-tile-foot {
   opacity: 0.7;
@@ -734,38 +735,6 @@ ion-content.visu-content {
   color: var(--vz-fg-mute);
 }
 
-/* blind chevrons row */
-.vz-blind-ctl {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  gap: 2px;
-}
-.vz-chev {
-  flex-shrink: 0;
-  width: 30px;
-  height: 30px;
-  border-radius: 8px;
-  border: 0;
-  background: transparent;
-  color: var(--vz-fg-mute);
-  display: grid;
-  place-items: center;
-  cursor: pointer;
-  transition:
-    background 0.14s,
-    color 0.14s,
-    transform 0.1s;
-}
-.vz-chev:hover {
-  background: var(--vz-chip-bg);
-  color: var(--vz-fg);
-}
-.vz-chev:active {
-  transform: scale(0.86);
-}
-
 /* big numbers + auto-fitting value groups (sensor) */
 .vz-num {
   font-weight: 600;
@@ -776,10 +745,10 @@ ion-content.visu-content {
   white-space: nowrap;
 }
 .vz-num.l {
-  font-size: 23px;
+  font-size: var(--vz-fs-num-l);
 }
 .vz-num.xl {
-  font-size: 33px;
+  font-size: var(--vz-fs-num-xl);
 }
 .vz-unit {
   color: var(--vz-fg-mute);
@@ -812,6 +781,139 @@ ion-content.visu-content {
 }
 .vz-status.is-warn {
   color: var(--vz-warn);
+  font-weight: 700;
+}
+
+/* Sensor mit Akzent-Icon (SensorDevice.icon: Wetter=Wolke, Strom=Blitz) — Icon
+   und Wert in einer Zeile, das Icon trägt als einzige Fläche den vollen Akzent. */
+.vz-sensor-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  width: 100%;
+}
+.vz-sensor-icon {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  color: var(--acc);
+}
+
+/* Sensor-Verlauf/Chart (2×2, SensorDevice.series) — Wert oben links, darunter die
+   Sparkline; der Fuß nennt „min … · max … {unit}“. */
+.vz-chart-body {
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: 4px;
+}
+.vz-val--lead {
+  align-self: flex-start;
+}
+.vz-spark {
+  display: block;
+  width: 100%;
+  margin-top: 2px;
+}
+.vz-spark-line {
+  fill: none;
+  stroke: var(--acc);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.vz-spark-area {
+  fill: var(--acc);
+  /* Reine Deko-Fläche (WCAG 1.4.11-exempt): getönter Verlauf unter der Linie. */
+  opacity: 0.12;
+  stroke: none;
+}
+
+/* ===========================================================================
+   CLIMATE WIDGET (type 'climate', v1.4) — Kachel: SOLL-Zahl + Caption · foot=stateText
+   =========================================================================== */
+.vz-climate-set {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+.vz-climate-num {
+  font-size: var(--vz-fs-num-xl);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--vz-fg);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.vz-climate-unit {
+  font-size: 18px;
+  color: var(--vz-fg-mute);
+  font-weight: 500;
+}
+.vz-climate-soll {
+  color: var(--acc);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+/* Climate-Detail: Sollwert-Stepper (−/+) + große SOLL-Zahl, Ist/Modus-Infozeile. */
+.vz-stepper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 22px;
+  margin: 6px 0 10px;
+}
+.vz-step-btn {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--vz-chip-bg);
+  border: 0.5px solid var(--vz-hairline);
+  color: var(--vz-fg);
+  cursor: pointer;
+}
+.vz-step-btn:active {
+  transform: scale(0.94);
+}
+.vz-stepper-val {
+  display: flex;
+  align-items: baseline;
+  gap: 3px;
+  min-width: 120px;
+  justify-content: center;
+}
+.vz-stepper-num {
+  font-size: var(--vz-fs-num-xl);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--vz-fg);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.vz-stepper-unit {
+  font-size: 18px;
+  color: var(--vz-fg-mute);
+  font-weight: 500;
+}
+.vz-climate-info {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 14px;
+  color: var(--vz-fg-mute);
+  font-size: 13px;
+}
+.vz-climate-info b {
+  color: var(--vz-fg);
+  font-weight: 700;
+}
+.vz-climate-mode {
+  color: var(--acc);
   font-weight: 700;
 }
 
@@ -959,6 +1061,31 @@ ion-content.visu-content {
   background: var(--acc);
   color: #fff;
   border-color: transparent;
+}
+/* „● LIVE"-Badge (Vorlage): oben links über dem Standbild. Hintergrund ist ein
+   abgedunkeltes --vz-bad-Rot, damit weißer 10-px-Text die AA-Textschwelle hält. */
+.vz-cam-live {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 7px;
+  border-radius: 5px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #fff;
+  background: color-mix(in oklab, var(--vz-bad) 72%, #000);
+}
+.vz-cam-live-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #fff;
 }
 .vz-cam-dot {
   display: inline-block;
@@ -1726,6 +1853,26 @@ ion-content.visu-content {
 .vz-preset:active {
   background: color-mix(in oklab, var(--acc, var(--vz-accent)) 14%, var(--vz-tile-bg-strong));
 }
+
+/* Light-Detail: zentrierter Kopf wie in der Design-System-Vorlage
+   (Breadcrumb links · Titel + Wert zentriert · Schließen rechts).
+   Nur auf den Licht-Dialog beschränkt (data-type="light"), damit die übrigen
+   Detail-Renderer ihren linksbündigen Standardkopf behalten. */
+.vz-dialog[data-type="light"] .vz-dialog-head {
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+}
+.vz-dialog[data-type="light"] .vz-dialog-crumb {
+  margin-bottom: 0;
+}
+.vz-dialog[data-type="light"] .vz-light-titlewrap {
+  text-align: center;
+  min-width: 0;
+}
+.vz-dialog[data-type="light"] .vz-dialog-val {
+  margin-top: 4px;
+}
+
 .vz-lockrow {
   display: flex;
   align-items: center;

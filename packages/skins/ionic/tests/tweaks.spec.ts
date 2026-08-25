@@ -11,7 +11,7 @@ describe("ionic skin — applyTweaks (I5)", () => {
   it("liefert für leere Eingabe die sauberen Defaults als Attribute", () => {
     const { attrs } = applyTweaks();
     expect(attrs["data-stil"]).toBe("glass");
-    expect(attrs["data-acc-style"]).toBe("glow");
+    expect(attrs["data-acc-style"]).toBe("bar");
     expect(attrs["data-theme"]).toBe("image");
     expect(attrs["data-room-group"]).toBe("labels");
     expect(attrs["data-titlebar"]).toBe("0");

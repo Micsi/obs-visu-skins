@@ -40,7 +40,7 @@ export const CameraTile: Renderer = (d: Device, t: Tokens, ctx: Ctx): VNode => {
     "div",
     {
       class: ["vz-tile", "vz-tile--camera", dev.online && "is-online"].filter(Boolean),
-      style: { "--acc": acc },
+      style: { "--acc": acc, "--acc-bar": `var(--vz-acc-${dev.accent})` },
       role: "group",
       "aria-label": `${tt(ctx, "skin.ionic.camera.aria", "Kamera")}: ${[dev.room, dev.label].filter(Boolean).join(" · ")}`,
     },
@@ -49,6 +49,14 @@ export const CameraTile: Renderer = (d: Device, t: Tokens, ctx: Ctx): VNode => {
       h("div", { class: "vz-label chip" }, ctx.hyphenate(dev.label)),
       h("div", { class: "vz-cam-view" }, [
         feed(dev, ctx),
+        // „● LIVE"-Badge (Vorlage): nur bei online, oben links über dem Standbild.
+        // Rein dekorativ (aria-hidden) — der Fuß trägt den Zustand für assistive Technik.
+        dev.online
+          ? h("span", { class: "vz-cam-live", "aria-hidden": "true" }, [
+              h("span", { class: "vz-cam-live-dot" }),
+              tt(ctx, "skin.ionic.camera.online", "Live"),
+            ])
+          : null,
         h(
           "button",
           {

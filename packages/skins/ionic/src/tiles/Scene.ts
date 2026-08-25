@@ -37,7 +37,7 @@ export const SceneTile: Renderer = (d: Device, t: Tokens, ctx: Ctx): VNode => {
     "div",
     {
       class: ["vz-tile", "vz-tile--scene"],
-      style: { "--acc": t.accent(dev.accent) },
+      style: { "--acc": t.accent(dev.accent), "--acc-bar": `var(--vz-acc-${dev.accent})` },
       role: "button",
       tabindex: "0",
       "data-action": "activateScene",

@@ -2,7 +2,7 @@
   "name": "terminal",
   "targetsContract": "1.1",
   "renderers": "./renderers.ts",
-  "unsupported": ["camera", "media"],
+  "unsupported": ["camera", "media", "climate"],
 
   "widgets": {
     "light": { "actions": ["toggle"] },

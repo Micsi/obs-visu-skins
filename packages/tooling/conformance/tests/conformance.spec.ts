@@ -1,7 +1,7 @@
 // TDD-Spec für den Konformitäts-Generator (ARCHITECTURE.md §2).
 //
-// Positiv: der vollständige ionic-Skin (alle 6 Kern-Typen supported,
-// unsupported=["camera","media"]) → kein gap, support.json deckt alle 6 als "supported".
+// Positiv: der vollständige ionic-Skin (alle neun Kern-Typen inkl. climate supported,
+// unsupported=[]) → kein gap, support.json deckt alle neun als "supported".
 // Negativ: ein konstruierter Skin-Stub mit deklariertem widget aber fehlendem Renderer
 // → "gap" + Exit != 0.
 
@@ -18,21 +18,21 @@ import {
 const ionic = ionicManifest as unknown as SkinManifest;
 
 describe("generateSupport — ionic (vollständig)", () => {
-  it("meldet keine gap und deckt alle acht Kern-Typen als supported", () => {
+  it("meldet keine gap und deckt alle neun Kern-Typen als supported", () => {
     const { report, hasGap } = generateSupport({ manifest: ionic, tiles });
 
     expect(hasGap).toBe(false);
     expect(report.skin).toBe("ionic");
-    expect(report.targetsContract).toBe("1.3");
+    expect(report.targetsContract).toBe("1.4");
 
-    // support.json deckt genau die acht Kern-Typen ab.
+    // support.json deckt genau die neun Kern-Typen ab (v1.4: inkl. climate).
     expect(Object.keys(report.widgets).sort()).toEqual([...CORE_WIDGET_TYPES].sort());
 
-    // Alle acht sind "full" (supported) — keiner unsupported, keine gap.
+    // Alle neun sind "full" (supported) — keiner unsupported, keine gap.
     for (const type of CORE_WIDGET_TYPES) {
       expect(report.widgets[type]?.level).toBe("full");
     }
-    expect(report.summary.full).toBe(8);
+    expect(report.summary.full).toBe(9);
     expect(report.summary.gap).toBe(0);
     expect(report.summary.unsupported).toBe(0);
   });
@@ -52,7 +52,7 @@ describe("generateSupport — gap-hart", () => {
     const brokenManifest: SkinManifest = {
       name: "broken",
       targetsContract: "1.1",
-      unsupported: ["camera", "media"],
+      unsupported: ["camera", "media", "climate"],
       widgets: {
         light: { actions: ["toggle"] },
         switch: { actions: ["toggle"] },
@@ -86,7 +86,7 @@ describe("generateSupport — gap-hart", () => {
     const manifest: SkinManifest = {
       name: "undeclared",
       targetsContract: "1.1",
-      unsupported: ["camera", "media"],
+      unsupported: ["camera", "media", "climate"],
       widgets: {
         // scene fehlt in der Deklaration, hat aber unten einen Renderer.
         light: { actions: ["toggle"] },
@@ -116,8 +116,8 @@ describe("generateSupport — gap-hart", () => {
     const manifest: SkinManifest = {
       name: "minimal",
       targetsContract: "1.1",
-      // sensor + scene bewusst als unsupported deklariert.
-      unsupported: ["camera", "media", "sensor", "scene"],
+      // sensor + scene bewusst als unsupported deklariert (climate ebenso, v1.4).
+      unsupported: ["camera", "media", "sensor", "scene", "climate"],
       widgets: {
         light: { actions: ["toggle"] },
         switch: { actions: ["toggle"] },
@@ -138,8 +138,8 @@ describe("generateSupport — gap-hart", () => {
     expect(hasGap).toBe(false);
     expect(report.widgets.sensor?.level).toBe("unsupported");
     expect(report.widgets.scene?.level).toBe("unsupported");
-    // camera + media + sensor + scene sind als unsupported deklariert (v1.2: 8 Kern-Typen).
-    expect(report.summary.unsupported).toBe(4);
+    // camera + media + sensor + scene + climate als unsupported deklariert (v1.4: 9 Kern-Typen).
+    expect(report.summary.unsupported).toBe(5);
     expect(report.summary.full).toBe(4);
   });
 });
