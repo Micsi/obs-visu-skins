@@ -13,7 +13,7 @@ import type { BlindDevice, Ctx, Device, Tokens } from "@obs/visu-contract";
 import { blindGlyph } from "../glyphs/BlindGlyph.js";
 import { svgIcon } from "../icon.js";
 import { tt } from "../i18n.js";
-import { crumbPath } from "../parts.js";
+import { crumbPath, isWritable } from "../parts.js";
 
 const STEP = 10;
 
@@ -42,11 +42,16 @@ function actionBtn(
   icon: string,
   label: string,
   attrs: Record<string, unknown>,
+  interactive: boolean,
   extraClass?: string,
 ): VNode {
+  // Gesperrt (writable === false): keine Schreib-`data-action`, Button inert.
+  const gated = interactive
+    ? attrs
+    : { ...attrs, "data-action": undefined, disabled: true, "aria-disabled": "true" };
   return h(
     "button",
-    { class: ["vz-action", extraClass].filter(Boolean), type: "button", ...attrs },
+    { class: ["vz-action", extraClass].filter(Boolean), type: "button", ...gated },
     [svgIcon(ctx, dev, icon, 18), label],
   );
 }
@@ -55,6 +60,10 @@ export function blindDetail(d: Device, t: Tokens, ctx: Ctx): VNode {
   const dev = d as BlindDevice;
   const acc = t.accent(dev.accent);
   const locked = !!dev.locked;
+  // writable === false ⇒ gesperrt: Position/Schrittaktionen/Presets UND die
+  // Sperre-Umschaltung (unlock/lock sind Schreibaktionen) sind inert. Der
+  // Schließen-Button (Navigation) bleibt bedienbar.
+  const interactive = isWritable(dev);
 
   return h("div", { class: "vz-dialog", style: { "--acc": acc } }, [
     h("div", { class: "vz-dialog-bar" }),
@@ -86,38 +95,69 @@ export function blindDetail(d: Device, t: Tokens, ctx: Ctx): VNode {
           min: 0,
           max: 100,
           value: dev.position,
-          "data-action": "setPosition",
+          disabled: interactive ? undefined : true,
+          "data-action": interactive ? "setPosition" : undefined,
+          "aria-disabled": interactive ? undefined : "true",
           "aria-label": tt(ctx, "skin.ionic.blind.position", "Position"),
         }),
       ),
       // Action grid — Icon + Label je Button (1:1 der Vorlage „Rollladen Ost").
       h("div", { class: "vz-action-grid" }, [
-        actionBtn(ctx, dev, "chev-up", tt(ctx, "skin.ionic.blind.stepOpen", "Schritt auf"), {
-          "data-action": "setPosition",
-          "data-arg": String(-STEP),
-          "data-relative": "1",
-        }),
-        actionBtn(ctx, dev, "chev-uu", tt(ctx, "skin.ionic.blind.open", "Öffnen"), {
-          "data-action": "setPosition",
-          "data-arg": "0",
-        }),
+        actionBtn(
+          ctx,
+          dev,
+          "chev-up",
+          tt(ctx, "skin.ionic.blind.stepOpen", "Schritt auf"),
+          {
+            "data-action": "setPosition",
+            "data-arg": String(-STEP),
+            "data-relative": "1",
+          },
+          interactive,
+        ),
+        actionBtn(
+          ctx,
+          dev,
+          "chev-uu",
+          tt(ctx, "skin.ionic.blind.open", "Öffnen"),
+          {
+            "data-action": "setPosition",
+            "data-arg": "0",
+          },
+          interactive,
+        ),
         actionBtn(
           ctx,
           dev,
           "stop",
           tt(ctx, "skin.ionic.blind.stop", "Stopp"),
           { "data-action": "stop" },
+          interactive,
           "full",
         ),
-        actionBtn(ctx, dev, "chev-down", tt(ctx, "skin.ionic.blind.stepClose", "Schritt zu"), {
-          "data-action": "setPosition",
-          "data-arg": String(STEP),
-          "data-relative": "1",
-        }),
-        actionBtn(ctx, dev, "chev-dd", tt(ctx, "skin.ionic.blind.close", "Schließen"), {
-          "data-action": "setPosition",
-          "data-arg": "100",
-        }),
+        actionBtn(
+          ctx,
+          dev,
+          "chev-down",
+          tt(ctx, "skin.ionic.blind.stepClose", "Schritt zu"),
+          {
+            "data-action": "setPosition",
+            "data-arg": String(STEP),
+            "data-relative": "1",
+          },
+          interactive,
+        ),
+        actionBtn(
+          ctx,
+          dev,
+          "chev-dd",
+          tt(ctx, "skin.ionic.blind.close", "Schließen"),
+          {
+            "data-action": "setPosition",
+            "data-arg": "100",
+          },
+          interactive,
+        ),
       ]),
       // Vorgabepositionen
       section(
@@ -132,7 +172,9 @@ export function blindDetail(d: Device, t: Tokens, ctx: Ctx): VNode {
                 key: p.key,
                 class: "vz-preset",
                 type: "button",
-                "data-action": "setPosition",
+                disabled: interactive ? undefined : true,
+                "aria-disabled": interactive ? undefined : "true",
+                "data-action": interactive ? "setPosition" : undefined,
                 "data-arg": String(p.pos),
               },
               tt(ctx, p.key, p.fallback),
@@ -149,15 +191,23 @@ export function blindDetail(d: Device, t: Tokens, ctx: Ctx): VNode {
             type: "button",
             role: "switch",
             "aria-checked": String(locked),
-            "data-action": locked ? "unlock" : "lock",
+            disabled: interactive ? undefined : true,
+            "data-action": interactive ? (locked ? "unlock" : "lock") : undefined,
+            "aria-disabled": interactive ? undefined : "true",
             "aria-label": tt(ctx, "skin.ionic.common.lock", "Sperre"),
           }),
           h(
             "span",
             null,
-            locked
-              ? tt(ctx, "skin.ionic.common.lockedHint", "Gesperrt – Bedienung im Widget blockiert")
-              : tt(ctx, "skin.ionic.common.unlocked", "Entsperrt"),
+            !interactive
+              ? tt(ctx, "skin.ionic.common.readonlyHint", "Nicht schreibbar – Bedienung gesperrt")
+              : locked
+                ? tt(
+                    ctx,
+                    "skin.ionic.common.lockedHint",
+                    "Gesperrt – Bedienung im Widget blockiert",
+                  )
+                : tt(ctx, "skin.ionic.common.unlocked", "Entsperrt"),
           ),
         ]),
       ),

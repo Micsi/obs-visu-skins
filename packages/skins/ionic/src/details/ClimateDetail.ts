@@ -13,7 +13,7 @@ import { h, type VNode } from "vue";
 import type { ClimateDevice, Ctx, Device, Tokens } from "@obs/visu-contract";
 import { svgIcon } from "../icon.js";
 import { tt } from "../i18n.js";
-import { crumbPath } from "../parts.js";
+import { crumbPath, isWritable } from "../parts.js";
 
 /** Sollwert-Schrittweite eines −/+ Tipps sowie des Slider-Rasters (°). */
 const STEP = 0.5;
@@ -33,15 +33,24 @@ function modeLabel(ctx: Ctx, mode: ClimateDevice["mode"]): string {
   return tt(ctx, `skin.ionic.climate.mode.${mode}`, MODE_FALLBACK[mode]);
 }
 
-function stepBtn(ctx: Ctx, dev: Device, icon: string, delta: number, label: string): VNode {
+function stepBtn(
+  ctx: Ctx,
+  dev: Device,
+  icon: string,
+  delta: number,
+  label: string,
+  interactive: boolean,
+): VNode {
   return h(
     "button",
     {
       class: "vz-step-btn",
       type: "button",
-      "data-action": "setSetpoint",
+      disabled: interactive ? undefined : true,
+      "data-action": interactive ? "setSetpoint" : undefined,
       "data-arg": String(delta),
       "data-relative": "1",
+      "aria-disabled": interactive ? undefined : "true",
       "aria-label": label,
     },
     svgIcon(ctx, dev, icon, 20),
@@ -51,6 +60,9 @@ function stepBtn(ctx: Ctx, dev: Device, icon: string, delta: number, label: stri
 export function climateDetail(d: Device, t: Tokens, ctx: Ctx): VNode {
   const dev = d as ClimateDevice;
   const acc = t.accent(dev.accent);
+  // writable === false ⇒ gesperrt: Sollwert-Stepper und -Slider tragen keine
+  // setSetpoint-Schreibaktion mehr; Schließen (Navigation) bleibt bedienbar.
+  const interactive = isWritable(dev);
   // Das Thermometer glüht nur, wenn aktiv temperiert wird (heat/cool), nicht bei off.
   const active = dev.mode === "heat" || dev.mode === "cool";
 
@@ -99,12 +111,26 @@ export function climateDetail(d: Device, t: Tokens, ctx: Ctx): VNode {
           tt(ctx, "skin.ionic.climate.setpoint", "Solltemperatur"),
         ),
         h("div", { class: "vz-stepper" }, [
-          stepBtn(ctx, dev, "minus", -STEP, tt(ctx, "skin.ionic.climate.lower", "kälter")),
+          stepBtn(
+            ctx,
+            dev,
+            "minus",
+            -STEP,
+            tt(ctx, "skin.ionic.climate.lower", "kälter"),
+            interactive,
+          ),
           h("div", { class: "vz-stepper-val" }, [
             h("span", { class: "vz-stepper-num" }, ctx.nf(dev.setpoint)),
             h("span", { class: "vz-stepper-unit" }, dev.unit),
           ]),
-          stepBtn(ctx, dev, "plus", STEP, tt(ctx, "skin.ionic.climate.raise", "wärmer")),
+          stepBtn(
+            ctx,
+            dev,
+            "plus",
+            STEP,
+            tt(ctx, "skin.ionic.climate.raise", "wärmer"),
+            interactive,
+          ),
         ]),
         h("input", {
           class: "vz-range",
@@ -113,7 +139,9 @@ export function climateDetail(d: Device, t: Tokens, ctx: Ctx): VNode {
           max: MAX,
           step: STEP,
           value: dev.setpoint,
-          "data-action": "setSetpoint",
+          disabled: interactive ? undefined : true,
+          "data-action": interactive ? "setSetpoint" : undefined,
+          "aria-disabled": interactive ? undefined : "true",
           "aria-label": tt(ctx, "skin.ionic.climate.setpoint", "Solltemperatur"),
         }),
       ]),

@@ -23,7 +23,9 @@
         "close": "schließen",
         "lock": "Sperre",
         "lockedHint": "Gesperrt – Bedienung im Widget blockiert",
-        "unlocked": "Entsperrt"
+        "unlocked": "Entsperrt",
+        "readonly": "Gesperrt",
+        "readonlyHint": "Nicht schreibbar – Bedienung gesperrt"
       },
       "blind": {
         "open": "Öffnen",

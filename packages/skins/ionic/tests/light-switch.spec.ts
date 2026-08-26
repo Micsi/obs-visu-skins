@@ -213,8 +213,14 @@ describe("SwitchTile", () => {
     const offTile = SwitchTile(sw("off"), tokens, ctx) as VNode;
     const offToggle = nodeOfClass(offTile, "vz-toggle");
     expect(classTokens(offToggle)).not.toContain("on");
+    // Der dekorative Toggle spiegelt den Aus-Zustand weiterhin (aria-checked).
     expect(offToggle?.props?.["aria-checked"]).toBe("false");
-    expect(offTile.props?.["aria-pressed"]).toBe("false");
+    // Die `off`-Fixture ist writable:false (Host-Sperre): keine aktive Button-
+    // Semantik (kein aria-pressed) und kein toggle-Intent; sichtbar gesperrt.
+    expect(offTile.props?.["aria-pressed"]).toBeUndefined();
+    expect(offTile.props?.["aria-disabled"]).toBe("true");
+    expect(classTokens(offTile)).toContain("readonly");
+    expect(actions(offTile)).not.toContain("toggle");
   });
 });
 
@@ -223,10 +229,14 @@ describe("SwitchTile", () => {
 describe("SwitchDetail", () => {
   it("renders a fan toggle for every switch fixture (no fabricated telemetry)", () => {
     for (const name of Object.keys(F.switch) as (keyof typeof F.switch)[]) {
-      const root = SwitchDetail(sw(name), tokens, ctx);
+      const dev = sw(name);
+      const root = SwitchDetail(dev, tokens, ctx);
       expect(isVNode(root)).toBe(true);
       expect(hasTag(root, "ion-toggle")).toBe(true);
-      expect(actions(root)).toContain("toggle");
+      // toggle-Intent nur bei bedienbarem Gerät; writable:false (Host-Sperre) rendert
+      // das Toggle inert (kein data-action).
+      if (dev.writable === false) expect(actions(root)).not.toContain("toggle");
+      else expect(actions(root)).toContain("toggle");
       // SwitchDevice carries no VOC/history in the contract — the detail must not
       // synthesize a chart from hard-coded demo data (the close-button icon svg is
       // fine; the fabricated VOC chart container must be absent).

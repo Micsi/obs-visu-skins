@@ -12,15 +12,23 @@ import { h, type VNode } from "vue";
 import type { Ctx, LightDevice, Renderer, Tokens } from "@obs/visu-contract";
 import { svgIcon } from "../icon.js";
 import { tt } from "../i18n.js";
-import { crumbPath } from "../parts.js";
+import { crumbPath, isWritable } from "../parts.js";
 
-function preset(ctx: Ctx, key: string, fallback: string, value: number): VNode {
+function preset(
+  ctx: Ctx,
+  key: string,
+  fallback: string,
+  value: number,
+  interactive: boolean,
+): VNode {
   return h(
     "button",
     {
       class: "vz-preset",
       type: "button",
-      "data-action": "setDim",
+      disabled: interactive ? undefined : true,
+      "aria-disabled": interactive ? undefined : "true",
+      "data-action": interactive ? "setDim" : undefined,
       "data-arg": String(value),
     },
     tt(ctx, key, fallback),
@@ -29,6 +37,9 @@ function preset(ctx: Ctx, key: string, fallback: string, value: number): VNode {
 
 export const LightDetail: Renderer = (d: Readonly<unknown>, t: Tokens, ctx: Ctx): unknown => {
   const dev = d as LightDevice;
+  // writable === false ⇒ gesperrt: alle setDim-Schreib-Controls inert; nur der
+  // Schließen-Button (Navigation, kein Core-Write) bleibt bedienbar.
+  const interactive = isWritable(dev);
   const dim = dev.dim ?? (dev.on ? 100 : 0);
   const val =
     dev.dim != null
@@ -96,7 +107,9 @@ export const LightDetail: Renderer = (d: Readonly<unknown>, t: Tokens, ctx: Ctx)
             min: 0,
             max: 100,
             pin: true,
-            "data-action": "setDim",
+            disabled: interactive ? undefined : true,
+            "data-action": interactive ? "setDim" : undefined,
+            "aria-disabled": interactive ? undefined : "true",
             "aria-label": tt(ctx, "skin.ionic.light.brightness", "Helligkeit"),
           }),
         ]),
@@ -104,12 +117,26 @@ export const LightDetail: Renderer = (d: Readonly<unknown>, t: Tokens, ctx: Ctx)
         h("div", { class: "vz-action-grid" }, [
           h(
             "button",
-            { class: "vz-action", type: "button", "data-action": "setDim", "data-arg": "0" },
+            {
+              class: "vz-action",
+              type: "button",
+              disabled: interactive ? undefined : true,
+              "aria-disabled": interactive ? undefined : "true",
+              "data-action": interactive ? "setDim" : undefined,
+              "data-arg": "0",
+            },
             tt(ctx, "skin.ionic.light.off", "Aus"),
           ),
           h(
             "button",
-            { class: "vz-action", type: "button", "data-action": "setDim", "data-arg": "100" },
+            {
+              class: "vz-action",
+              type: "button",
+              disabled: interactive ? undefined : true,
+              "aria-disabled": interactive ? undefined : "true",
+              "data-action": interactive ? "setDim" : undefined,
+              "data-arg": "100",
+            },
             tt(ctx, "skin.ionic.light.full", "Voll"),
           ),
         ]),
@@ -117,9 +144,9 @@ export const LightDetail: Renderer = (d: Readonly<unknown>, t: Tokens, ctx: Ctx)
         h("div", {}, [
           h("div", { class: "vz-section-h" }, tt(ctx, "skin.ionic.light.scenes", "Szenen")),
           h("div", { class: "vz-preset-row" }, [
-            preset(ctx, "skin.ionic.light.cozy", "Gemütlich", 20),
-            preset(ctx, "skin.ionic.light.read", "Lesen", 60),
-            preset(ctx, "skin.ionic.light.work", "Arbeit", 100),
+            preset(ctx, "skin.ionic.light.cozy", "Gemütlich", 20, interactive),
+            preset(ctx, "skin.ionic.light.read", "Lesen", 60, interactive),
+            preset(ctx, "skin.ionic.light.work", "Arbeit", 100, interactive),
           ]),
         ]),
       ]),

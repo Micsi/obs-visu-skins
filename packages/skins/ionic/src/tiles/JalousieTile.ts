@@ -15,6 +15,7 @@ import { h, type VNode } from "vue";
 import type { Ctx, Device, JalousieDevice, JalousieStatus, Tokens } from "@obs/visu-contract";
 import { jalousieGlyph, slatAngleDeg } from "../glyphs/JalousieGlyph.js";
 import { svgIcon } from "../icon.js";
+import { isWritable } from "../parts.js";
 import { tt } from "../i18n.js";
 
 const SLAT_STEP = 10;
@@ -32,7 +33,11 @@ function posLabel(position: number, ctx: Ctx): string {
 export function jalousieTile(d: Device, t: Tokens, ctx: Ctx): VNode {
   const dev = d as JalousieDevice;
   const locked = !!dev.locked;
-  const interactive = !locked;
+  // writable === false (Host-Sperre) blockiert die Bedienung genau wie die Geräte-
+  // Sperre `locked`: Slider/Tasten werden inert; nur openDetail (Ansicht) bleibt.
+  const ro = !isWritable(dev);
+  const blocked = locked || ro;
+  const interactive = !blocked;
   const acc = t.accent(dev.accent);
   const moving = dev.moving ?? null;
   const statuses: readonly JalousieStatus[] = dev.statuses ?? [];
@@ -61,7 +66,7 @@ export function jalousieTile(d: Device, t: Tokens, ctx: Ctx): VNode {
 
   // ── body: live window glyph + vertical position rail ──
   const windowChildren: VNode[] = [jalousieGlyph({ position: dev.position, slat: dev.slat })];
-  if (locked) {
+  if (blocked) {
     windowChildren.push(h("span", { class: "jal-locktag" }, svgIcon(ctx, dev, "lock", 14)));
   }
   windowChildren.push(
@@ -194,8 +199,11 @@ export function jalousieTile(d: Device, t: Tokens, ctx: Ctx): VNode {
   return h(
     "div",
     {
-      class: ["jal-tile", locked && "locked"].filter(Boolean),
-      style: { "--acc": acc },
+      class: ["jal-tile", locked && "locked", ro && "readonly"].filter(Boolean),
+      // Hülle: vivider Akzent läuft nur in die 4px-Deko-Topbar (--acc-bar), Text/
+      // Icons behalten das AA-abgeleitete --acc — identische Akzent-Semantik wie die
+      // vz-tile-Kacheln (Rolladen/Licht/…). Die reiche Bedienzone bleibt jal-eigen.
+      style: { "--acc": acc, "--acc-bar": `var(--vz-acc-${dev.accent})` },
     },
     [h("div", { class: "jal-head" }, headChildren), body, slatCtl, driveBtns],
   );

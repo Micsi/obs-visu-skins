@@ -10,40 +10,46 @@
 // der Wrapper ist der Button (role/tabindex/aria-pressed). Fußtext zentral über
 // `ctx.stateText(d)`.
 
-import { h } from "vue";
+import { h, type VNode } from "vue";
 import type { Ctx, Renderer, SwitchDevice, Tokens } from "@obs/visu-contract";
-import { stateFoot } from "../parts.js";
+import { isWritable, lockedLabel, lockOverlay, stateFoot } from "../parts.js";
 
 export const SwitchTile: Renderer = (d: Readonly<unknown>, t: Tokens, ctx: Ctx): unknown => {
   const dev = d as SwitchDevice;
+  // writable === false ⇒ gesperrt: keine toggle-Schreibaktion, kein aktiver Button,
+  // Schloss-Badge + Veil und aria-disabled — analog zum Licht-Tile.
+  const ro = !isWritable(dev);
+  const children: VNode[] = ro ? lockOverlay(ctx, dev) : [];
+  children.push(
+    h("div", { class: "vz-eyebrow" }, dev.room),
+    h("div", { class: "vz-label chip" }, ctx.hyphenate(dev.label)),
+    h("div", { class: "vz-tile-body" }, [
+      h(
+        "span",
+        {
+          class: ["vz-toggle", dev.on && "on", ro && "is-disabled"].filter(Boolean),
+          role: "switch",
+          "aria-checked": String(dev.on),
+          "aria-hidden": "true",
+        },
+        [h("i")],
+      ),
+    ]),
+    h("div", { class: "vz-tile-foot" }, stateFoot(ctx, dev)),
+  );
   return h(
     "div",
     {
-      class: ["vz-tile", dev.on && "is-on"].filter(Boolean),
+      class: ["vz-tile", dev.on && "is-on", ro && "readonly"].filter(Boolean),
       style: { "--acc": t.accent(dev.accent), "--acc-bar": `var(--vz-acc-${dev.accent})` },
       "data-type": "switch",
-      "data-action": "toggle",
-      role: "button",
-      tabindex: 0,
-      "aria-pressed": String(dev.on),
-      "aria-label": dev.label,
+      "data-action": ro ? undefined : "toggle",
+      role: ro ? undefined : "button",
+      tabindex: ro ? undefined : 0,
+      "aria-pressed": ro ? undefined : String(dev.on),
+      "aria-disabled": ro ? "true" : undefined,
+      "aria-label": ro ? `${dev.label} – ${lockedLabel(ctx)}` : dev.label,
     },
-    [
-      h("div", { class: "vz-eyebrow" }, dev.room),
-      h("div", { class: "vz-label chip" }, ctx.hyphenate(dev.label)),
-      h("div", { class: "vz-tile-body" }, [
-        h(
-          "span",
-          {
-            class: ["vz-toggle", dev.on && "on"].filter(Boolean),
-            role: "switch",
-            "aria-checked": String(dev.on),
-            "aria-hidden": "true",
-          },
-          [h("i")],
-        ),
-      ]),
-      h("div", { class: "vz-tile-foot" }, stateFoot(ctx, dev)),
-    ],
+    children,
   );
 };
