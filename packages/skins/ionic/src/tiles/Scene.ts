@@ -9,6 +9,7 @@
 import { h, type VNode } from "vue";
 import type { Ctx, Device, Renderer, SceneDevice, Tokens } from "@obs/visu-contract";
 import { svgIcon } from "../icon.js";
+import { isWritable, lockedLabel, lockOverlay } from "../parts.js";
 
 /** Übersetzt einen Skin-Locale-Key mit Fallback (ctx.t ist optional, v1.1). */
 const tr = (ctx: Ctx, key: string, fallback: string): string =>
@@ -31,26 +32,39 @@ export const SceneTile: Renderer = (d: Device, t: Tokens, ctx: Ctx): VNode => {
   // denselben Namen und assistive Technik kann sie nicht unterscheiden (das aria-label
   // überschreibt den sichtbaren Kindtext bei role="button").
   const sceneName = [dev.room, dev.label].filter(Boolean).join(" · ");
-  const ariaLabel = `${tr(ctx, "skin.ionic.scene.activate", "Szene aktivieren")}: ${sceneName}`;
+  // writable === false ⇒ gesperrt: keine activateScene-Schreibaktion, kein aktiver
+  // Button, Schloss-Badge + Veil; aria kennzeichnet den Sperrzustand.
+  const ro = !isWritable(dev);
+  const ariaLabel = ro
+    ? `${sceneName} – ${lockedLabel(ctx)}`
+    : `${tr(ctx, "skin.ionic.scene.activate", "Szene aktivieren")}: ${sceneName}`;
+
+  const children: (VNode | null)[] = ro ? [...lockOverlay(ctx, dev)] : [];
+  children.push(
+    h("div", { class: "vz-eyebrow" }, dev.room),
+    h("div", { class: "vz-label chip" }, ctx.hyphenate(dev.label)),
+    h("div", { class: "vz-tile-body" }, [
+      h(
+        "span",
+        { class: "vz-scene-icon", style: { color: "var(--acc)" } },
+        svgIcon(ctx, dev, dev.icon, 28),
+      ),
+    ]),
+    foot,
+  );
 
   return h(
     "div",
     {
-      class: ["vz-tile", "vz-tile--scene"],
+      class: ["vz-tile", "vz-tile--scene", ro && "readonly"].filter(Boolean),
       style: { "--acc": t.accent(dev.accent), "--acc-bar": `var(--vz-acc-${dev.accent})` },
-      role: "button",
-      tabindex: "0",
-      "data-action": "activateScene",
-      "data-flash-ms": "600",
+      role: ro ? undefined : "button",
+      tabindex: ro ? undefined : "0",
+      "data-action": ro ? undefined : "activateScene",
+      "data-flash-ms": ro ? undefined : "600",
+      "aria-disabled": ro ? "true" : undefined,
       "aria-label": ariaLabel,
     },
-    [
-      h("div", { class: "vz-eyebrow" }, dev.room),
-      h("div", { class: "vz-label chip" }, ctx.hyphenate(dev.label)),
-      h("div", { class: "vz-tile-body" }, [
-        h("span", { class: "vz-scene-icon", style: { color: "var(--acc)" } }, svgIcon(ctx, dev, dev.icon, 28)),
-      ]),
-      foot,
-    ],
+    children,
   );
 };

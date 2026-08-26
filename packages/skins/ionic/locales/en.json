@@ -23,7 +23,9 @@
         "close": "close",
         "lock": "Lock",
         "lockedHint": "Locked – operation blocked in the widget",
-        "unlocked": "Unlocked"
+        "unlocked": "Unlocked",
+        "readonly": "Locked",
+        "readonlyHint": "Not writable – controls locked"
       },
       "blind": {
         "open": "Open",

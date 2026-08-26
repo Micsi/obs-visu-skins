@@ -717,6 +717,30 @@ ion-content.visu-content {
   opacity: 0.7;
 }
 
+/* readonly (writable === false): host-imposed lock — same Sperr-Look as .locked
+   (Schloss-Badge + Veil kommen aus dem Markup via lockOverlay). Bediengruppen
+   werden gedämpft, bleiben aber AA-lesbar (mirror der .locked-Opazität). */
+.vz-tile.readonly .vz-tile-body,
+.vz-tile.readonly .vz-tile-foot,
+.vz-tile--media.readonly .vz-media-head,
+.vz-tile--media.readonly .vz-media-transport,
+.vz-tile--media.readonly .vz-media-volrow {
+  opacity: 0.7;
+}
+
+/* inert Bedien-Controls (disabled / aria-disabled): gedämpft + not-allowed, ohne
+   die Textlesbarkeit unter AA zu drücken. Gilt Kachel- wie Detail-Controls. */
+.vz-action:disabled,
+.vz-preset:disabled,
+.vz-range:disabled,
+.vz-media-btn:disabled,
+.vz-step-btn:disabled,
+.vz-lock-toggle:disabled,
+.vz-toggle.is-disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 /* category row (eyebrow) toggle */
 [data-cats="0"] .vz-eyebrow,
 [data-cats="0"] .jal-eyebrow {
@@ -1187,6 +1211,21 @@ ion-content.visu-content {
   color: var(--vz-fg);
   min-height: 0;
   --acc: var(--vz-accent);
+}
+/* Deko-Akzentbar wie bei .vz-tile: vivides --acc-bar (raw palette) läuft NUR in
+   die 4px-Topbar (WCAG 1.4.11 kontrast-exempt), Fallback auf das AA-sichere --acc,
+   wenn eine Kachel kein --acc-bar setzt. Bringt die Jalousie beim Akzent auf
+   Container-Parität, ohne das jal-eigene Bedien-Chrome anzutasten. */
+.jal-tile::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: var(--vz-bar-h);
+  background: var(--acc-bar, var(--acc));
+  border-top-left-radius: inherit;
+  border-top-right-radius: inherit;
 }
 [data-stil="glass"] .jal-tile {
   backdrop-filter: blur(var(--vz-blur)) saturate(var(--vz-saturate));

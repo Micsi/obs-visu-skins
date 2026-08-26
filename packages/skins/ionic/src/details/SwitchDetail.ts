@@ -15,10 +15,12 @@ import { h } from "vue";
 import type { Ctx, Renderer, SwitchDevice, Tokens } from "@obs/visu-contract";
 import { svgIcon } from "../icon.js";
 import { tt } from "../i18n.js";
-import { crumbPath } from "../parts.js";
+import { crumbPath, isWritable } from "../parts.js";
 
 export const SwitchDetail: Renderer = (d: Readonly<unknown>, t: Tokens, ctx: Ctx): unknown => {
   const dev = d as SwitchDevice;
+  // writable === false ⇒ gesperrt: das toggle trägt keine Schreibaktion mehr.
+  const interactive = isWritable(dev);
 
   return h(
     "div",
@@ -46,7 +48,9 @@ export const SwitchDetail: Renderer = (d: Readonly<unknown>, t: Tokens, ctx: Ctx
         h("div", { style: "display:flex;align-items:center;gap:12px" }, [
           h("ion-toggle", {
             checked: dev.on,
-            "data-action": "toggle",
+            disabled: interactive ? undefined : true,
+            "data-action": interactive ? "toggle" : undefined,
+            "aria-disabled": interactive ? undefined : "true",
             "aria-label": tt(ctx, "skin.ionic.fan.label", "Lüfter"),
           }),
           h(

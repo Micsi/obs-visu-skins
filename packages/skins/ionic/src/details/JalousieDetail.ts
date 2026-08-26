@@ -13,7 +13,7 @@ import type { Ctx, Device, JalousieDevice, JalousieStatus, Tokens } from "@obs/v
 import { jalousieGlyph, slatAngleDeg } from "../glyphs/JalousieGlyph.js";
 import { svgIcon } from "../icon.js";
 import { tt } from "../i18n.js";
-import { crumbPath } from "../parts.js";
+import { crumbPath, isWritable } from "../parts.js";
 
 function dotClass(val: boolean | null): string {
   return val === true ? "is-true" : val === false ? "is-false" : "is-unknown";
@@ -36,10 +36,14 @@ export function jalousieDetail(d: Device, t: Tokens, ctx: Ctx): VNode {
   const dev = d as JalousieDevice;
   const acc = t.accent(dev.accent);
   const locked = !!dev.locked;
-  // Gesperrt = nur Entsperren ist erlaubt; Bewegungs-Intents (setPosition/setSlat)
-  // dürfen die Sperre nicht umgehen — die Detailfläche enforced dieselbe Sperre wie
-  // das Widget. Steuerelemente werden disabled und tragen kein data-action.
-  const interactive = !locked;
+  // writable === false (Host-Sperre): das Gerät ist nicht schreibbar — auch das
+  // Entsperren wäre eine Schreibaktion und ist blockiert.
+  const ro = !isWritable(dev);
+  // Gesperrt = nur Entsperren ist erlaubt (sofern schreibbar); Bewegungs-Intents
+  // (setPosition/setSlat) dürfen die Sperre nicht umgehen — die Detailfläche enforced
+  // dieselbe Sperre wie das Widget. Steuerelemente werden disabled und tragen kein
+  // data-action.
+  const interactive = !locked && !ro;
   const statuses: readonly JalousieStatus[] = dev.statuses ?? [];
 
   const body: VNode[] = [
@@ -147,15 +151,19 @@ export function jalousieDetail(d: Device, t: Tokens, ctx: Ctx): VNode {
           type: "button",
           role: "switch",
           "aria-checked": String(locked),
-          "data-action": locked ? "unlock" : "lock",
+          disabled: ro ? true : undefined,
+          "data-action": ro ? undefined : locked ? "unlock" : "lock",
+          "aria-disabled": ro ? "true" : undefined,
           "aria-label": tt(ctx, "skin.ionic.common.lock", "Sperre"),
         }),
         h(
           "span",
           null,
-          locked
-            ? tt(ctx, "skin.ionic.common.lockedHint", "Gesperrt – Bedienung im Widget blockiert")
-            : tt(ctx, "skin.ionic.common.unlocked", "Entsperrt"),
+          ro
+            ? tt(ctx, "skin.ionic.common.readonlyHint", "Nicht schreibbar – Bedienung gesperrt")
+            : locked
+              ? tt(ctx, "skin.ionic.common.lockedHint", "Gesperrt – Bedienung im Widget blockiert")
+              : tt(ctx, "skin.ionic.common.unlocked", "Entsperrt"),
         ),
       ]),
     ),

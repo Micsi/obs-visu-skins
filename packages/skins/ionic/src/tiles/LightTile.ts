@@ -9,7 +9,7 @@
 
 import { h, type VNode } from "vue";
 import type { Ctx, LightDevice, Renderer, Tokens } from "@obs/visu-contract";
-import { stateFoot } from "../parts.js";
+import { isWritable, lockedLabel, lockOverlay, stateFoot } from "../parts.js";
 
 /**
  * Glühbirnen-Glyph (bulb) — Größe/Geometrie 1:1 aus der Design-System-Vorlage
@@ -44,23 +44,29 @@ function bulbGlyph(): VNode {
 
 export const LightTile: Renderer = (d: Readonly<unknown>, t: Tokens, ctx: Ctx): unknown => {
   const dev = d as LightDevice;
+  // writable === false ⇒ gesperrt: keine toggle-Schreibaktion, kein aktiver Button,
+  // Schloss-Badge + Veil (Blind-Tile-Sperrmuster) und aria-disabled auf der Kachel.
+  const ro = !isWritable(dev);
+  const children: VNode[] = ro ? lockOverlay(ctx, dev) : [];
+  children.push(
+    h("div", { class: "vz-eyebrow" }, dev.room),
+    h("div", { class: "vz-label chip" }, ctx.hyphenate(dev.label)),
+    h("div", { class: "vz-tile-body" }, [bulbGlyph()]),
+    h("div", { class: "vz-tile-foot" }, stateFoot(ctx, dev)),
+  );
   return h(
     "div",
     {
-      class: ["vz-tile", dev.on && "is-on"].filter(Boolean),
+      class: ["vz-tile", dev.on && "is-on", ro && "readonly"].filter(Boolean),
       style: { "--acc": t.accent(dev.accent), "--acc-bar": `var(--vz-acc-${dev.accent})` },
       "data-type": "light",
-      "data-action": "toggle",
-      role: "button",
-      tabindex: 0,
-      "aria-pressed": String(dev.on),
-      "aria-label": dev.label,
+      "data-action": ro ? undefined : "toggle",
+      role: ro ? undefined : "button",
+      tabindex: ro ? undefined : 0,
+      "aria-pressed": ro ? undefined : String(dev.on),
+      "aria-disabled": ro ? "true" : undefined,
+      "aria-label": ro ? `${dev.label} – ${lockedLabel(ctx)}` : dev.label,
     },
-    [
-      h("div", { class: "vz-eyebrow" }, dev.room),
-      h("div", { class: "vz-label chip" }, ctx.hyphenate(dev.label)),
-      h("div", { class: "vz-tile-body" }, [bulbGlyph()]),
-      h("div", { class: "vz-tile-foot" }, stateFoot(ctx, dev)),
-    ],
+    children,
   );
 };

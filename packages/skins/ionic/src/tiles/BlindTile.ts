@@ -12,22 +12,19 @@
 import { h, type VNode } from "vue";
 import type { BlindDevice, Ctx, Device, Tokens } from "@obs/visu-contract";
 import { blindGlyph } from "../glyphs/BlindGlyph.js";
-import { svgIcon } from "../icon.js";
+import { isWritable, lockOverlay } from "../parts.js";
 import { tt } from "../i18n.js";
 
 export function blindTile(d: Device, t: Tokens, ctx: Ctx): VNode {
   const dev = d as BlindDevice;
   const locked = !!dev.locked;
+  // writable === false (Host-Sperre) zeigt dasselbe Sperrmuster wie die Geräte-
+  // Sperre `locked`; openDetail (nur Ansicht) bleibt in beiden Fällen erreichbar.
+  const ro = !isWritable(dev);
+  const showLock = locked || ro;
   const acc = t.accent(dev.accent);
 
-  const children: VNode[] = [];
-
-  if (locked) {
-    children.push(
-      h("span", { class: "vz-lock" }, svgIcon(ctx, dev, "lock", 14)),
-      h("span", { class: "vz-lockveil" }),
-    );
-  }
+  const children: VNode[] = showLock ? lockOverlay(ctx, dev) : [];
 
   children.push(
     h("div", { class: "vz-eyebrow" }, dev.room),
@@ -43,7 +40,7 @@ export function blindTile(d: Device, t: Tokens, ctx: Ctx): VNode {
   return h(
     "div",
     {
-      class: ["vz-tile", "blind", locked && "locked"].filter(Boolean),
+      class: ["vz-tile", "blind", locked && "locked", ro && "readonly"].filter(Boolean),
       style: { "--acc": acc, "--acc-bar": `var(--vz-acc-${dev.accent})` },
       // Anzeige-Kachel: Tap/Long-press öffnet das Detail (auch gesperrt — dort wird
       // entsperrt). Kein setPosition auf der Kachel (Ganzfahrt lebt im Detail).
