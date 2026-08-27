@@ -29,10 +29,10 @@ function contrast(aHex: string, bHex: string): number {
 }
 
 describe("ionic skin scaffold", () => {
-  it("declares a contract-shaped manifest targeting v1.5", () => {
+  it("declares a contract-shaped manifest targeting v1.6", () => {
     const m = manifest as unknown as SkinManifest;
     expect(m.name).toBe("ionic");
-    expect(m.targetsContract).toBe("1.5");
+    expect(m.targetsContract).toBe("1.6");
     expect(m.layout.model).toBe("grid");
     // v1.2: media + camera sind jetzt unterstützt — nichts mehr unsupported.
     expect(m.unsupported).not.toContain("camera");

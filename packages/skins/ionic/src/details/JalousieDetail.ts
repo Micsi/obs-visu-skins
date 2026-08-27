@@ -14,6 +14,7 @@ import { jalousieGlyph, slatAngleDeg } from "../glyphs/JalousieGlyph.js";
 import { svgIcon } from "../icon.js";
 import { tt } from "../i18n.js";
 import { crumbPath, isWritable } from "../parts.js";
+import { presetRow } from "../presets/PositionPresets.js";
 
 function dotClass(val: boolean | null): string {
   return val === true ? "is-true" : val === false ? "is-false" : "is-unknown";
@@ -139,6 +140,12 @@ export function jalousieDetail(d: Device, t: Tokens, ctx: Ctx): VNode {
         ),
       ),
     );
+  }
+
+  // Vorgabepositionen (v1.6, datengetrieben – Position + optional Lamelle in einem Schritt)
+  const presetR = presetRow(dev, ctx);
+  if (presetR) {
+    body.push(section(tt(ctx, "skin.ionic.jalousie.presets", "Vorgabepositionen"), presetR));
   }
 
   // Sperre

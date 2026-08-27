@@ -14,20 +14,9 @@ import { blindGlyph } from "../glyphs/BlindGlyph.js";
 import { svgIcon } from "../icon.js";
 import { tt } from "../i18n.js";
 import { crumbPath, isWritable } from "../parts.js";
+import { presetRow } from "../presets/PositionPresets.js";
 
 const STEP = 10;
-
-interface Preset {
-  readonly key: string;
-  readonly fallback: string;
-  readonly pos: number;
-}
-
-const PRESETS: readonly Preset[] = [
-  { key: "skin.ionic.blind.presetMorning", fallback: "Guten Morgen!", pos: 0 },
-  { key: "skin.ionic.blind.presetSlit", fallback: "Spalt offen", pos: 85 },
-  { key: "skin.ionic.blind.presetSlats", fallback: "Schlitze", pos: 70 },
-];
 
 function section(title: string, body: VNode | VNode[]): VNode {
   return h("div", null, [
@@ -64,6 +53,9 @@ export function blindDetail(d: Device, t: Tokens, ctx: Ctx): VNode {
   // Sperre-Umschaltung (unlock/lock sind Schreibaktionen) sind inert. Der
   // Schließen-Button (Navigation) bleibt bedienbar.
   const interactive = isWritable(dev);
+  // Vorgabepositionen datengetrieben (v1.6): der generische Preset-Renderer trägt die
+  // Sperr-/Schreib-Semantik selbst; fehlen Presets, entfällt die Section ganz.
+  const presetR = presetRow(dev, ctx);
 
   return h("div", { class: "vz-dialog", style: { "--acc": acc } }, [
     h("div", { class: "vz-dialog-bar" }),
@@ -159,29 +151,10 @@ export function blindDetail(d: Device, t: Tokens, ctx: Ctx): VNode {
           interactive,
         ),
       ]),
-      // Vorgabepositionen
-      section(
-        tt(ctx, "skin.ionic.blind.presets", "Vorgabepositionen"),
-        h(
-          "div",
-          { class: "vz-preset-row" },
-          PRESETS.map((p) =>
-            h(
-              "button",
-              {
-                key: p.key,
-                class: "vz-preset",
-                type: "button",
-                disabled: interactive ? undefined : true,
-                "aria-disabled": interactive ? undefined : "true",
-                "data-action": interactive ? "setPosition" : undefined,
-                "data-arg": String(p.pos),
-              },
-              tt(ctx, p.key, p.fallback),
-            ),
-          ),
-        ),
-      ),
+      // Vorgabepositionen (v1.6, datengetrieben – nur wenn Presets vorliegen)
+      ...(presetR
+        ? [section(tt(ctx, "skin.ionic.blind.presets", "Vorgabepositionen"), presetR)]
+        : []),
       // Sperre
       section(
         tt(ctx, "skin.ionic.common.lock", "Sperre"),

@@ -25,7 +25,9 @@
         "lockedHint": "Gesperrt – Bedienung im Widget blockiert",
         "unlocked": "Entsperrt",
         "readonly": "Gesperrt",
-        "readonlyHint": "Nicht schreibbar – Bedienung gesperrt"
+        "readonlyHint": "Nicht schreibbar – Bedienung gesperrt",
+        "positions": "Positionen",
+        "noPresets": "Keine Vorgaben"
       },
       "blind": {
         "open": "Öffnen",
@@ -46,6 +48,7 @@
         "open": "Öffnen",
         "close": "Schließen",
         "position": "Position",
+        "presets": "Vorgabepositionen",
         "posHint": "· 0 %=auf, 100 %=zu",
         "slatAngle": "Lamellenwinkel",
         "slatOpen": "Lamelle öffnen",

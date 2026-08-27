@@ -1,6 +1,6 @@
 {
   "name": "ionic",
-  "targetsContract": "1.5",
+  "targetsContract": "1.6",
   "font": { "family": "Manrope", "src": "./fonts/Manrope.woff2" },
   "renderers": "./renderers.ts",
   "unsupported": [],
@@ -8,8 +8,8 @@
   "widgets": {
     "light": { "actions": ["toggle", "setDim"] },
     "switch": { "actions": ["toggle"] },
-    "blind": { "actions": ["setPosition", "lock", "unlock"] },
-    "jalousie": { "actions": ["setPosition", "setSlat", "lock", "unlock"] },
+    "blind": { "actions": ["setPosition", "applyPreset", "lock", "unlock"] },
+    "jalousie": { "actions": ["setPosition", "setSlat", "applyPreset", "lock", "unlock"] },
     "sensor": { "actions": [] },
     "scene": { "actions": ["activateScene"] },
     "media": { "actions": ["playPause", "stop", "next", "previous", "setVolume"] },
