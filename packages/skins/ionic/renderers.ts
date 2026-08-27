@@ -28,6 +28,8 @@ import { blindDetail } from "./src/details/BlindDetail.js";
 import { jalousieDetail } from "./src/details/JalousieDetail.js";
 import { climateDetail } from "./src/details/ClimateDetail.js";
 
+import { positionPresets } from "./src/presets/PositionPresets.js";
+
 /** Welche Kern-Typen der Ionic-Skin rendert (Spiegel von manifest.json → widgets). */
 export type IonicWidgetType = CoreWidgetType;
 
@@ -63,6 +65,16 @@ export const details: RendererMap = {
   blind: blindDetail,
   jalousie: jalousieDetail,
   climate: climateDetail,
+};
+
+/**
+ * Positions-Preset-Renderer je positionsbasiertem Kern-Typ (v1.6). blind und jalousie
+ * teilen sich denselben generischen Renderer – nur der Preset-Index zählt, die
+ * Anzeige ist identisch. Der Host fährt `dev.presets[index]` via Aktion `applyPreset`.
+ */
+export const presets: RendererMap = {
+  blind: positionPresets,
+  jalousie: positionPresets,
 };
 
 // Tweaks-Verdrahtung: Root-Attribute/Style aus Daten-Tweaks (Daten=JSON, Verhalten=Code).

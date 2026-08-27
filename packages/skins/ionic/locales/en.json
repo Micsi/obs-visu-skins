@@ -25,7 +25,9 @@
         "lockedHint": "Locked – operation blocked in the widget",
         "unlocked": "Unlocked",
         "readonly": "Locked",
-        "readonlyHint": "Not writable – controls locked"
+        "readonlyHint": "Not writable – controls locked",
+        "positions": "Positions",
+        "noPresets": "No presets"
       },
       "blind": {
         "open": "Open",
@@ -35,9 +37,6 @@
         "stop": "Stop",
         "position": "Position",
         "presets": "Preset positions",
-        "presetMorning": "Good morning!",
-        "presetSlit": "Ajar",
-        "presetSlats": "Slits",
         "posOpen": "Open",
         "posClosed": "Closed",
         "posPartial": "Partial"
@@ -46,6 +45,7 @@
         "open": "Open",
         "close": "Close",
         "position": "Position",
+        "presets": "Presets",
         "posHint": "· 0 %=open, 100 %=closed",
         "slatAngle": "Slat angle",
         "slatOpen": "Open slats",

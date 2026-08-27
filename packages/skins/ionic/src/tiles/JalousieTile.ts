@@ -91,6 +91,12 @@ export function jalousieTile(d: Device, t: Tokens, ctx: Ctx): VNode {
       {
         class: ["jal-window", moving && "moving"].filter(Boolean),
         "data-action": "openDetail",
+        // Tastatur-Erreichbarkeit des Details: fokussierbarer Button-Träger (Enter
+        // öffnet). Nur dieser Träger, nicht die Wurzel (die Slider/Buttons enthält),
+        // wird fokussierbar – verschachtelte Interaktive vermeiden.
+        role: "button",
+        tabindex: 0,
+        "aria-label": tt(ctx, "skin.ionic.jalousie.detailHint", "Details"),
         title: tt(ctx, "skin.ionic.jalousie.detailHint", "Details · Sperre"),
       },
       windowChildren,

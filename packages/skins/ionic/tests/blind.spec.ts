@@ -84,8 +84,18 @@ describe("blind detail", () => {
     expect(acts).toContain("setPosition");
     expect(acts).toContain("stop");
     expect(acts).toContain("close");
-    // presets
-    expect(findAll(v, "button", "vz-preset")).toHaveLength(3);
+    // presets (v1.6, datengetrieben aus blind.half.presets): applyPreset trägt den
+    // Index (0..n), Button-Text = roher Fixture-Label — kein setPosition/data-arg=pos mehr.
+    const presetBtns = findAll(v, "button", "vz-preset");
+    expect(presetBtns).toHaveLength(3);
+    expect(acts).toContain("applyPreset");
+    expect(presetBtns.map((b) => b.props?.["data-action"])).toEqual([
+      "applyPreset",
+      "applyPreset",
+      "applyPreset",
+    ]);
+    expect(presetBtns.map((b) => b.props?.["data-arg"])).toEqual(["0", "1", "2"]);
+    expect(presetBtns.map((b) => text(b))).toEqual(["Guten Morgen", "Spalt offen", "Schlitze"]);
   });
 
   it("unlocked detail offers lock; locked detail offers unlock", () => {
