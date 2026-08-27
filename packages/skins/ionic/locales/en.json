@@ -37,9 +37,6 @@
         "stop": "Stop",
         "position": "Position",
         "presets": "Preset positions",
-        "presetMorning": "Good morning!",
-        "presetSlit": "Ajar",
-        "presetSlats": "Slits",
         "posOpen": "Open",
         "posClosed": "Closed",
         "posPartial": "Partial"
