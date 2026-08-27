@@ -29,10 +29,10 @@ function contrast(aHex: string, bHex: string): number {
 }
 
 describe("ionic skin scaffold", () => {
-  it("declares a contract-shaped manifest targeting v1.6", () => {
+  it("declares a contract-shaped manifest targeting v1.7", () => {
     const m = manifest as unknown as SkinManifest;
     expect(m.name).toBe("ionic");
-    expect(m.targetsContract).toBe("1.6");
+    expect(m.targetsContract).toBe("1.7");
     expect(m.layout.model).toBe("grid");
     // v1.2: media + camera sind jetzt unterstützt — nichts mehr unsupported.
     expect(m.unsupported).not.toContain("camera");
@@ -52,6 +52,17 @@ describe("ionic skin scaffold", () => {
         "switch",
       ].sort(),
     );
+  });
+
+  it("declares the v1.7 skin-driven gesture model (tap/longPress/doubleTap)", () => {
+    const m = manifest as unknown as SkinManifest;
+    // Daten=JSON, Verhalten=Code: the manifest maps each gesture to a target; the
+    // host owns the mapping and applies it (the skin owns no state).
+    expect(m.gestures).toEqual({
+      tap: "action",
+      longPress: "presets",
+      doubleTap: "openDetail",
+    });
   });
 
   it("exposes typed renderer maps wired by the renderer waves", () => {

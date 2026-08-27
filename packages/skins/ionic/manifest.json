@@ -1,9 +1,11 @@
 {
   "name": "ionic",
-  "targetsContract": "1.6",
+  "targetsContract": "1.7",
   "font": { "family": "Manrope", "src": "./fonts/Manrope.woff2" },
   "renderers": "./renderers.ts",
   "unsupported": [],
+
+  "gestures": { "tap": "action", "longPress": "presets", "doubleTap": "openDetail" },
 
   "widgets": {
     "light": { "actions": ["toggle", "setDim"] },
