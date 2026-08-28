@@ -10,9 +10,8 @@
 
 import { h, type VNode } from "vue";
 import type { Ctx, LightDevice, Renderer, Tokens } from "@obs/visu-contract";
-import { svgIcon } from "../icon.js";
 import { tt } from "../i18n.js";
-import { crumbPath, isWritable } from "../parts.js";
+import { dialogHead, isWritable } from "../parts.js";
 
 function preset(
   ctx: Ctx,
@@ -50,25 +49,8 @@ export const LightDetail: Renderer = (d: Readonly<unknown>, t: Tokens, ctx: Ctx)
     { class: "vz-dialog", style: { "--acc": t.accent(dev.accent) }, "data-type": "light" },
     [
       h("div", { class: "vz-dialog-bar" }),
-      // Kopf 1:1 aus der Vorlage: Breadcrumb links · zentrierter Titel + Wert ·
-      // Schließen rechts (Layout via `.vz-dialog[data-type="light"]`-Regeln, light-scoped).
-      h("div", { class: "vz-dialog-head" }, [
-        h("div", { class: "vz-dialog-crumb" }, crumbPath(dev)),
-        h("div", { class: "vz-light-titlewrap" }, [
-          h("h2", { class: "vz-dialog-title" }, dev.label),
-          h("div", { class: "vz-dialog-val" }, val),
-        ]),
-        h(
-          "button",
-          {
-            class: "vz-iconbtn",
-            type: "button",
-            "data-action": "close",
-            "aria-label": tt(ctx, "skin.ionic.common.close", "schließen"),
-          },
-          svgIcon(ctx, dev, "x", 20),
-        ),
-      ]),
+      // Geteilter 3-Spalten-Kopf (Breadcrumb · zentrierter Titel+Wert · Schließen).
+      dialogHead(ctx, dev, val),
       h("div", { class: "vz-dialog-body" }, [
         // Hero-Glühbirne — Geometrie 1:1 aus der Vorlage (drei Pfade, 64×64).
         // Farbe/Glow folgen der Helligkeit: leuchtet ab dim > 0 im Akzent.

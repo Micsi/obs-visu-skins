@@ -244,6 +244,14 @@ describe("SwitchDetail", () => {
     }
   });
 
+  it("nutzt den vereinheitlichten 3-Spalten-Kopf (Titel in titlewrap, keine Wert-Zeile)", () => {
+    const root = SwitchDetail(sw("off"), tokens, ctx);
+    expect(hasClass(root, "vz-dialog-titlewrap")).toBe(true);
+    expect(hasClass(root, "vz-dialog-title")).toBe(true);
+    // SwitchDevice trägt keinen Wert ⇒ die Wert-Zeile entfällt.
+    expect(hasClass(root, "vz-dialog-val")).toBe(false);
+  });
+
   it("does not mutate the input device (golden rule 4)", () => {
     const dev = sw("off");
     const snapshot = JSON.stringify(dev);

@@ -13,7 +13,7 @@ import { h, type VNode } from "vue";
 import type { ClimateDevice, Ctx, Device, Tokens } from "@obs/visu-contract";
 import { svgIcon } from "../icon.js";
 import { tt } from "../i18n.js";
-import { crumbPath, isWritable } from "../parts.js";
+import { dialogHead, isWritable } from "../parts.js";
 
 /** Sollwert-Schrittweite eines −/+ Tipps sowie des Slider-Rasters (°). */
 const STEP = 0.5;
@@ -68,23 +68,8 @@ export function climateDetail(d: Device, t: Tokens, ctx: Ctx): VNode {
 
   return h("div", { class: "vz-dialog", style: { "--acc": acc }, "data-type": "climate" }, [
     h("div", { class: "vz-dialog-bar" }),
-    h("div", { class: "vz-dialog-head" }, [
-      h("div", null, [
-        h("div", { class: "vz-dialog-crumb" }, crumbPath(dev)),
-        h("h2", { class: "vz-dialog-title" }, dev.label),
-        h("div", { class: "vz-dialog-val" }, `${ctx.nf(dev.setpoint)} ${dev.unit}`),
-      ]),
-      h(
-        "button",
-        {
-          class: "vz-iconbtn",
-          type: "button",
-          "data-action": "close",
-          "aria-label": tt(ctx, "skin.ionic.common.close", "schließen"),
-        },
-        svgIcon(ctx, dev, "x", 20),
-      ),
-    ]),
+    // Geteilter 3-Spalten-Kopf (Breadcrumb · zentrierter Titel+SOLL-Wert · Schließen).
+    dialogHead(ctx, dev, `${ctx.nf(dev.setpoint)} ${dev.unit}`),
     h("div", { class: "vz-dialog-body" }, [
       h("div", { class: "vz-hero" }, [
         h("svg", {

@@ -162,6 +162,15 @@ describe("climateDetail (v1.4)", () => {
     expect(args).toEqual([-0.5, 0.5]);
   });
 
+  it("nutzt den vereinheitlichten 3-Spalten-Kopf (Titel + Wert in der titlewrap-Zelle)", () => {
+    const root = climateDetail(climate("heat"), tokens, ctx);
+    const wrap = nodeOfClass(root, "vz-dialog-titlewrap");
+    expect(wrap).toBeDefined();
+    // Titel und SOLL-Wert liegen gemeinsam in der zentrierten Titel-Zelle.
+    expect(flatten(wrap).some((n) => classTokens(n).includes("vz-dialog-title"))).toBe(true);
+    expect(flatten(wrap).some((n) => classTokens(n).includes("vz-dialog-val"))).toBe(true);
+  });
+
   it("shows the current temperature and the operating mode label", () => {
     const dev = climate("heat");
     const root = climateDetail(dev, tokens, ctx);

@@ -5,8 +5,8 @@
 import { describe, expect, it } from "vitest";
 import { isVNode, type VNode } from "vue";
 import type { ClimateDevice, Ctx, Device, LightDevice } from "@obs/visu-contract";
-import { stateFoot, crumbPath } from "../src/parts.js";
-import { ctxStub } from "./_vnode.js";
+import { stateFoot, crumbPath, dialogHead } from "../src/parts.js";
+import { classOf, ctxStub, find, text } from "./_vnode.js";
 
 const light = (dim: number | null, on: boolean): LightDevice =>
   ({ type: "light", room: "Bad", label: "Spot", accent: "orange", on, dim }) as LightDevice;
@@ -68,5 +68,30 @@ describe("crumbPath — Detail-Kopf-Breadcrumb", () => {
   it("degradiert ohne floor auf den reinen Raum", () => {
     const dev = light(null, false) as Device;
     expect(crumbPath(dev)).toBe("Bad");
+  });
+});
+
+describe("dialogHead — geteilter Detail-Kopf (3-Spalten-Grid)", () => {
+  const dev = light(45, true) as Device;
+
+  it("baut Crumb-Zelle, zentrierte Titel-Zelle (Titel+Wert im titlewrap) und Schließen-Button", () => {
+    const head = dialogHead(ctxStub(), dev, "45 %");
+    expect(classOf(find(head, "div", "vz-dialog-head"))).toContain("vz-dialog-head");
+    // Crumb-Zelle
+    expect(text(find(head, "div", "vz-dialog-crumb"))).toBe("Bad");
+    // Titel und Wert liegen gemeinsam in der zentrierten titlewrap-Zelle
+    const wrap = find(head, "div", "vz-dialog-titlewrap");
+    expect(wrap).toBeDefined();
+    expect(text(find(wrap, "h2", "vz-dialog-title"))).toBe("Spot");
+    expect(text(find(wrap, "div", "vz-dialog-val"))).toBe("45 %");
+    // Schließen-Button rechts (Navigation, kein Core-Write)
+    const close = find(head, "button", "vz-iconbtn");
+    expect(close?.props?.["data-action"]).toBe("close");
+  });
+
+  it("lässt die Wert-Zeile weg, wenn kein Wert übergeben wird (z. B. Switch)", () => {
+    const head = dialogHead(ctxStub(), dev);
+    expect(find(head, "div", "vz-dialog-titlewrap")).toBeDefined();
+    expect(find(head, "div", "vz-dialog-val")).toBeUndefined();
   });
 });

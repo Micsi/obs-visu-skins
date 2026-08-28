@@ -13,7 +13,7 @@ import type { BlindDevice, Ctx, Device, Tokens } from "@obs/visu-contract";
 import { blindGlyph } from "../glyphs/BlindGlyph.js";
 import { svgIcon } from "../icon.js";
 import { tt } from "../i18n.js";
-import { crumbPath, isWritable } from "../parts.js";
+import { dialogHead, isWritable } from "../parts.js";
 import { presetRow } from "../presets/PositionPresets.js";
 
 const STEP = 10;
@@ -59,23 +59,8 @@ export function blindDetail(d: Device, t: Tokens, ctx: Ctx): VNode {
 
   return h("div", { class: "vz-dialog", style: { "--acc": acc } }, [
     h("div", { class: "vz-dialog-bar" }),
-    h("div", { class: "vz-dialog-head" }, [
-      h("div", null, [
-        h("div", { class: "vz-dialog-crumb" }, crumbPath(dev)),
-        h("h2", { class: "vz-dialog-title" }, dev.label),
-        h("div", { class: "vz-dialog-val" }, `${dev.position} %`),
-      ]),
-      h(
-        "button",
-        {
-          class: "vz-iconbtn",
-          type: "button",
-          "data-action": "close",
-          "aria-label": tt(ctx, "skin.ionic.common.close", "schließen"),
-        },
-        svgIcon(ctx, dev, "x", 20),
-      ),
-    ]),
+    // Geteilter 3-Spalten-Kopf (Breadcrumb · zentrierter Titel+Position · Schließen).
+    dialogHead(ctx, dev, `${dev.position} %`),
     h("div", { class: "vz-dialog-body" }, [
       h("div", { class: "vz-hero" }, [blindGlyph({ position: dev.position, w: 60, h: 50 })]),
       // Position slider
