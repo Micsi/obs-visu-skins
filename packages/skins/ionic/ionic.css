@@ -42,7 +42,7 @@
   --vz-cell: 112px;
   --vz-gap: 7px;
   --vz-pad: 14px;
-  --vz-radius: 16px;
+  --vz-radius: 14px;
   --vz-radius-sm: 8px;
   --vz-radius-lg: 22px;
   --vz-bar-h: 4px;
@@ -654,10 +654,13 @@ ion-content.visu-content {
 }
 .vz-label.chip {
   align-self: stretch;
-  background: var(--vz-chip-bg);
+  /* Vorlage: Titel als schlichter Text auf dem Glas, kein sichtbares Chip-Plättchen.
+     Geometrie (padding/radius) bleibt, nur die milchige Fläche + Hairline entfallen
+     (AA-neutral: Titel ist near-white, der whitish Chip trug keinen Kontrast bei). */
+  background: transparent;
   padding: 2px 6px;
   border-radius: 7px;
-  border: 0.5px solid var(--vz-hairline);
+  border: 0;
 }
 .vz-tile-body {
   flex: 1;
