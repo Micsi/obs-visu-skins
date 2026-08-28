@@ -66,7 +66,11 @@ export function climateDetail(d: Device, t: Tokens, ctx: Ctx): VNode {
   // Das Thermometer glüht nur, wenn aktiv temperiert wird (heat/cool), nicht bei off.
   const active = dev.mode === "heat" || dev.mode === "cool";
 
-  return h("div", { class: "vz-dialog", style: { "--acc": acc }, "data-type": "climate" }, [
+  // Kachel-Ableitung spiegeln: vivides --acc-bar (rohe Palette) speist die helle
+  // 4px-Deko-Topbar, das AA-sichere --acc bleibt für Text/Werte.
+  const dialogStyle = { "--acc": acc, "--acc-bar": `var(--vz-acc-${dev.accent})` };
+
+  return h("div", { class: "vz-dialog", style: dialogStyle, "data-type": "climate" }, [
     h("div", { class: "vz-dialog-bar" }),
     // Geteilter 3-Spalten-Kopf (Breadcrumb · zentrierter Titel+SOLL-Wert · Schließen).
     dialogHead(ctx, dev, `${ctx.nf(dev.setpoint)} ${dev.unit}`),

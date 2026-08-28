@@ -23,6 +23,7 @@ export function ctxStub(overrides: Partial<Ctx> = {}): Ctx {
     stateText: () => "",
     stateParts: () => ({ word: "", rest: "" }),
     hyphenate: (s) => s,
+    floorShort: () => "",
     icon: (_d: Device, slot: string) => `icon:${slot}`,
     nf: (v) => String(v),
     warn: () => false,

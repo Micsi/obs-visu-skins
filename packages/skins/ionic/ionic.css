@@ -627,10 +627,10 @@ ion-content.visu-content {
 .vz-eyebrow {
   font-size: 9.5px;
   line-height: 1.1;
-  letter-spacing: 0.07em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--vz-fg-mute);
-  font-weight: 700;
+  font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1806,7 +1806,9 @@ ion-content.visu-content {
 }
 .vz-dialog-bar {
   height: 5px;
-  background: var(--acc, var(--vz-accent));
+  /* Wie .vz-tile::before: vivides --acc-bar (rohe Palette) in die Deko-Topbar,
+     Fallback auf das AA-sichere --acc, falls ein Dialog kein --acc-bar setzt. */
+  background: var(--acc-bar, var(--acc, var(--vz-accent)));
 }
 .vz-dialog-crumb {
   font-family: var(--vz-font-mono);

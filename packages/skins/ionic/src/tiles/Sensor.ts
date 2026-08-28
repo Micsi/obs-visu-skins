@@ -15,6 +15,7 @@ import { h, type VNode } from "vue";
 import type { Ctx, Device, Renderer, SensorDevice, Tokens } from "@obs/visu-contract";
 import { svgIcon } from "../icon.js";
 import { tt } from "../i18n.js";
+import { eyebrowText } from "../parts.js";
 
 /** Sparkline-Geometrie (nicht-uniformer viewBox, füllt die Kachelbreite). */
 const CHART_W = 200;
@@ -98,7 +99,7 @@ function chartTile(dev: SensorDevice, t: Tokens, ctx: Ctx, warn: boolean): VNode
       "aria-label": tt(ctx, "skin.ionic.sensor.aria", "Sensor"),
     },
     [
-      h("div", { class: "vz-eyebrow" }, dev.room),
+      h("div", { class: "vz-eyebrow" }, eyebrowText(ctx, dev)),
       h("div", { class: "vz-label chip" }, ctx.hyphenate(dev.label)),
       h("div", { class: "vz-tile-body vz-chart-body" }, [
         valueGroup(dev, ctx, "vz-val--lead"),
@@ -128,7 +129,7 @@ function iconTile(dev: SensorDevice, t: Tokens, ctx: Ctx, warn: boolean): VNode 
       "aria-label": tt(ctx, "skin.ionic.sensor.aria", "Sensor"),
     },
     [
-      h("div", { class: "vz-eyebrow" }, dev.room),
+      h("div", { class: "vz-eyebrow" }, eyebrowText(ctx, dev)),
       h("div", { class: "vz-label chip" }, ctx.hyphenate(dev.label)),
       h("div", { class: "vz-tile-body" }, [
         h("div", { class: "vz-sensor-row" }, [
@@ -169,7 +170,7 @@ export const SensorTile: Renderer = (d: Device, t: Tokens, ctx: Ctx): VNode => {
       "aria-label": tt(ctx, "skin.ionic.sensor.aria", "Sensor"),
     },
     [
-      h("div", { class: "vz-eyebrow" }, dev.room),
+      h("div", { class: "vz-eyebrow" }, eyebrowText(ctx, dev)),
       h("div", { class: "vz-label chip" }, ctx.hyphenate(dev.label)),
       h("div", { class: "vz-tile-body" }, [valueGroup(dev, ctx)]),
       foot,

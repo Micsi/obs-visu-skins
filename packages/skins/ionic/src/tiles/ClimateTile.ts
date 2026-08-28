@@ -10,7 +10,7 @@
 import { h, type VNode } from "vue";
 import type { ClimateDevice, Ctx, Device, Tokens } from "@obs/visu-contract";
 import { tt } from "../i18n.js";
-import { isWritable, lockOverlay, stateFoot } from "../parts.js";
+import { eyebrowText, isWritable, lockOverlay, stateFoot } from "../parts.js";
 
 /**
  * climate-Kachel (2×2): SOLL-Temperatur groß, darunter die Akzent-Caption „SOLL";
@@ -36,7 +36,7 @@ export function climateTile(d: Device, t: Tokens, ctx: Ctx): VNode {
     },
     [
       ...(ro ? lockOverlay(ctx, dev) : []),
-      h("div", { class: "vz-eyebrow" }, dev.room),
+      h("div", { class: "vz-eyebrow" }, eyebrowText(ctx, dev)),
       h("div", { class: "vz-label chip" }, ctx.hyphenate(dev.label)),
       h("div", { class: "vz-tile-body" }, [
         h("div", { class: "vz-climate-set" }, [

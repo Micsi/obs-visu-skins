@@ -9,7 +9,7 @@
 
 import { h, type VNode } from "vue";
 import type { Ctx, LightDevice, Renderer, Tokens } from "@obs/visu-contract";
-import { isWritable, lockedLabel, lockOverlay, stateFoot } from "../parts.js";
+import { eyebrowText, isWritable, lockedLabel, lockOverlay, stateFoot } from "../parts.js";
 
 /**
  * Glühbirnen-Glyph (bulb) — Größe/Geometrie 1:1 aus der Design-System-Vorlage
@@ -49,7 +49,7 @@ export const LightTile: Renderer = (d: Readonly<unknown>, t: Tokens, ctx: Ctx): 
   const ro = !isWritable(dev);
   const children: VNode[] = ro ? lockOverlay(ctx, dev) : [];
   children.push(
-    h("div", { class: "vz-eyebrow" }, dev.room),
+    h("div", { class: "vz-eyebrow" }, eyebrowText(ctx, dev)),
     h("div", { class: "vz-label chip" }, ctx.hyphenate(dev.label)),
     h("div", { class: "vz-tile-body" }, [bulbGlyph()]),
     h("div", { class: "vz-tile-foot" }, stateFoot(ctx, dev)),

@@ -15,7 +15,7 @@ import { h, type VNode } from "vue";
 import type { Ctx, Device, JalousieDevice, JalousieStatus, Tokens } from "@obs/visu-contract";
 import { jalousieGlyph, slatAngleDeg } from "../glyphs/JalousieGlyph.js";
 import { svgIcon } from "../icon.js";
-import { isWritable } from "../parts.js";
+import { eyebrowText, isWritable } from "../parts.js";
 import { tt } from "../i18n.js";
 
 const SLAT_STEP = 10;
@@ -45,7 +45,7 @@ export function jalousieTile(d: Device, t: Tokens, ctx: Ctx): VNode {
   // ── header ──
   const headChildren: VNode[] = [
     h("div", { class: "jal-title" }, [
-      h("span", { class: "jal-eyebrow" }, dev.room),
+      h("span", { class: "jal-eyebrow" }, eyebrowText(ctx, dev)),
       h("span", { class: "jal-label" }, ctx.hyphenate(dev.label)),
     ]),
   ];

@@ -24,6 +24,18 @@ export function stateFoot(ctx: Ctx, d: Device): (VNode | string)[] {
 }
 
 /**
+ * Eyebrow-Text der Kachel (Vorlage: „EG KÜCHE" – Etagenkürzel + Raum, das
+ * Uppercase kommt aus dem CSS `text-transform`, hier NICHT doppelt hochstellen).
+ * Das Kürzel liefert der Host über {@link Ctx.floorShort} (Etagen-Mapping =
+ * Host/Core-Logik, der Skin besitzt kein Mapping – Goldene Regel 7). Fehlt der
+ * Floor (leeres Kürzel), bleibt nur der Raum – kein führendes Leerzeichen.
+ */
+export function eyebrowText(ctx: Ctx, d: Device): string {
+  const fs = ctx.floorShort(d);
+  return fs ? `${fs} ${d.room}` : d.room;
+}
+
+/**
  * Crumb-Pfad des Detail-Kopfs (Vorlage: „Erdgeschoss / Bad"). Mit optionalem
  * {@link DeviceBase.floor} (v1.4) wird „<floor> / <room>" gezeigt, sonst nur der
  * Raum — kein Fork, reine Anzeige der Vertragsfelder.

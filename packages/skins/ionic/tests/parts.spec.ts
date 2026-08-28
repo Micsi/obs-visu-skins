@@ -5,7 +5,7 @@
 import { describe, expect, it } from "vitest";
 import { isVNode, type VNode } from "vue";
 import type { ClimateDevice, Ctx, Device, LightDevice } from "@obs/visu-contract";
-import { stateFoot, crumbPath, dialogHead } from "../src/parts.js";
+import { stateFoot, crumbPath, dialogHead, eyebrowText } from "../src/parts.js";
 import { classOf, ctxStub, find, text } from "./_vnode.js";
 
 const light = (dim: number | null, on: boolean): LightDevice =>
@@ -68,6 +68,19 @@ describe("crumbPath — Detail-Kopf-Breadcrumb", () => {
   it("degradiert ohne floor auf den reinen Raum", () => {
     const dev = light(null, false) as Device;
     expect(crumbPath(dev)).toBe("Bad");
+  });
+});
+
+describe("eyebrowText — Etagenkürzel + Raum (Vorlage: „EG KÜCHE“)", () => {
+  it("stellt das Host-Kürzel (ctx.floorShort) dem Raum voran, space-getrennt", () => {
+    // Uppercase kommt aus dem CSS (text-transform), nicht aus dem Renderer.
+    const ctx: Ctx = ctxStub({ floorShort: () => "EG" });
+    expect(eyebrowText(ctx, light(null, false))).toBe("EG Bad");
+  });
+
+  it("degradiert ohne Kürzel auf den reinen Raum – kein führendes Leerzeichen", () => {
+    const ctx: Ctx = ctxStub({ floorShort: () => "" });
+    expect(eyebrowText(ctx, light(null, false))).toBe("Bad");
   });
 });
 

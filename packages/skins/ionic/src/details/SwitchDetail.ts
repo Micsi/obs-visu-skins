@@ -23,7 +23,12 @@ export const SwitchDetail: Renderer = (d: Readonly<unknown>, t: Tokens, ctx: Ctx
 
   return h(
     "div",
-    { class: "vz-dialog", style: { "--acc": t.accent(dev.accent) }, "data-type": "switch" },
+    {
+      class: "vz-dialog",
+      // --acc-bar (hell, rohe Palette) speist die Deko-Topbar wie bei der Kachel.
+      style: { "--acc": t.accent(dev.accent), "--acc-bar": `var(--vz-acc-${dev.accent})` },
+      "data-type": "switch",
+    },
     [
       h("div", { class: "vz-dialog-bar" }),
       // Geteilter 3-Spalten-Kopf ohne Wert-Zeile (SwitchDevice trägt keinen Kopf-Wert).

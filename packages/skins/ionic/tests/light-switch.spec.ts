@@ -35,6 +35,7 @@ const ctx: Ctx = {
     return at >= 0 ? { word: full.slice(0, at), rest: full.slice(at) } : { word: full, rest: "" };
   },
   hyphenate: (s) => s,
+  floorShort: () => "",
   icon: (_d, slot) => slot,
   nf: (v) => String(v),
   warn: () => false,

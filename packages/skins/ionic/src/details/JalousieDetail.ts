@@ -176,7 +176,11 @@ export function jalousieDetail(d: Device, t: Tokens, ctx: Ctx): VNode {
     ),
   );
 
-  return h("div", { class: "vz-dialog", style: { "--acc": acc } }, [
+  // Kachel-Ableitung spiegeln: vivides --acc-bar (rohe Palette) speist die helle
+  // 4px-Deko-Topbar, das AA-sichere --acc bleibt für Text/Werte.
+  const dialogStyle = { "--acc": acc, "--acc-bar": `var(--vz-acc-${dev.accent})` };
+
+  return h("div", { class: "vz-dialog", style: dialogStyle }, [
     h("div", { class: "vz-dialog-bar" }),
     // Geteilter 3-Spalten-Kopf (Breadcrumb · zentrierter Titel+Position/Winkel · Schließen).
     dialogHead(ctx, dev, `${dev.position} % · ${slatAngleDeg(dev.slat)}°`),

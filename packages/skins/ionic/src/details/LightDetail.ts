@@ -46,7 +46,12 @@ export const LightDetail: Renderer = (d: Readonly<unknown>, t: Tokens, ctx: Ctx)
       : tt(ctx, dev.on ? "skin.ionic.light.on" : "skin.ionic.light.off", dev.on ? "Ein" : "Aus");
   return h(
     "div",
-    { class: "vz-dialog", style: { "--acc": t.accent(dev.accent) }, "data-type": "light" },
+    {
+      class: "vz-dialog",
+      // --acc-bar (hell, rohe Palette) speist die Deko-Topbar wie bei der Kachel.
+      style: { "--acc": t.accent(dev.accent), "--acc-bar": `var(--vz-acc-${dev.accent})` },
+      "data-type": "light",
+    },
     [
       h("div", { class: "vz-dialog-bar" }),
       // Geteilter 3-Spalten-Kopf (Breadcrumb · zentrierter Titel+Wert · Schließen).

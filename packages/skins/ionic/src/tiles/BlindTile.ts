@@ -12,7 +12,7 @@
 import { h, type VNode } from "vue";
 import type { BlindDevice, Ctx, Device, Tokens } from "@obs/visu-contract";
 import { blindGlyph } from "../glyphs/BlindGlyph.js";
-import { isWritable, lockOverlay } from "../parts.js";
+import { eyebrowText, isWritable, lockOverlay } from "../parts.js";
 import { tt } from "../i18n.js";
 
 export function blindTile(d: Device, t: Tokens, ctx: Ctx): VNode {
@@ -27,7 +27,7 @@ export function blindTile(d: Device, t: Tokens, ctx: Ctx): VNode {
   const children: VNode[] = showLock ? lockOverlay(ctx, dev) : [];
 
   children.push(
-    h("div", { class: "vz-eyebrow" }, dev.room),
+    h("div", { class: "vz-eyebrow" }, eyebrowText(ctx, dev)),
     h("div", { class: "vz-label chip" }, ctx.hyphenate(dev.label)),
     h("div", { class: "vz-tile-body" }, [blindGlyph({ position: dev.position, w: 44, h: 34 })]),
     h("div", { class: "vz-tile-foot" }, [
