@@ -39,7 +39,7 @@
   --vz-fs-num-xl: 44px;
 
   /* === Spacing & shape === */
-  --vz-cell: 112px;
+  --vz-cell: 108px;
   --vz-gap: 7px;
   --vz-pad: 14px;
   --vz-radius: 14px;
@@ -1788,6 +1788,15 @@ ion-content.visu-content {
   background-image: var(--vz-bg-grad), var(--vz-bg-image);
   background-size: cover;
   color: var(--vz-fg);
+}
+/* Image-Theme: das Detail-Modal ist eine fokussierte Flaeche. Der Seiten-Scrim
+   (--vz-bg-grad 0.18 oben) laesst den Kachel-Fototeil oben zu hell/scharf, sodass
+   Inhalt darauf schwimmt. Hier ein staerkerer, nahezu gleichmaessiger Scrim ueber
+   dem Foto, damit Kopf/Slider/Szenen ueber die volle Hoehe AA-lesbar sind und der
+   Modal-Fokus stimmt. Kein image-Vorlage-Ref (Vorlage zeigt Dialoge nur dark);
+   AA-verifiziert. */
+.visu-root[data-theme="image"] .vz-dialog {
+  background-image: linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.58)), var(--vz-bg-image);
 }
 /* Geteilter Detail-Kopf (Design-System-Vorlage „Detail-Dialoge"): drei Spalten
    Breadcrumb · zentrierter Titel · Schließen, mit dezenter Kopf-Trennlinie unter
