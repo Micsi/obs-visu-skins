@@ -24,12 +24,54 @@ export function stateFoot(ctx: Ctx, d: Device): (VNode | string)[] {
 }
 
 /**
+ * Eyebrow-Text der Kachel (Vorlage: „EG KÜCHE" – Etagenkürzel + Raum, das
+ * Uppercase kommt aus dem CSS `text-transform`, hier NICHT doppelt hochstellen).
+ * Das Kürzel liefert der Host über {@link Ctx.floorShort} (Etagen-Mapping =
+ * Host/Core-Logik, der Skin besitzt kein Mapping – Goldene Regel 7). Fehlt der
+ * Floor (leeres Kürzel), bleibt nur der Raum – kein führendes Leerzeichen.
+ */
+export function eyebrowText(ctx: Ctx, d: Device): string {
+  const fs = ctx.floorShort(d);
+  return fs ? `${fs} ${d.room}` : d.room;
+}
+
+/**
  * Crumb-Pfad des Detail-Kopfs (Vorlage: „Erdgeschoss / Bad"). Mit optionalem
  * {@link DeviceBase.floor} (v1.4) wird „<floor> / <room>" gezeigt, sonst nur der
  * Raum — kein Fork, reine Anzeige der Vertragsfelder.
  */
 export function crumbPath(d: Device): string {
   return d.floor ? `${d.floor} / ${d.room}` : d.room;
+}
+
+/**
+ * Geteilter Detail-Kopf (Design-System-Vorlage „Detail-Dialoge"): drei Spalten
+ * `Breadcrumb | zentrierter Titel | Schließen`. Der Titel (und ein optionaler Wert)
+ * liegen gemeinsam in der zentrierten `.vz-dialog-titlewrap`-Zelle AUF der Crumb-Zeile
+ * (nicht mehr in einer zweiten, linksbündigen Zeile). Alle Detail-Renderer teilen
+ * diesen Baustein, damit Light/Blind/Jalousie/Switch/Climate denselben Kopf zeigen.
+ *
+ * Reine Anzeige (Goldene Regel 1/4): liest nur `d`; der Schließen-Button markiert die
+ * Navigations-Aktion `close` (kein Core-Write). `val` entfällt bei Geräten ohne
+ * Kopf-Wert (z. B. Switch), dann bleibt die Wert-Zeile weg.
+ */
+export function dialogHead(ctx: Ctx, d: Device, val?: string | null): VNode {
+  const titlewrap: (VNode | null)[] = [h("h2", { class: "vz-dialog-title" }, d.label)];
+  if (val != null) titlewrap.push(h("div", { class: "vz-dialog-val" }, val));
+  return h("div", { class: "vz-dialog-head" }, [
+    h("div", { class: "vz-dialog-crumb" }, crumbPath(d)),
+    h("div", { class: "vz-dialog-titlewrap" }, titlewrap),
+    h(
+      "button",
+      {
+        class: "vz-iconbtn",
+        type: "button",
+        "data-action": "close",
+        "aria-label": tt(ctx, "skin.ionic.common.close", "schließen"),
+      },
+      svgIcon(ctx, d, "x", 20),
+    ),
+  ]);
 }
 
 /**

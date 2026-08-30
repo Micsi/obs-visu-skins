@@ -9,7 +9,7 @@
 import { h, type VNode } from "vue";
 import type { Ctx, Device, Renderer, SceneDevice, Tokens } from "@obs/visu-contract";
 import { svgIcon } from "../icon.js";
-import { isWritable, lockedLabel, lockOverlay } from "../parts.js";
+import { eyebrowText, isWritable, lockedLabel, lockOverlay } from "../parts.js";
 
 /** Übersetzt einen Skin-Locale-Key mit Fallback (ctx.t ist optional, v1.1). */
 const tr = (ctx: Ctx, key: string, fallback: string): string =>
@@ -41,7 +41,7 @@ export const SceneTile: Renderer = (d: Device, t: Tokens, ctx: Ctx): VNode => {
 
   const children: (VNode | null)[] = ro ? [...lockOverlay(ctx, dev)] : [];
   children.push(
-    h("div", { class: "vz-eyebrow" }, dev.room),
+    h("div", { class: "vz-eyebrow" }, eyebrowText(ctx, dev)),
     h("div", { class: "vz-label chip" }, ctx.hyphenate(dev.label)),
     h("div", { class: "vz-tile-body" }, [
       h(

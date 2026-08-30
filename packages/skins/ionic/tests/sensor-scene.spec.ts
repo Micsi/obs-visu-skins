@@ -24,6 +24,7 @@ const makeCtx = (over: Partial<Ctx> = {}): Ctx => ({
   stateText: () => "",
   stateParts: () => ({ word: "", rest: "" }),
   hyphenate: (s) => s,
+  floorShort: () => "",
   icon: (_d, slot) => slot,
   nf: (v) => String(v),
   warn: () => false,

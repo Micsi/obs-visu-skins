@@ -13,9 +13,8 @@
 
 import { h } from "vue";
 import type { Ctx, Renderer, SwitchDevice, Tokens } from "@obs/visu-contract";
-import { svgIcon } from "../icon.js";
 import { tt } from "../i18n.js";
-import { crumbPath, isWritable } from "../parts.js";
+import { dialogHead, isWritable } from "../parts.js";
 
 export const SwitchDetail: Renderer = (d: Readonly<unknown>, t: Tokens, ctx: Ctx): unknown => {
   const dev = d as SwitchDevice;
@@ -24,25 +23,16 @@ export const SwitchDetail: Renderer = (d: Readonly<unknown>, t: Tokens, ctx: Ctx
 
   return h(
     "div",
-    { class: "vz-dialog", style: { "--acc": t.accent(dev.accent) }, "data-type": "switch" },
+    {
+      class: "vz-dialog",
+      // --acc-bar (hell, rohe Palette) speist die Deko-Topbar wie bei der Kachel.
+      style: { "--acc": t.accent(dev.accent), "--acc-bar": `var(--vz-acc-${dev.accent})` },
+      "data-type": "switch",
+    },
     [
       h("div", { class: "vz-dialog-bar" }),
-      h("div", { class: "vz-dialog-head" }, [
-        h("div", null, [
-          h("div", { class: "vz-dialog-crumb" }, crumbPath(dev)),
-          h("h2", { class: "vz-dialog-title" }, dev.label),
-        ]),
-        h(
-          "button",
-          {
-            class: "vz-iconbtn",
-            type: "button",
-            "data-action": "close",
-            "aria-label": tt(ctx, "skin.ionic.common.close", "schließen"),
-          },
-          svgIcon(ctx, dev, "x", 20),
-        ),
-      ]),
+      // Geteilter 3-Spalten-Kopf ohne Wert-Zeile (SwitchDevice trägt keinen Kopf-Wert).
+      dialogHead(ctx, dev),
       h("div", { class: "vz-dialog-body" }, [
         // Lüfter-Toggle
         h("div", { style: "display:flex;align-items:center;gap:12px" }, [

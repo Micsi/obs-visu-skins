@@ -35,6 +35,7 @@ const ctx: Ctx = {
     return at >= 0 ? { word: full.slice(0, at), rest: full.slice(at) } : { word: full, rest: "" };
   },
   hyphenate: (s) => s,
+  floorShort: () => "",
   icon: (_d, slot) => `body:${slot}`,
   nf: (v) => String(v),
   warn: () => false,
@@ -160,6 +161,15 @@ describe("climateDetail (v1.4)", () => {
     expect(steppers.length).toBe(2);
     const args = steppers.map((n) => Number(n.props?.["data-arg"])).sort((a, b) => a - b);
     expect(args).toEqual([-0.5, 0.5]);
+  });
+
+  it("nutzt den vereinheitlichten 3-Spalten-Kopf (Titel + Wert in der titlewrap-Zelle)", () => {
+    const root = climateDetail(climate("heat"), tokens, ctx);
+    const wrap = nodeOfClass(root, "vz-dialog-titlewrap");
+    expect(wrap).toBeDefined();
+    // Titel und SOLL-Wert liegen gemeinsam in der zentrierten Titel-Zelle.
+    expect(flatten(wrap).some((n) => classTokens(n).includes("vz-dialog-title"))).toBe(true);
+    expect(flatten(wrap).some((n) => classTokens(n).includes("vz-dialog-val"))).toBe(true);
   });
 
   it("shows the current temperature and the operating mode label", () => {

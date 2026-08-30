@@ -98,6 +98,15 @@ describe("blind detail", () => {
     expect(presetBtns.map((b) => text(b))).toEqual(["Guten Morgen", "Spalt offen", "Schlitze"]);
   });
 
+  it("nutzt den vereinheitlichten 3-Spalten-Kopf (Titel im titlewrap, Wert daneben)", () => {
+    const v = blindDetail(dev("half"), tokensStub, ctxStub());
+    const wrap = find(v, "div", "vz-dialog-titlewrap");
+    expect(wrap).toBeDefined();
+    // Titel liegt in der zentrierten titlewrap-Zelle, nicht mehr in einer 2. Zeile.
+    expect(text(find(wrap, "h2", "vz-dialog-title"))).toBe(dev("half").label);
+    expect(text(find(wrap, "div", "vz-dialog-val"))).toBe("62 %");
+  });
+
   it("unlocked detail offers lock; locked detail offers unlock", () => {
     expect(actions(blindDetail(dev("half"), tokensStub, ctxStub()))).toContain("lock");
     expect(actions(blindDetail(dev("locked"), tokensStub, ctxStub()))).toContain("unlock");

@@ -107,7 +107,11 @@ describe("jalousie detail", () => {
     expect(acts).toContain("setPosition");
     expect(acts).toContain("setSlat");
     expect(findAll(v, "span", "vz-status-item")).toHaveLength(3);
-    expect(text(find(v, "div", "vz-dialog-val"))).toBe("62 % · 31°");
+    // Vereinheitlichter 3-Spalten-Kopf: Titel + Wert liegen in der titlewrap-Zelle.
+    const wrap = find(v, "div", "vz-dialog-titlewrap");
+    expect(wrap).toBeDefined();
+    expect(text(find(wrap, "h2", "vz-dialog-title"))).toBe(dev("tilted").label);
+    expect(text(find(wrap, "div", "vz-dialog-val"))).toBe("62 % · 31°");
   });
 
   it("unlocked detail offers lock; locked detail offers unlock", () => {

@@ -627,10 +627,10 @@ ion-content.visu-content {
 .vz-eyebrow {
   font-size: 9.5px;
   line-height: 1.1;
-  letter-spacing: 0.07em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--vz-fg-mute);
-  font-weight: 700;
+  font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1789,16 +1789,26 @@ ion-content.visu-content {
   background-size: cover;
   color: var(--vz-fg);
 }
+/* Geteilter Detail-Kopf (Design-System-Vorlage „Detail-Dialoge"): drei Spalten
+   Breadcrumb · zentrierter Titel · Schließen, mit dezenter Kopf-Trennlinie unter
+   der Titel-Zeile (Hairline-Token, dark + light/image AA-dezent). */
 .vz-dialog-head {
   display: grid;
-  grid-template-columns: 1fr auto;
-  align-items: start;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
   gap: 12px;
-  padding: 18px 16px 8px;
+  padding: 18px 16px 12px;
+  border-bottom: 0.5px solid var(--vz-hairline);
+}
+.vz-dialog-titlewrap {
+  text-align: center;
+  min-width: 0;
 }
 .vz-dialog-bar {
   height: 5px;
-  background: var(--acc, var(--vz-accent));
+  /* Wie .vz-tile::before: vivides --acc-bar (rohe Palette) in die Deko-Topbar,
+     Fallback auf das AA-sichere --acc, falls ein Dialog kein --acc-bar setzt. */
+  background: var(--acc-bar, var(--acc, var(--vz-accent)));
 }
 .vz-dialog-crumb {
   font-family: var(--vz-font-mono);
@@ -1809,7 +1819,6 @@ ion-content.visu-content {
   border-radius: 8px;
   color: var(--vz-fg);
   display: inline-block;
-  margin-bottom: 8px;
 }
 .vz-dialog-title {
   font-size: 22px;
@@ -1821,7 +1830,7 @@ ion-content.visu-content {
   color: var(--acc, var(--vz-accent));
   font-weight: 700;
   font-size: 15px;
-  margin-top: 2px;
+  margin-top: 4px;
 }
 .vz-dialog-body {
   padding: 8px 16px 24px;
@@ -1914,25 +1923,6 @@ ion-content.visu-content {
 .vz-popover-empty {
   color: var(--vz-fg-mute);
   font-size: 13px;
-}
-
-/* Light-Detail: zentrierter Kopf wie in der Design-System-Vorlage
-   (Breadcrumb links · Titel + Wert zentriert · Schließen rechts).
-   Nur auf den Licht-Dialog beschränkt (data-type="light"), damit die übrigen
-   Detail-Renderer ihren linksbündigen Standardkopf behalten. */
-.vz-dialog[data-type="light"] .vz-dialog-head {
-  grid-template-columns: auto 1fr auto;
-  align-items: center;
-}
-.vz-dialog[data-type="light"] .vz-dialog-crumb {
-  margin-bottom: 0;
-}
-.vz-dialog[data-type="light"] .vz-light-titlewrap {
-  text-align: center;
-  min-width: 0;
-}
-.vz-dialog[data-type="light"] .vz-dialog-val {
-  margin-top: 4px;
 }
 
 .vz-lockrow {

@@ -10,7 +10,7 @@ import { h, type VNode } from "vue";
 import type { Ctx, Device, MediaDevice, Renderer, Tokens } from "@obs/visu-contract";
 import { svgIcon } from "../icon.js";
 import { tt } from "../i18n.js";
-import { isWritable, lockedLabel, lockOverlay } from "../parts.js";
+import { eyebrowText, isWritable, lockedLabel, lockOverlay } from "../parts.js";
 
 /** Cover: echtes Bild bei artUrl, sonst Platzhalter mit Noten-Glyph. */
 function cover(dev: MediaDevice, ctx: Ctx): VNode {
@@ -87,7 +87,7 @@ export const MediaTile: Renderer = (d: Device, t: Tokens, ctx: Ctx): VNode => {
     },
     [
       ...(ro ? lockOverlay(ctx, dev) : []),
-      h("div", { class: "vz-eyebrow" }, dev.room),
+      h("div", { class: "vz-eyebrow" }, eyebrowText(ctx, dev)),
       h("div", { class: "vz-media-head" }, [
         cover(dev, ctx),
         h("div", { class: "vz-media-meta" }, [

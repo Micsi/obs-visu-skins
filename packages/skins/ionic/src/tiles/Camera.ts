@@ -10,6 +10,7 @@ import { h, type VNode } from "vue";
 import type { CameraDevice, Ctx, Device, Renderer, Tokens } from "@obs/visu-contract";
 import { svgIcon } from "../icon.js";
 import { tt } from "../i18n.js";
+import { eyebrowText } from "../parts.js";
 
 /** Standbild bei online + snapshotUrl, sonst Platzhalter mit Kamera-Glyph. */
 function feed(dev: CameraDevice, ctx: Ctx): VNode {
@@ -45,7 +46,7 @@ export const CameraTile: Renderer = (d: Device, t: Tokens, ctx: Ctx): VNode => {
       "aria-label": `${tt(ctx, "skin.ionic.camera.aria", "Kamera")}: ${[dev.room, dev.label].filter(Boolean).join(" · ")}`,
     },
     [
-      h("div", { class: "vz-eyebrow" }, dev.room),
+      h("div", { class: "vz-eyebrow" }, eyebrowText(ctx, dev)),
       h("div", { class: "vz-label chip" }, ctx.hyphenate(dev.label)),
       h("div", { class: "vz-cam-view" }, [
         feed(dev, ctx),
