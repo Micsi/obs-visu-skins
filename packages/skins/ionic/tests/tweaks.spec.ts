@@ -21,14 +21,14 @@ describe("ionic skin — applyTweaks (I5)", () => {
     const { style } = applyTweaks();
     expect(style["--vz-blur"]).toBe("22px");
     expect(style["--vz-tile-alpha"]).toBe("0.55");
-    expect(style["--vz-cell"]).toBe("112px");
+    expect(style["--vz-cell"]).toBe("108px");
     expect(style["--vz-glow"]).toBe("1");
     expect(style["--vz-room-gap"]).toBe("22px");
   });
 
   it("skaliert die Zellhöhe über cellScale", () => {
-    expect(applyTweaks({ cellScale: 1.4 }).style["--vz-cell"]).toBe("157px");
-    expect(applyTweaks({ cellScale: 0.8 }).style["--vz-cell"]).toBe("90px");
+    expect(applyTweaks({ cellScale: 1.4 }).style["--vz-cell"]).toBe("151px");
+    expect(applyTweaks({ cellScale: 0.8 }).style["--vz-cell"]).toBe("86px");
   });
 
   it("reicht stil/accentStyle/theme als Attribute durch", () => {
@@ -46,13 +46,13 @@ describe("ionic skin — applyTweaks (I5)", () => {
     const lo = applyTweaks({ glassBlur: -10, tileAlpha: 0.1, cellScale: 0.1, glow: -1 });
     expect(lo.style["--vz-blur"]).toBe("0px");
     expect(lo.style["--vz-tile-alpha"]).toBe("0.3");
-    expect(lo.style["--vz-cell"]).toBe("90px"); // clamp 0.8 → 112*0.8
+    expect(lo.style["--vz-cell"]).toBe("86px"); // clamp 0.8 → 108*0.8
     expect(lo.style["--vz-glow"]).toBe("0");
 
     const hi = applyTweaks({ glassBlur: 999, tileAlpha: 9, cellScale: 9, glow: 9 });
     expect(hi.style["--vz-blur"]).toBe("40px");
     expect(hi.style["--vz-tile-alpha"]).toBe("0.9");
-    expect(hi.style["--vz-cell"]).toBe("157px"); // clamp 1.4 → 112*1.4
+    expect(hi.style["--vz-cell"]).toBe("151px"); // clamp 1.4 → 108*1.4
     expect(hi.style["--vz-glow"]).toBe("1.6");
   });
 
