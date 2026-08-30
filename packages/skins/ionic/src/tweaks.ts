@@ -93,7 +93,7 @@ export const TWEAK_DEFAULTS = {
 >;
 
 /** Basis-Zellhöhe in px (visu-ionic.css → `--vz-cell`); cellScale skaliert sie. */
-const BASE_CELL_PX = 112;
+const BASE_CELL_PX = 108;
 
 /** Grenzen aus manifest.json → `tweaks` — Schutz gegen Out-of-range vom Host. */
 const RANGES = {
