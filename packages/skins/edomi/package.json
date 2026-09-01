@@ -1,0 +1,28 @@
+{
+  "name": "@obs-visu-skins/edomi",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Edomi-POC-Skin für obs Visu — pixelgenaue, überlagerte Visu à la Edomi. Besitzt die ganze Seite (Navigation + komponierte Layer + Popups) über einen Page-Renderer; honoriert die Autoren-Position (x/y/w/h). Re-nutzt die ionic-Content-Renderer; kein State (der Host besitzt ihn), kein Datenfork.",
+  "type": "module",
+  "main": "renderers.ts",
+  "types": "renderers.ts",
+  "exports": {
+    ".": "./renderers.ts",
+    "./manifest.json": "./manifest.json",
+    "./edomi.css": "./src/edomi.css"
+  },
+  "scripts": {
+    "test": "vitest run --typecheck"
+  },
+  "dependencies": {
+    "@obs/visu-contract": "link:/Volumes/Daten/Projekte/openbridge/openbridgeserver-visu-integrate/packages/contract",
+    "@obs-visu-skins/ionic": "workspace:*"
+  },
+  "peerDependencies": {
+    "vue": "^3.5.0"
+  },
+  "devDependencies": {
+    "vitest": "^2.1.8",
+    "vue": "^3.5.0"
+  }
+}

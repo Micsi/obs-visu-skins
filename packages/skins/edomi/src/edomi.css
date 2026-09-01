@@ -1,0 +1,147 @@
+/* @obs-visu-skins/edomi — pixel-precise, overlaid Visu à la Edomi.
+ *
+ * The host places each item absolutely from its author box scaled by
+ * --vz-pos-unit; Edomi semantics = 1px, so author coordinates are pixels. The
+ * skin owns only appearance; all state is the host's. AA-safe colours come from
+ * the host tokens the content tiles already carry (this file styles chrome only).
+ */
+
+.edomi-root {
+  --vz-pos-unit: 1px;
+  display: grid;
+  grid-template-columns: minmax(160px, max-content) 1fr;
+  min-height: 100%;
+  background: var(--ion-background-color, #0f1216);
+  color: var(--ion-text-color, #e8ecf2);
+}
+
+/* ------------------------------------------------------------------- nav rail */
+.edomi-nav {
+  padding: 12px 8px;
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  overflow: auto;
+}
+.edomi-nav-list,
+.edomi-nav-children {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.edomi-nav-children {
+  padding-left: 12px;
+}
+.edomi-nav-link {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 8px 10px;
+  margin: 2px 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.edomi-nav-link:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+.edomi-nav-link.is-active {
+  background: rgba(90, 160, 255, 0.22);
+  font-weight: 600;
+}
+.edomi-nav-link:disabled {
+  opacity: 0.6;
+  cursor: default;
+  font-size: 0.8em;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+/* Gated pages get a small lock hint. */
+.edomi-nav-link.is-protected::after,
+.edomi-nav-link.is-user::after {
+  content: " \1F512";
+  opacity: 0.7;
+}
+
+/* ------------------------------------------------------------- pixel canvas */
+.edomi-canvas {
+  position: relative;
+  overflow: auto;
+  padding: 0;
+}
+/* Each composed layer overlays the same canvas; ancestor layers sit beneath the
+ * own layer in stack order (source order = paint order). */
+.edomi-layer {
+  position: absolute;
+  inset: 0;
+}
+.edomi-layer-include {
+  z-index: 0;
+}
+.edomi-layer-own {
+  z-index: 1;
+}
+.edomi-item {
+  /* box comes from the host inline style (absolute left/top/width/height) */
+  overflow: hidden;
+}
+
+/* ---------------------------------------------------------------- popups */
+.edomi-popup-wrap {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  z-index: 100;
+}
+.edomi-popup-wrap.is-dimmed {
+  background: rgba(0, 0, 0, 0.45);
+  pointer-events: auto;
+}
+.edomi-popup-wrap.is-modal {
+  pointer-events: auto;
+}
+.edomi-popup {
+  position: relative;
+  min-width: 160px;
+  min-height: 80px;
+  background: var(--ion-card-background, #1a1f26);
+  border-radius: 12px;
+  pointer-events: auto;
+}
+.edomi-popup.is-centered {
+  position: static;
+}
+.edomi-popup.has-shadow {
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+}
+.edomi-popup.is-animated {
+  animation: edomi-pop-in 160ms ease-out;
+}
+@keyframes edomi-pop-in {
+  from {
+    transform: scale(0.94);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+.edomi-popup-close {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  color: inherit;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  z-index: 1;
+}
