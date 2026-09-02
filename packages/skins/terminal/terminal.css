@@ -37,6 +37,10 @@
   --t-dim: #9aa7b4;
   --t-line: #222a35;
   --t-surface: #151a22;
+  /* Unbefüllte Balkenspur (die ░-Glyphen). Eigener Token, weil das VORDERGRUND ist
+     und nicht die Trennlinie — die Spur muss sich von der Füllung abheben, nicht vom
+     Grund. Gemessen wird darum Füllung↔Spur, siehe tests/contrast.spec.ts. */
+  --t-bar-track: #222a35;
   /* Inaktiver LED-Punkt: eigener Token statt Deckkraft auf --t-dim — so hält er
      die Nicht-Text-Schwelle 3:1 auch in der gedimmten (gesperrt/readonly) Zeile. */
   --t-led-off: #78838f;
@@ -57,6 +61,7 @@
   --t-dim: #4c5663;
   --t-line: #d8dce3;
   --t-surface: #ffffff;
+  --t-bar-track: #d8dce3;
   --t-led-off: #6b7480;
 
   --t-acc-orange: #9a4b00;
@@ -177,7 +182,7 @@
   color: var(--acc, var(--t-fg));
 }
 .t-root .t-bar-rest {
-  color: var(--t-line);
+  color: var(--t-bar-track);
 }
 .t-root .t-minmax {
   flex: 0 0 auto;
