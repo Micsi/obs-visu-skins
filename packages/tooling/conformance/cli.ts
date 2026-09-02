@@ -13,20 +13,24 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
 import type { SkinManifest } from "@obs/visu-contract";
-import { generateSupport, type RendererMap } from "./index.js";
+import { generateSupport, type RendererMap, type SkinInput } from "./index.js";
 
 interface SkinModule {
   readonly tiles: RendererMap;
+  /** Optionale Detail-/Preset-Flächen — die Aktions-Achse misst über alle. */
+  readonly details?: RendererMap;
+  readonly presets?: RendererMap;
 }
 
-async function loadSkin(
-  pkg: string,
-): Promise<{ manifest: SkinManifest; tiles: RendererMap; manifestPath: string }> {
+async function loadSkin(pkg: string): Promise<{ skin: SkinInput; manifestPath: string }> {
   const require = createRequire(import.meta.url);
   const mod = (await import(pkg)) as SkinModule;
   const manifestPath = require.resolve(`${pkg}/manifest.json`);
   const manifest = require(manifestPath) as SkinManifest;
-  return { manifest, tiles: mod.tiles, manifestPath };
+  return {
+    skin: { manifest, tiles: mod.tiles, details: mod.details, presets: mod.presets },
+    manifestPath,
+  };
 }
 
 async function main(argv: readonly string[]): Promise<number> {
@@ -39,8 +43,8 @@ async function main(argv: readonly string[]): Promise<number> {
     return 2;
   }
 
-  const { manifest, tiles, manifestPath } = await loadSkin(pkg);
-  const { report, hasGap } = generateSupport({ manifest, tiles });
+  const { skin, manifestPath } = await loadSkin(pkg);
+  const { report, hasGap } = generateSupport(skin);
   const json = JSON.stringify(report, null, 2);
 
   if (toStdout) {

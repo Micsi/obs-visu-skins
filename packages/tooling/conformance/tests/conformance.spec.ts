@@ -12,7 +12,7 @@ import type { Renderer, SkinManifest } from "@obs/visu-contract";
 import { tiles } from "@obs-visu-skins/ionic";
 import ionicManifest from "@obs-visu-skins/ionic/manifest.json" with { type: "json" };
 import { version as contractVersion } from "@obs/visu-contract";
-import { CORE_WIDGET_TYPES, generateSupport, type RendererMap } from "../index.js";
+import { CORE_WIDGET_TYPES, collectActions, generateSupport, type RendererMap } from "../index.js";
 
 const ionic = ionicManifest as unknown as SkinManifest;
 
@@ -26,13 +26,11 @@ describe("generateSupport — ionic (vollständig)", () => {
     // support.json deckt genau die neun Kern-Typen ab (v1.4: inkl. climate).
     expect(Object.keys(report.widgets).sort()).toEqual([...CORE_WIDGET_TYPES].sort());
 
-    // Kein Typ ist offen oder kaputt; sensor ist "display" (der Vertrag kennt
-    // dort keine Aktion), die übrigen acht sind vollständig verdrahtet.
-    for (const type of CORE_WIDGET_TYPES) {
-      expect(report.widgets[type]?.level).toBe(type === "sensor" ? "display" : "full");
-    }
-    expect(report.summary.full).toBe(8);
-    expect(report.summary.display).toBe(1);
+    // Kein Typ ist offen oder kaputt. Bewusst KEINE Stufen-Erwartung je Typ: die
+    // hinge an ionics Manifest, das eine fremde Arbeitslinie ändern darf. `sensor`
+    // ist die eine Ausnahme — dass er nie "full" werden kann, folgt aus dem VERTRAG
+    // (er kennt für sensor keine Aktion), nicht aus ionics Deklaration.
+    expect(report.widgets.sensor?.level).toBe("display");
     expect(report.summary.gap).toBe(0);
     expect(report.summary.broken).toBe(0);
     expect(report.summary.unsupported).toBe(0);
@@ -40,15 +38,28 @@ describe("generateSupport — ionic (vollständig)", () => {
 
   it("spiegelt nicht die eigene Zielversion, sondern den echten Vertragsstand", () => {
     const { report } = generateSupport({ manifest: ionic, tiles });
-    expect(report.targetsContract).toBe(ionic.targetsContract);
     expect(report.contractLatest).toBe(contractVersion);
   });
 
-  it("nennt je Typ die Aktions-Abdeckung und die geprüften Fixture-Zustände", () => {
+  it("nennt je Typ die Aktions-Abdeckung, die Fixtures und die Renderer-Herkunft", () => {
     const { report } = generateSupport({ manifest: ionic, tiles });
     // camera kennt genau eine kanonische Aktion (refresh) und zwei Fixtures.
     expect(report.widgets.camera?.actions).toBe("1/1");
     expect(report.widgets.camera?.fixtures).toEqual(["online", "offline"]);
+    // Fläche + Implementierung: zwei Skins mit derselben Implementierung (edomi
+    // re-exportiert ionics Renderer) sind daran im Report erkennbar.
+    expect(report.widgets.camera?.render).toMatch(/^tile:\S+/);
+  });
+
+  it("übernimmt das Layout-Modell aus dem geprüften Manifest", () => {
+    // Bewusst gegen ein EIGENES Fixture-Manifest, nicht gegen ionic: sonst würde
+    // diese Spec im geteilten Tooling rot, sobald ein fremder Skin sein `honors` ändert.
+    const manifest: SkinManifest = {
+      ...ionic,
+      name: "layout-fixture",
+      layout: { model: "grid", honors: ["order", "grouping", "role"] },
+    };
+    const { report } = generateSupport({ manifest, tiles });
     expect(report.layout).toEqual({ model: "grid", honors: ["order", "grouping", "role"] });
   });
 
@@ -60,8 +71,21 @@ describe("generateSupport — ionic (vollständig)", () => {
 });
 
 describe("generateSupport — gap-hart", () => {
-  // Renderer-Stub: reine Funktion, gibt irgendein Markup zurück (Form egal für die Konformität).
+  // Renderer-Stub: reine Funktion, markiert nichts (Form egal für die gap-Prüfung).
   const stubRenderer: Renderer = () => ({ tag: "div" });
+
+  /**
+   * Renderer, der die genannten Aktionen wirklich markiert. Seit die Aktions-Achse
+   * am Baum gemessen wird, reicht ein stummer Stub für Stufen-Erwartungen nicht mehr —
+   * genau das ist der Punkt.
+   */
+  const marking =
+    (...actions: string[]): Renderer =>
+    () => ({
+      type: "div",
+      props: {},
+      children: actions.map((a) => ({ type: "button", props: { "data-action": a }, children: a })),
+    });
 
   it('meldet "gap" für ein deklariertes widget ohne passenden tiles-Renderer', () => {
     const brokenManifest: SkinManifest = {
@@ -142,10 +166,10 @@ describe("generateSupport — gap-hart", () => {
       layout: { model: "grid", honors: ["order"] },
     };
     const partialTiles: RendererMap = {
-      light: stubRenderer,
-      switch: stubRenderer,
-      blind: stubRenderer,
-      jalousie: stubRenderer,
+      light: marking("toggle"),
+      switch: marking("toggle"),
+      blind: marking("setPosition"),
+      jalousie: marking("setPosition"),
     };
 
     const { report, hasGap } = generateSupport({ manifest, tiles: partialTiles });
@@ -163,6 +187,110 @@ describe("generateSupport — gap-hart", () => {
     expect(report.widgets.light?.actions).toBe("1/2");
     expect(report.summary.full).toBe(1);
     expect(report.summary.partial).toBe(3);
+  });
+
+  it("misst die Aktions-Achse am gerenderten Baum, nicht am Manifest", () => {
+    // Der Renderer markiert NICHTS — das Manifest behauptet trotzdem beide Aktionen.
+    // Genau diese Lücke soll sichtbar werden: die Stufe folgt dem Baum.
+    const silent: Renderer = () => ({ type: "div", props: {}, children: [] });
+    const manifest: SkinManifest = {
+      name: "claims-too-much",
+      targetsContract: "1.10",
+      unsupported: ["blind", "jalousie", "sensor", "scene", "media", "camera", "climate"],
+      widgets: {
+        light: { actions: ["toggle", "setDim"] },
+        switch: { actions: ["toggle"] },
+      },
+      layout: { model: "list", honors: ["order"] },
+    };
+
+    const { report, hasGap } = generateSupport({
+      manifest,
+      tiles: { light: silent, switch: silent },
+    });
+
+    // Unbelegte Behauptung ist kein harter Fehler — aber sie hebt die Stufe nicht
+    // und wird beim Namen genannt.
+    expect(hasGap).toBe(false);
+    expect(report.widgets.light?.level).toBe("display");
+    expect(report.widgets.light?.actions).toBe("0/2");
+    expect(report.widgets.light?.reason).toContain("declared but never marked: setDim, toggle");
+  });
+
+  it("zählt eine Aktion, die nur die Detailfläche markiert, als angeboten", () => {
+    const silent: Renderer = () => ({ type: "div", props: {}, children: [] });
+    const toggleInDetail: Renderer = () => ({
+      type: "div",
+      props: { "data-action": "toggle" },
+      children: [{ type: "b", props: { "data-action": "setDim" }, children: "45" }],
+    });
+    const manifest: SkinManifest = {
+      name: "detail-surface",
+      targetsContract: "1.10",
+      unsupported: ["switch", "blind", "jalousie", "sensor", "scene", "media", "camera", "climate"],
+      widgets: { light: { actions: ["toggle", "setDim"] } },
+      layout: { model: "grid", honors: ["order"] },
+    };
+
+    const { report } = generateSupport({
+      manifest,
+      tiles: { light: silent },
+      details: { light: toggleInDetail },
+    });
+
+    expect(report.widgets.light?.level).toBe("full");
+    expect(report.widgets.light?.actions).toBe("2/2");
+    expect(report.widgets.light?.render).toContain("detail:");
+  });
+
+  it('meldet "broken", wenn ein Renderer eine nicht deklarierte Aktion markiert', () => {
+    // Goldene Regel 3: nicht verdrahtet darf nie vorgetäuscht werden.
+    const liar: Renderer = () => ({
+      type: "div",
+      props: { "data-action": "setDim" },
+      children: [],
+    });
+    const manifest: SkinManifest = {
+      name: "pretender",
+      targetsContract: "1.10",
+      unsupported: ["switch", "blind", "jalousie", "sensor", "scene", "media", "camera", "climate"],
+      widgets: { light: { actions: ["toggle"] } },
+      layout: { model: "grid", honors: ["order"] },
+    };
+
+    const { report, hasGap } = generateSupport({ manifest, tiles: { light: liar } });
+
+    expect(hasGap).toBe(true);
+    expect(report.widgets.light?.level).toBe("broken");
+    expect(report.widgets.light?.reason).toContain("marks undeclared action(s): setDim");
+  });
+
+  it("duldet universelle Host-Aktionen ohne Deklaration (§6)", () => {
+    const hostMarks: Renderer = () => ({
+      type: "div",
+      props: { "data-action": "openDetail" },
+      children: [{ type: "button", props: { "data-action": "stop" }, children: "■" }],
+    });
+    const manifest: SkinManifest = {
+      name: "host-actions",
+      targetsContract: "1.10",
+      unsupported: ["light", "switch", "jalousie", "sensor", "scene", "media", "camera", "climate"],
+      // `stop` ist für Bewegungs-Widgets UI-only, `openDetail` universell — beide
+      // brauchen laut Vertrag keine Deklaration je Widget.
+      widgets: { blind: { actions: ["setPosition"] } },
+      layout: { model: "grid", honors: ["order"] },
+    };
+
+    const { report, hasGap } = generateSupport({ manifest, tiles: { blind: hostMarks } });
+
+    expect(hasGap).toBe(false);
+    expect(report.widgets.blind?.level).not.toBe("broken");
+  });
+
+  it("liest data-action auch aus rohem Markup (Renderer ohne Framework)", () => {
+    expect(
+      [...collectActions('<div data-action="toggle"><b data-action="lock"/></div>')].sort(),
+    ).toEqual(["lock", "toggle"]);
   });
 
   it('meldet "broken" für einen Renderer, der an einer Vertrags-Fixture wirft', () => {

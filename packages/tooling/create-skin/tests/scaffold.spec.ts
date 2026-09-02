@@ -77,6 +77,8 @@ describe("scaffoldSkin (end-to-end against a temporary target)", () => {
       expect(m.targetsContract).toBe(contractVersion);
       expect(m.unsupported).toEqual([]);
       expect(m.layout.honors).toEqual(["order", "grouping"]);
+      // Kein Typ behauptet eine Aktion, die die Platzhalter nicht markieren.
+      for (const entry of Object.values(m.widgets)) expect(entry?.actions).toEqual([]);
     }
   });
 
@@ -99,10 +101,17 @@ describe("scaffoldSkin (end-to-end against a temporary target)", () => {
       expect(hasGap).toBe(false);
       expect(report.summary.gap).toBe(0);
       expect(report.summary.broken).toBe(0);
-      // Acht Typen mit vollständigem Aktionssatz; sensor kennt im Vertrag keine
-      // Aktion und ist damit "display" — nicht "full" (der Generator vergibt die Stufe).
-      expect(report.summary.full).toBe(8);
-      expect(report.summary.display).toBe(1);
+      // Die Platzhalter zeigen nur an und markieren keine data-action — ein frisches
+      // Scaffold ist deshalb EHRLICH `display` auf allen neun Typen, nicht `full`.
+      // Es behauptet nichts, was es nicht tut, und ist trotzdem gap-frei.
+      expect(report.summary.display).toBe(9);
+      expect(report.summary.full).toBe(0);
+      expect(report.summary.partial).toBe(0);
+      for (const type of Object.keys(report.widgets)) {
+        expect(report.widgets[type]?.actions, type).toMatch(/^0\/\d+$/);
+        // Keine unbelegte Deklaration: das Manifest verspricht keine Aktion.
+        expect(report.widgets[type]?.reason ?? "").not.toContain("declared but never marked");
+      }
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

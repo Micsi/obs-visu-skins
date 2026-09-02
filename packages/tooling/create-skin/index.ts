@@ -6,9 +6,10 @@
 // je Typ, damit der Konformitäts-Generator keine `gap` meldet), tsconfig.json und einem
 // Scaffold-Test.
 //
-// Vertragsstand: `targetsContract` und die kanonischen Aktionen kommen aus
-// @obs/visu-contract selbst — ein Scaffold kann so nicht hinter dem Vertrag
-// zurückbleiben (genau das war bei terminal passiert: Manifest auf 1.1 eingefroren).
+// Vertragsstand: `targetsContract` kommt aus @obs/visu-contract selbst — ein Scaffold
+// kann so nicht hinter dem Vertrag zurückbleiben (genau das war bei terminal passiert:
+// Manifest auf 1.1 eingefroren). Aktionen bleiben leer, bis der Autor sie wirklich
+// markiert: das Scaffold soll nichts behaupten, was seine Platzhalter nicht tun.
 //
 // Designentscheidung (Onboarding): das frische Skin rendert SOFORT — jede Kachel ist
 // ein schlichter Platzhalter (Label · Typ · Zustand). Der Autor ersetzt die Platzhalter
@@ -20,7 +21,7 @@
 
 import { mkdirSync, writeFileSync, readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
-import { schema, version as CONTRACT_VERSION } from "@obs/visu-contract";
+import { version as CONTRACT_VERSION } from "@obs/visu-contract";
 
 /** Die neun stabilen Kern-Typen — jedes Scaffold deklariert + rendert alle. */
 export const CORE_WIDGET_TYPES = [
@@ -99,21 +100,24 @@ function packageJson(name: string): string {
 }
 
 /**
- * Default-Aktionen je Kern-Typ: der VOLLSTÄNDIGE kanonische Satz aus
- * contract.schema.json (§6). Ein frisches Scaffold behauptet damit „full" — der
- * Autor streicht beim Reduzieren gezielt Aktionen, und der Generator stuft
- * automatisch auf `partial` zurück. Keine Kopie der Aktionsnamen im Tooling.
+ * Aktionen eines frischen Scaffolds: KEINE.
+ *
+ * Die Platzhalter-Kachel zeigt nur an und markiert keine einzige `data-action` — ein
+ * Manifest, das trotzdem den vollen kanonischen Satz deklariert, wäre exakt die
+ * Pauschal-Behauptung, die dieses Tooling aufdecken soll (Goldene Regel 3). Der
+ * Generator misst die Aktions-Achse am gerenderten Baum; ein frisches Skin ist damit
+ * ehrlich `display` und wächst auf `partial`/`full`, sobald der Autor Aktionen
+ * markiert UND deklariert. Welche Aktionen ein Typ kennt, steht im Vertrag
+ * (contract.schema.json §6) und im Authoring-Guide.
  */
-function canonicalActions(type: string): string[] {
-  const widgets = (schema as { widgets?: Record<string, { actions?: Record<string, unknown> }> })
-    .widgets;
-  return Object.keys(widgets?.[type]?.actions ?? {});
+function scaffoldActions(): string[] {
+  return [];
 }
 
 function manifestJson(name: string, layout: LayoutModel): string {
   const widgets: Record<string, { actions: string[] }> = {};
   for (const type of CORE_WIDGET_TYPES) {
-    widgets[type] = { actions: canonicalActions(type) };
+    widgets[type] = { actions: scaffoldActions() };
   }
 
   const layoutBlock =
