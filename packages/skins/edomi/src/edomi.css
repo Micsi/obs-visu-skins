@@ -3,8 +3,14 @@
  * The host places each item absolutely from its author box scaled by
  * --vz-pos-unit; Edomi semantics = 1px, so author coordinates are pixels. The
  * skin owns only appearance; all state is the host's. AA-safe colours come from
- * the host tokens the content tiles already carry (this file styles chrome only).
+ * the host tokens the content tiles already carry.
+ *
+ * Self-contained: the Edomi renderer map delegates every tile/detail to the ionic
+ * content renderers, so this entry point pulls in the ionic tile styles too — a
+ * consumer that loads `@obs-visu-skins/edomi/edomi.css` gets fully styled content
+ * without knowing to load a second skin's stylesheet.
  */
+@import '@obs-visu-skins/ionic/ionic.css';
 
 .edomi-root {
   --vz-pos-unit: 1px;
@@ -75,6 +81,10 @@
 .edomi-layer {
   position: absolute;
   inset: 0;
+  /* Layer boxes span the canvas for stacking only — they must NOT intercept
+     pointer input, or the topmost (own) layer would swallow clicks meant for an
+     included ancestor layer beneath it. The item boxes restore interactivity. */
+  pointer-events: none;
 }
 .edomi-layer-include {
   z-index: 0;
@@ -84,7 +94,20 @@
 }
 .edomi-item {
   /* box comes from the host inline style (absolute left/top/width/height) */
+  display: flex;
   overflow: hidden;
+  pointer-events: auto;
+}
+/* Fill the authored box with the reused ionic content tile (the host wraps the
+   tile in .skin-host-cell; ionic normally stretches it via flex). */
+.edomi-item > .skin-host-cell {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+}
+.edomi-item .vz-tile,
+.edomi-item .jal-tile {
+  flex: 1;
 }
 
 /* ---------------------------------------------------------------- popups */
@@ -111,8 +134,11 @@
   border-radius: 12px;
   pointer-events: auto;
 }
+/* A centered popup is centred by the wrapper's grid `place-items`; it MUST stay a
+   positioning context (relative) so its absolute close button + composed layers
+   anchor to the card, not the fixed viewport wrapper. */
 .edomi-popup.is-centered {
-  position: static;
+  position: relative;
 }
 .edomi-popup.has-shadow {
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
@@ -143,5 +169,6 @@
   font-size: 18px;
   line-height: 1;
   cursor: pointer;
-  z-index: 1;
+  /* Above every popup layer (own = 1) so the close control always receives clicks. */
+  z-index: 2;
 }

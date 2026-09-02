@@ -87,6 +87,9 @@ importers:
         specifier: link:/Volumes/Daten/Projekte/openbridge/openbridgeserver-visu-integrate/packages/contract
         version: link:../../../../../../../../../../Volumes/Daten/Projekte/openbridge/openbridgeserver-visu-integrate/packages/contract
     devDependencies:
+      '@obs-visu-skins/edomi':
+        specifier: workspace:*
+        version: link:../../skins/edomi
       '@obs-visu-skins/ionic':
         specifier: workspace:*
         version: link:../../skins/ionic
