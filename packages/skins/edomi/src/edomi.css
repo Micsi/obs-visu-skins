@@ -16,7 +16,10 @@
   --vz-pos-unit: 1px;
   display: grid;
   grid-template-columns: minmax(160px, max-content) 1fr;
-  min-height: 100%;
+  /* A definite floor (not a percentage that resolves to `auto` in an auto-height
+     container): the canvas's layers are absolutely positioned and contribute no
+     intrinsic height, so without this the page could collapse. */
+  min-height: 100dvh;
   background: var(--ion-background-color, #0f1216);
   color: var(--ion-text-color, #e8ecf2);
 }
@@ -130,8 +133,6 @@
 }
 .edomi-popup {
   position: relative;
-  min-width: 160px;
-  min-height: 80px;
   background: var(--ion-card-background, #1a1f26);
   border-radius: 12px;
   pointer-events: auto;
@@ -143,14 +144,25 @@
    contain them — a sensible viewport-relative default. */
 .edomi-popup.is-centered {
   position: relative;
+  /* Sized by the host from its layers (inline), or this viewport-relative default
+     when it has none; a small floor keeps a sparse popup usable. Positioned popups
+     (with `desc.position`) get their exact author box and no min override. */
   width: min(90vw, 520px);
   height: min(85vh, 400px);
+  min-width: 160px;
+  min-height: 80px;
 }
 .edomi-popup.has-shadow {
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
 }
 .edomi-popup.is-animated {
   animation: edomi-pop-in 160ms ease-out;
+}
+/* Respect reduced-motion: no open animation for users who ask for less motion. */
+@media (prefers-reduced-motion: reduce) {
+  .edomi-popup.is-animated {
+    animation: none;
+  }
 }
 @keyframes edomi-pop-in {
   from {
