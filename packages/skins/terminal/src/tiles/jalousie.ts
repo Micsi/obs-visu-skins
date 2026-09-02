@@ -1,71 +1,77 @@
 // Terminal-Skin · jalousie (Lamellen-Jalousie) — Listen-Zeilen-Renderer (reine Funktion).
 //
-// BEWUSST reduzierte Bedienung gemäß manifest.json → widgets.jalousie.actions:
-//   setPosition (auf=0 / zu=100), lock, unlock — OHNE setSlat.
-// Terminal lässt die Lamellenfeinsteuerung weg (ehrliche partielle Aktion). Aufbau wie
-// blind: "Raum · Label   <pos>% Offen/Zu/Teil   [auf][zu][sperren|öffnen]". `locked`
-// blockiert das Verfahren und bietet `unlock`. Goldene Regeln 1/4: kein State, nie d.x=…
+// Wie blind, plus die Lamellenstellung — aber BEWUSST nur als ANZEIGE:
+// manifest.json → widgets.jalousie.actions verdrahtet setPosition, applyPreset,
+// lock, unlock, jedoch NICHT `setSlat`. Eine Lamellen-Feinsteuerung gehört nicht in
+// eine Konsolenzeile; der Wert wird gezeigt, nie als Bedienelement vorgetäuscht
+// (Issue #11). 4 von 5 kanonischen Aktionen → Stufe `partial` (ehrlich, kein Vergessen).
+//
+// Goldene Regeln 1/4: kein State, nie d.x=…
 
 import { h, type VNode } from "vue";
 import type { Ctx, JalousieDevice, Renderer, Tokens } from "@obs/visu-contract";
-import { rowLabel } from "../row.js";
-
-function posLabel(position: number): string {
-  if (position === 0) return "Offen";
-  if (position === 100) return "Zu";
-  return "Teil";
-}
-
-/** Verfahr-Befehl (auf/zu); im Lock-Zustand disabled und ohne data-action. */
-function moveCmd(label: string, arg: string, locked: boolean): VNode {
-  return h(
-    "button",
-    {
-      class: "t-cmd",
-      type: "button",
-      disabled: locked,
-      "data-action": locked ? undefined : "setPosition",
-      "data-arg": locked ? undefined : arg,
-      "aria-label": label,
-    },
-    label,
-  );
-}
+import { blockBar, cmd, isWritable, rowLabel, rowLed } from "../row.js";
+import { posWord, presetCmds } from "./blind.js";
+import { tt } from "../i18n.js";
 
 export const jalousieTile: Renderer = (d, t: Tokens, ctx: Ctx): VNode => {
   const dev = d as JalousieDevice;
   const locked = !!dev.locked;
-
-  const lockCmd = h(
-    "button",
-    {
-      class: "t-cmd t-lock",
-      type: "button",
-      "data-action": locked ? "unlock" : "lock",
-      "aria-label": locked ? "entsperren" : "sperren",
-    },
-    locked ? "[öffnen]" : "[sperren]",
-  );
+  const movable = !locked && isWritable(dev);
 
   return h(
     "div",
     {
-      class: ["t-row", "t-jalousie", locked && "is-locked"].filter(Boolean),
+      class: [
+        "t-row",
+        "t-jalousie",
+        locked && "is-locked",
+        !isWritable(dev) && "is-readonly",
+      ].filter(Boolean),
       style: { "--acc": t.accent(dev.accent) },
       "data-type": "jalousie",
+      role: "group",
+      "aria-label": dev.label,
     },
     [
-      rowLabel(ctx, dev.room, dev.label),
+      rowLed(locked ? "dead" : dev.position > 0 ? "on" : "off"),
+      rowLabel(ctx, dev, dev.label),
       h("span", { class: "t-state" }, [
         h("b", null, String(Math.round(dev.position))),
         h("span", { class: "t-unit" }, "%"),
-        ` · ${posLabel(dev.position)}`,
-        locked ? h("span", { class: "t-locktag", "aria-hidden": "true" }, " 🔒") : null,
+        blockBar(dev.position),
+        ` · ${posWord(ctx, dev.position)}`,
+        // Lamelle: reine Anzeige (setSlat ist nicht verdrahtet).
+        h(
+          "span",
+          { class: "t-status" },
+          ` · ${tt(ctx, "skin.terminal.state.slat", "Lamelle")} ${Math.round(dev.slat)} %`,
+        ),
+        locked
+          ? h(
+              "span",
+              { class: "t-locktag" },
+              ` · ${tt(ctx, "skin.terminal.state.locked", "gesperrt")}`,
+            )
+          : null,
       ]),
       h("span", { class: "t-cmds" }, [
-        moveCmd("[auf]", "0", locked),
-        moveCmd("[zu]", "100", locked),
-        lockCmd,
+        cmd(`[${tt(ctx, "skin.terminal.cmd.open", "auf")}]`, "setPosition", {
+          arg: "0",
+          enabled: movable,
+        }),
+        cmd(`[${tt(ctx, "skin.terminal.cmd.close", "zu")}]`, "setPosition", {
+          arg: "100",
+          enabled: movable,
+        }),
+        ...presetCmds(dev.presets, movable),
+        locked
+          ? cmd(`[${tt(ctx, "skin.terminal.cmd.unlock", "öffnen")}]`, "unlock", {
+              enabled: isWritable(dev),
+            })
+          : cmd(`[${tt(ctx, "skin.terminal.cmd.lock", "sperren")}]`, "lock", {
+              enabled: isWritable(dev),
+            }),
       ]),
     ],
   );

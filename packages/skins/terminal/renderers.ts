@@ -1,14 +1,38 @@
 // @obs-visu-skins/terminal — Renderer-Map (CONTRACT-v1.md §3, ARCHITECTURE.md §3/§6).
 //
-// Golden rules: ein Skin besitzt nie State; je Typ EINE reine Renderer-Funktion,
+// Goldene Regeln: ein Skin besitzt nie State; je Typ EINE reine Renderer-Funktion,
 // adressiert über den Typ-Schlüssel (renderers[type]) — niemals ein switch mit
 // stillem Default. Der Renderer gibt Markup zurück und markiert nur data-action;
 // der Host übersetzt Gesten auf die kanonischen Aktionen und besitzt allein den State.
 //
-// TE1-Scaffold: Nur die getypte Export-Form (tiles + details). Die reinen
-// Renderer-Funktionen liefert das Folge-Issue TE2 und füllt diese Maps.
-// Fehlt ein Eintrag und ist der Typ nicht `unsupported`, meldet der Generator
-// eine `gap` (ARCHITECTURE.md §2).
+// ---------------------------------------------------------------------------
+// Vertragsstand: targetsContract "1.10" (vorher "1.1").
+//
+// Der Nachzug über neun Minor-Versionen ist bewusst pro Fläche entschieden, nicht
+// bloß eine erhöhte Zahl im Manifest:
+//   • v1.2 media/camera, v1.4 climate — alle drei waren pauschal `unsupported`,
+//     obwohl diese Deklaration noch gegen 1.1 geschrieben wurde, als sie gar keine
+//     Kern-Typen waren. Terminal rendert sie jetzt (siehe tiles unten); `unsupported`
+//     ist damit leer — und bleibt leer, damit ein künftiger Vertrags-Bump einen
+//     neuen Kern-Typ wieder als `gap` sichtbar macht statt ihn stillzustellen.
+//   • v1.1 `ctx.t` — Befehls-/Statuswörter laufen über src/i18n.ts (`skin.terminal.*`).
+//   • v1.4 `ctx.stateParts` (Zustandswort fett) + `SensorDevice.series/min/max`
+//     (Inline-Sparkline im sensor-Renderer).
+//   • v1.5 `DeviceBase.writable` — nicht schreibbare Geräte verlieren ihre
+//     data-action, statt Bedienbarkeit vorzutäuschen.
+//   • v1.6 `presets`/`applyPreset` — Vorgabepositionen als benannte Befehle
+//     ([Beschattung] …), was der Terminal-Sprache entspricht.
+//   • v1.7 `gestures` — tap = markierte Aktion, Long-Press = Host-Default-Detail.
+//   • v1.8 `ctx.floorShort` — Eyebrow als „<Kürzel> <Raum>".
+//   • v1.9 Layering (`position`/`layers`/`popup`) und v1.10 Page-Renderer:
+//     BEWUSST nicht übernommen. Terminal ist responsiv und listenbasiert; ein
+//     Pixel-Layout, ein Layer-Stack oder modale Popups haben in einer Zeilenliste
+//     keine Entsprechung. `layout.honors` deklariert deshalb nur `order` +
+//     `grouping` (der Layout-Boden, Goldene Regel 5) und exportiert keinen
+//     `PageRenderer` — die Seite gehört weiter dem Host. Auch `role` steht nicht
+//     mehr in `honors`: terminal hat keine `roleMap` und eine einspaltige Liste
+//     hat keinen Rollen-Footprint, die Deklaration war ein ungedeckter Anspruch.
+// ---------------------------------------------------------------------------
 
 import type { CoreWidgetType, Renderer } from "@obs/visu-contract";
 
@@ -18,6 +42,9 @@ import { blindTile } from "./src/tiles/blind.js";
 import { jalousieTile } from "./src/tiles/jalousie.js";
 import { sensorTile } from "./src/tiles/sensor.js";
 import { sceneTile } from "./src/tiles/scene.js";
+import { mediaTile } from "./src/tiles/media.js";
+import { cameraTile } from "./src/tiles/camera.js";
+import { climateTile } from "./src/tiles/climate.js";
 
 /** Welche Kern-Typen der Terminal-Skin rendert (Spiegel von manifest.json → widgets). */
 export type TerminalWidgetType = CoreWidgetType;
@@ -27,11 +54,12 @@ export type RendererMap = Partial<Record<TerminalWidgetType, Renderer>>;
 
 /**
  * Listen-Zeilen-Renderer je Kern-Typ — reine `Renderer`-Funktionen (eine Zeile pro
- * Gerät, monospace-/konsolenartig). Vollständig für alle sechs v1-Kern-Typen:
- * light · switch · blind · jalousie · sensor · scene. Adressierung über den Typ-
- * Schlüssel (tiles[type]); die in manifest.json deklarierten partiellen Aktionen
- * werden hier exakt gespiegelt (jalousie z. B. ohne setSlat), damit der
- * Konformitäts-Generator keine `gap` meldet.
+ * Gerät, monospace-/konsolenartig, kein Raster). Vollständig für ALLE neun Kern-Typen
+ * des Vertrags 1.10. Adressierung über den Typ-Schlüssel (tiles[type]); die in
+ * manifest.json deklarierten Aktionen werden hier exakt gespiegelt — nicht verdrahtete
+ * Aktionen (light.setDim, jalousie.setSlat, media.setVolume) werden ANGEZEIGT, aber nie
+ * als Bedienelement vorgetäuscht. Der Konformitäts-Generator rechnet daraus `full`
+ * bzw. `partial` aus; `display` bei sensor (der Vertrag kennt dort keine Aktion).
  */
 export const tiles: RendererMap = {
   light: lightTile,
@@ -40,6 +68,9 @@ export const tiles: RendererMap = {
   jalousie: jalousieTile,
   sensor: sensorTile,
   scene: sceneTile,
+  media: mediaTile,
+  camera: cameraTile,
+  climate: climateTile,
 };
 
 /**

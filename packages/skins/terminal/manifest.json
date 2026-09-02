@@ -1,16 +1,21 @@
 {
   "name": "terminal",
-  "targetsContract": "1.1",
+  "targetsContract": "1.10",
   "renderers": "./renderers.ts",
-  "unsupported": ["camera", "media", "climate"],
+  "unsupported": [],
+
+  "gestures": { "tap": "action", "longPress": "openDetail" },
 
   "widgets": {
     "light": { "actions": ["toggle"] },
     "switch": { "actions": ["toggle"] },
-    "blind": { "actions": ["setPosition", "lock", "unlock"] },
-    "jalousie": { "actions": ["setPosition", "lock", "unlock"] },
+    "blind": { "actions": ["setPosition", "applyPreset", "lock", "unlock"] },
+    "jalousie": { "actions": ["setPosition", "applyPreset", "lock", "unlock"] },
     "sensor": { "actions": [] },
-    "scene": { "actions": ["activateScene"] }
+    "scene": { "actions": ["activateScene"] },
+    "media": { "actions": ["playPause", "stop", "next", "previous"] },
+    "camera": { "actions": ["refresh"] },
+    "climate": { "actions": ["setSetpoint"] }
   },
 
   "layout": {
@@ -20,7 +25,7 @@
       "gutter": 0,
       "flow": "column"
     },
-    "honors": ["order", "grouping", "role"]
+    "honors": ["order", "grouping"]
   },
 
   "themes": ["light", "dark"]

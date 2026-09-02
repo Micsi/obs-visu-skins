@@ -2,13 +2,16 @@
   "name": "@obs-visu-skins/terminal",
   "version": "0.0.0",
   "private": true,
-  "description": "Terminal-Skin für obs Visu — schlichte Listendarstellung mit reduzierter Bedienung auf dem v1-Kern (light · switch · blind · jalousie · sensor · scene). Renderer pro Typ; kein State, kein Datenfork.",
+  "description": "Terminal-Skin für obs Visu — Konsolen-/Listendarstellung über alle neun Kern-Typen des Vertrags 1.10 (LED, Block-Bars, Inline-Sparkline). Renderer pro Typ; kein State, kein Datenfork.",
   "type": "module",
   "main": "renderers.ts",
   "types": "renderers.ts",
   "exports": {
     ".": "./renderers.ts",
-    "./manifest.json": "./manifest.json"
+    "./manifest.json": "./manifest.json",
+    "./terminal.css": "./terminal.css",
+    "./locales/de.json": "./locales/de.json",
+    "./locales/en.json": "./locales/en.json"
   },
   "scripts": {
     "test": "vitest run --typecheck"
