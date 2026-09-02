@@ -95,7 +95,7 @@ describe("edomi page renderer", () => {
     const vnode = page(stubHost());
     const items = findAll(vnode, "edomi-item");
     expect(items).toHaveLength(1);
-    const style = items[0].props?.style as Record<string, string>;
+    const style = items[0]?.props?.style as Record<string, string>;
     expect(style.position).toBe("absolute");
     expect(style.left).toContain("* 10)");
     expect(style.width).toContain("* 4)");
