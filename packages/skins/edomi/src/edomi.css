@@ -130,6 +130,7 @@
 }
 .edomi-popup-wrap.is-modal {
   pointer-events: auto;
+  z-index: 101;
 }
 .edomi-popup {
   position: relative;

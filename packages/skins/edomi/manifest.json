@@ -10,7 +10,7 @@
     "light": { "actions": ["toggle", "setDim"] },
     "switch": { "actions": ["toggle"] },
     "blind": { "actions": ["setPosition", "applyPreset", "lock", "unlock"] },
-    "jalousie": { "actions": ["setPosition", "setSlat", "applyPreset", "lock", "unlock"] },
+    "jalousie": { "actions": ["setPosition", "setSlat", "applyPreset", "lock", "unlock", "stop"] },
     "sensor": { "actions": [] },
     "scene": { "actions": ["activateScene"] },
     "media": { "actions": ["playPause", "stop", "next", "previous", "setVolume"] },
