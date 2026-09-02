@@ -1,5 +1,10 @@
 import { describe, it, expect, vi } from "vitest";
-import type { PageHost, PageLayer, PopupDescriptor } from "@obs/visu-contract";
+import {
+  version as contractVersion,
+  type PageHost,
+  type PageLayer,
+  type PopupDescriptor,
+} from "@obs/visu-contract";
 
 import manifest from "../manifest.json";
 import { tiles, details, presets, page } from "../renderers";
@@ -10,8 +15,9 @@ import { h, isVNode } from "vue";
  *
  * It owns the page via a `page` renderer (nav + composed pixel layers + popups),
  * re-using the ionic content tiles. These tests pin the manifest shape (targets
- * 1.10, honours position/nav/layers/popup) and that the page renderer draws the
- * nav, places layer items by their author box, and renders host-owned popups —
+ * the current contract, honours position/nav/layers/popup) and that the page
+ * renderer draws the nav, places layer items by their author box, and renders
+ * host-owned popups —
  * driving a stub PageHost so no app/host is needed.
  */
 
@@ -57,9 +63,10 @@ function stubHost(over: Partial<PageHost> = {}): PageHost {
 }
 
 describe("edomi manifest", () => {
-  it("targets contract 1.10 and honours position/nav/layers/popup", () => {
+  it("targets the current contract and honours position/nav/layers/popup", () => {
     expect(manifest.name).toBe("edomi");
-    expect(manifest.targetsContract).toBe("1.10");
+    // Measured against the contract, not a literal (see ionic/terminal).
+    expect(manifest.targetsContract).toBe(contractVersion);
     for (const cap of ["position", "nav", "layers", "popup"]) {
       expect(manifest.layout.honors).toContain(cap);
     }

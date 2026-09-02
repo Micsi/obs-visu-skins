@@ -38,10 +38,16 @@ pnpm new-skin <name> --layout list  # Listen-Layout
 Das erzeugt `packages/skins/<name>/` mit `package.json`, `manifest.json`, `renderers.ts`,
 `tsconfig.json` und `tests/scaffold.spec.ts` — und trägt das Paket **automatisch** in die
 Root-`tsconfig.json` (`references`) ein. Das frische Skin ist sofort konformitäts-grün:
-jeder der neun Kern-Typen (`light · switch · blind · jalousie · sensor · scene · media ·
-camera · climate`) hat einen **Platzhalter-Renderer** (eine schlichte Kachel: Label · Typ ·
-Zustand), `targetsContract` steht auf der aktuellen Vertragsversion und die Aktionen sind
-der vollständige kanonische Satz. Danach einmal:
+jeder Kern-Typ des Vertrags (`light · switch · blind · jalousie · sensor · scene · media ·
+camera · climate` — die Liste kommt **aus dem Schema**, nicht aus dem Scaffold) hat einen
+**Platzhalter-Renderer** (eine schlichte Kachel: Label · Typ · Zustand) und
+`targetsContract` steht auf der aktuellen Vertragsversion.
+
+**Die Aktionslisten sind absichtlich leer.** Ein frisches Skin ist `display`-only: es zeigt
+jeden Typ an und behauptet keine einzige Bedienung. Aktionen kommen erst dazu, wenn du sie
+wirklich verdrahtest — und zwar **paarweise**: der Eintrag in `widgets.<type>.actions` und
+der `data-action`-Marker im Renderer. Der Konformitätslauf misst den Marker im erzeugten
+Markup, eine Deklaration allein hebt die Stufe nicht. Danach einmal:
 
 ```bash
 pnpm install        # neues Paket verlinken
@@ -52,9 +58,12 @@ pnpm install        # neues Paket verlinken
 - `manifest.json` → `widgets.<type>.actions`: welche **kanonischen** Aktionen dein Skin je
   Typ verdrahtet (`toggle`, `setDim`, `setPosition`, `setSlat`, `applyPreset`, `lock`,
   `unlock`, `activateScene`, `setSetpoint`, `playPause`, `stop`, `next`, `previous`,
-  `setVolume`, `refresh`). Streiche, was du nicht anbietest — Terminal lässt z. B.
-  `setSlat`, `setDim` und `setVolume` weg und ZEIGT die Werte nur an. Was du streichst,
-  darfst du im Renderer auch nicht als `data-action` markieren.
+  `setVolume`, `refresh`). Die Listen starten **leer** — trag nur ein, was du wirklich
+  anbietest. Terminal lässt z. B. `setSlat`, `setDim` und `setVolume` bewusst weg und
+  ZEIGT die Werte nur an. Was nicht in der Liste steht, darfst du im Renderer auch nicht
+  als `data-action` markieren (das meldet der Lauf als `broken`) — und was drinsteht,
+  aber nirgends markiert ist, hebt die Stufe nicht. Deklaration und Marker gehören
+  zusammen; eine Aktion, die der Vertrag gar nicht kennt, ist ebenfalls `broken`.
 - `manifest.json` → `layout.honors`: nur die Fähigkeiten, die du wirklich umsetzt
   (`order`/`grouping` sind der Boden; `role` erst mit einer `roleMap`, `position`/`layers`/
   `popup` erst mit einem Pixel-/Overlay-Layout).

@@ -90,7 +90,11 @@ const Wall = defineComponent({
     const themes = computed(() => skin.value.manifest.themes ?? ["light", "dark"]);
     const cells = computed(() =>
       buildWall(
-        { tiles: skin.value.tiles, unsupported: skin.value.manifest.unsupported },
+        {
+          tiles: skin.value.tiles,
+          unsupported: skin.value.manifest.unsupported,
+          widgets: skin.value.manifest.widgets,
+        },
         skin.value.tokens,
         ctxStub(),
       ),

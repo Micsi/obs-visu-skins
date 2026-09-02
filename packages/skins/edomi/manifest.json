@@ -1,6 +1,6 @@
 {
   "name": "edomi",
-  "targetsContract": "1.10",
+  "targetsContract": "1.11",
   "renderers": "./renderers.ts",
   "unsupported": [],
 

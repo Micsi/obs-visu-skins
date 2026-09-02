@@ -4,7 +4,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import type { SkinManifest } from "@obs/visu-contract";
+import { version as contractVersion, type SkinManifest } from "@obs/visu-contract";
 import manifest from "../manifest.json" with { type: "json" };
 import { details, tiles } from "../renderers.js";
 
@@ -29,10 +29,12 @@ function contrast(aHex: string, bHex: string): number {
 }
 
 describe("ionic skin scaffold", () => {
-  it("declares a contract-shaped manifest targeting v1.10", () => {
+  it("declares a contract-shaped manifest targeting the current contract", () => {
     const m = manifest as unknown as SkinManifest;
     expect(m.name).toBe("ionic");
-    expect(m.targetsContract).toBe("1.10");
+    // Measured against the contract, not a literal: a literal stays green while the
+    // skin lags behind the contract. This line goes red the moment it does.
+    expect(m.targetsContract).toBe(contractVersion);
     expect(m.layout.model).toBe("grid");
     // v1.2: media + camera sind jetzt unterstützt — nichts mehr unsupported.
     expect(m.unsupported).not.toContain("camera");

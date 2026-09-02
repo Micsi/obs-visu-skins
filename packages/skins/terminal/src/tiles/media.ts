@@ -43,6 +43,11 @@ export const mediaTile: Renderer = (d, t: Tokens, ctx: Ctx): VNode => {
       h("span", { class: "t-state" }, [
         h("b", null, ctx.hyphenate(title)),
         dev.subtitle ? h("span", { class: "t-sub" }, ` — ${dev.subtitle}`) : null,
+        // Transportzustand ausschreiben: `paused` und `stopped` teilen sich sonst
+        // Label, Befehl (`[play]`) und LED-Farbe — zwei Geraete mit gleichen Metadaten
+        // waeren visuell UND fuer Hilfstechnik ununterscheidbar, obwohl `stateText`
+        // die lokalisierte Antwort liefert.
+        h("span", { class: "t-status" }, ` · ${ctx.stateText(dev)}`),
         h("span", { class: "t-unit" }, ` ${tt(ctx, "skin.terminal.state.volume", "Vol")} `),
         blockBar(dev.volume),
         h("span", { class: "t-unit" }, ` ${ctx.nf(dev.volume)}`),

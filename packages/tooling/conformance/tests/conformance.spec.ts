@@ -22,9 +22,10 @@ describe("generateSupport — ionic (vollständig)", () => {
 
     expect(hasGap).toBe(false);
     expect(report.skin).toBe("ionic");
-    // Durchreichung, nicht ionic-Fakt: der Report gibt `targetsContract` unveraendert
-    // aus dem Manifest weiter. Abgeleitet statt hartkodiert — ein Literal hier fror
-    // schon einmal neun Minor-Versionen lang eine Divergenz ein.
+    // Der Report reicht die Zielversion des Manifests durch. Bewusst gegen den
+    // Vertrag gemessen statt gegen ein Literal: ein Literal hier bliebe gruen,
+    // waehrend der Skin hinter dem Vertrag herhinkt - genau der stille Drift,
+    // den der Bump auf 1.11 sichtbar machen soll.
     expect(report.targetsContract).toBe(contractVersion);
 
     // support.json deckt genau die neun Kern-Typen ab (v1.4: inkl. climate).
