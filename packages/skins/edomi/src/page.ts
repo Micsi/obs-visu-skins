@@ -10,15 +10,16 @@
 import { h, type VNode } from "vue";
 import type { NavNode, PageHost, PageLayer, PopupDescriptor } from "@obs/visu-contract";
 
-/** Absolute box from an author position, scaled by the pixel unit var. */
+/** Absolute box from an author position (Edomi units = pixels). Emits plain `px`
+ *  rather than `calc(var() * n)`: length*number typed arithmetic is invalid on
+ *  older WebViews (Chrome/Android < 140, older iOS), which would drop positioning. */
 function boxStyle(pos: { x: number; y: number; w: number; h: number }): Record<string, string> {
-  const u = "var(--vz-pos-unit, 1px)";
   return {
     position: "absolute",
-    left: `calc(${u} * ${pos.x})`,
-    top: `calc(${u} * ${pos.y})`,
-    width: `calc(${u} * ${pos.w})`,
-    height: `calc(${u} * ${pos.h})`,
+    left: `${pos.x}px`,
+    top: `${pos.y}px`,
+    width: `${pos.w}px`,
+    height: `${pos.h}px`,
   };
 }
 
@@ -91,10 +92,9 @@ function popup(desc: PopupDescriptor, host: PageHost, inert?: boolean): VNode {
   // A centered popup's layers are absolutely positioned (no intrinsic size), so
   // size the card to contain them; fall back to the CSS default when it has none.
   const ext = centered ? layersExtent(layers) : null;
-  const u = "var(--vz-pos-unit, 1px)";
   const centeredStyle =
     ext && (ext.w > 0 || ext.h > 0)
-      ? { width: `calc(${u} * ${ext.w})`, height: `calc(${u} * ${ext.h})` }
+      ? { width: `${ext.w}px`, height: `${ext.h}px` }
       : undefined;
   return h(
     "div",
@@ -115,6 +115,9 @@ function popup(desc: PopupDescriptor, host: PageHost, inert?: boolean): VNode {
             centered && "is-centered",
           ].filter(Boolean),
           "data-popup": desc.id,
+          // A modal popup is a dialog for assistive tech (the background is inert).
+          role: desc.modal ? "dialog" : undefined,
+          "aria-modal": desc.modal ? "true" : undefined,
           style: desc.position ? boxStyle(desc.position) : centeredStyle,
         },
         [
@@ -148,6 +151,12 @@ export function page(host: PageHost): VNode {
   // the tab order + pointer/keyboard interaction (not just visually dimmed).
   const hasModal = host.openPopups.some((p) => p.modal);
   const inert = hasModal ? true : undefined;
+  // The topmost open modal is the only interactive surface; everything below it
+  // (nav, canvas, and any earlier/sibling popup) is inert.
+  let topModalIdx = -1;
+  host.openPopups.forEach((p, i) => {
+    if (p.modal) topModalIdx = i;
+  });
   // `visu-root` + the ionic style hooks (data-stil/data-theme) so the re-used
   // ionic content tiles — whose CSS is scoped under `.visu-root[data-stil]` —
   // actually pick up their styling inside the Edomi page.
@@ -164,8 +173,8 @@ export function page(host: PageHost): VNode {
       { class: "edomi-canvas", "data-page": pageId ?? "", inert },
       layers.map((layer) => layerCanvas(layer, host)),
     ),
-    // A modal popup is exclusive: while one is open, non-modal sibling popups are
-    // inert too (the modal itself stays interactive).
-    ...host.openPopups.map((p) => popup(p, host, hasModal && !p.modal)),
+    // A modal is exclusive: while one is open, every popup except the topmost modal
+    // is inert too (two modals → only the last stays interactive).
+    ...host.openPopups.map((p, i) => popup(p, host, hasModal && i !== topModalIdx)),
   ]);
 }

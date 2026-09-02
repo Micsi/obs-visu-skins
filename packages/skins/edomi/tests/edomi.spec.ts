@@ -101,8 +101,9 @@ describe("edomi page renderer", () => {
     expect(items).toHaveLength(1);
     const style = items[0]?.props?.style as Record<string, string>;
     expect(style.position).toBe("absolute");
-    expect(style.left).toContain("* 10)");
-    expect(style.width).toContain("* 4)");
+    // Plain px (x=10, w=4) — no typed calc(var()*n), which older WebViews reject.
+    expect(style.left).toBe("10px");
+    expect(style.width).toBe("4px");
     // the host tile is nested inside the placed item
     expect(findAll(items[0], "host-tile")).toHaveLength(1);
   });

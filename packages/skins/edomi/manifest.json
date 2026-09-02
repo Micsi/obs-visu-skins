@@ -20,7 +20,7 @@
 
   "layout": {
     "model": "grid",
-    "honors": ["order", "grouping", "position", "nav", "layers", "popup"]
+    "honors": ["order", "position", "nav", "layers", "popup"]
   },
 
   "themes": ["dark"]
