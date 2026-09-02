@@ -21,20 +21,23 @@
 
 import { mkdirSync, writeFileSync, readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
-import { version as CONTRACT_VERSION } from "@obs/visu-contract";
+import { version as CONTRACT_VERSION, schema as contractSchema } from "@obs/visu-contract";
 
-/** Die neun stabilen Kern-Typen — jedes Scaffold deklariert + rendert alle. */
-export const CORE_WIDGET_TYPES = [
-  "light",
-  "switch",
-  "blind",
-  "jalousie",
-  "sensor",
-  "scene",
-  "media",
-  "camera",
-  "climate",
-] as const;
+/**
+ * Die stabilen Kern-Typen — **aus dem Vertragsschema abgeleitet**, an dieselbe
+ * Quelle gebunden wie `CONTRACT_VERSION`. Sonst laufen beide auseinander: die
+ * Version zieht automatisch mit, die getippte Liste nicht, und ein frisches
+ * Scaffold behauptete Kompatibilitaet mit einem Vertrag, dessen neuen Typ es
+ * weder deklariert noch rendert — der versprochene `gap` bliebe aus, weil auch
+ * sein generierter Test dieselbe statische Liste benutzt.
+ */
+export const CORE_WIDGET_TYPES: readonly string[] = Object.freeze(
+  Object.entries(
+    (contractSchema as { widgets?: Record<string, { reserved?: boolean }> }).widgets ?? {},
+  )
+    .filter(([, def]) => def?.reserved !== true)
+    .map(([type]) => type),
+);
 
 /** Layout-Modell des Scaffolds — `grid` (Default) oder `list`. */
 export type LayoutModel = "grid" | "list";

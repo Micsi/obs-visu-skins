@@ -50,18 +50,21 @@ import { ctxStub, tokensStub } from "./stubs.js";
 // support.json sollen dieselbe Prüfung zeigen, nicht zwei Nachbildungen.
 export { ctxStub, tokensStub } from "./stubs.js";
 
-/** Die neun stabilen Kern-Typen (v1.2: + media/camera, v1.4: + climate) — Prüfgrundlage des Generators. */
-export const CORE_WIDGET_TYPES: readonly CoreWidgetType[] = [
-  "light",
-  "switch",
-  "blind",
-  "jalousie",
-  "sensor",
-  "scene",
-  "media",
-  "camera",
-  "climate",
-];
+/**
+ * Die stabilen Kern-Typen — **aus dem Vertragsschema abgeleitet**, nicht getippt:
+ * alles unter `widgets`, was nicht `reserved` ist. Befoerdert ein kuenftiger Vertrag
+ * einen reservierten Typ (weather/energy/chart/alarm), erscheint er hier automatisch
+ * und damit als `gap`, bis ein Skin ihn rendert oder bewusst abwaehlt. Eine getippte
+ * Liste haette genau das verschluckt — dieselbe Blindheit, die `targetsContract` als
+ * Literal neun Minor-Versionen lang verdeckt hat.
+ */
+export const CORE_WIDGET_TYPES: readonly CoreWidgetType[] = Object.freeze(
+  Object.entries(
+    (contractSchema as { widgets?: Record<string, { reserved?: boolean }> }).widgets ?? {},
+  )
+    .filter(([, def]) => def?.reserved !== true)
+    .map(([type]) => type as CoreWidgetType),
+);
 
 /** Eine partielle Map über Kern-Typen auf reine Renderer-Funktionen (Spiegel von `tiles`). */
 export type RendererMap = Partial<Record<CoreWidgetType, Renderer>>;
@@ -142,7 +145,15 @@ export function collectActions(
   if (depth > 64 || node === null || node === undefined) return out;
 
   if (typeof node === "string") {
-    for (const [, action] of node.matchAll(/data-action=["']([^"']+)["']/g)) out.add(action!);
+    // HTML-Attributregeln statt "nur direkt anliegend und gequotet": Leerraum um
+    // das `=`, einfache/doppelte Quotes und der unquotierte Fall sind alle gueltig.
+    // Ein Renderer, der `<button data-action=toggle>` liefert, wurde sonst still
+    // als display/partial abgewertet — der Waechter haette geschwiegen.
+    const ATTR = /data-action\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'`=<>]+))/g;
+    for (const m of node.matchAll(ATTR)) {
+      const action = m[1] ?? m[2] ?? m[3];
+      if (action && action.length > 0) out.add(action);
+    }
     return out;
   }
   if (Array.isArray(node)) {
@@ -151,9 +162,36 @@ export function collectActions(
   }
   if (typeof node !== "object") return out;
 
-  const vnode = node as { props?: Record<string, unknown> | null; children?: unknown };
+  const vnode = node as {
+    type?: unknown;
+    props?: Record<string, unknown> | null;
+    children?: unknown;
+  };
   const marked = vnode.props?.["data-action"];
   if (typeof marked === "string" && marked.length > 0) out.add(marked);
+
+  // Komponenten-VNodes aufloesen: Ein Renderer darf seine Bedienelemente durch eine
+  // Komponente ziehen (`h(ActionButton)`), deren Render-Funktion erst das Element mit
+  // `data-action` erzeugt. Wer nur props/children des aeusseren VNode liest, sieht die
+  // Aktion nie und stuft einen voll bedienbaren Skin auf display/partial herunter.
+  const type = vnode.type;
+  const render =
+    typeof type === "function"
+      ? (type as (props?: unknown, ctx?: unknown) => unknown)
+      : type && typeof type === "object" && typeof (type as { render?: unknown }).render === "function"
+        ? ((type as { render: (props?: unknown, ctx?: unknown) => unknown }).render)
+        : undefined;
+  if (render) {
+    try {
+      const slots = vnode.children;
+      collectActions(render(vnode.props ?? {}, { slots, attrs: vnode.props ?? {} }), out, depth + 1);
+    } catch {
+      // Eine Komponente, die ohne echte Laufzeit nicht rendert, darf den Lauf nicht
+      // kippen — sie bleibt schlicht ungemessen. `broken` ist dem Renderer selbst
+      // vorbehalten, nicht unserer Unfaehigkeit, ihn zu instanziieren.
+    }
+  }
+
   if (vnode.children !== undefined) collectActions(vnode.children, out, depth + 1);
   return out;
 }
@@ -244,6 +282,20 @@ function classify(
 
   if (run.error) {
     return { level: "broken", render: run.render, fixtures: run.states, reason: run.error };
+  }
+
+  // Tote Aktion (Goldene Regel 3): Was ein Skin deklariert UND markiert, der Vertrag
+  // aber nicht kennt, kann der Host nicht dispatchen. Ein Tippfehler, den Manifest und
+  // Renderer teilen (`toggel`), rutschte vorher durch — er galt als "deklariert", der
+  // Typ wurde still auf display/partial gestuft und `hasGap` blieb false.
+  const nonCanonical = [...declared].filter((a) => !canonical.includes(a) && !tolerated.has(a));
+  if (nonCanonical.length > 0) {
+    return {
+      level: "broken",
+      render: run.render,
+      fixtures: run.states,
+      reason: `declares action(s) the contract does not define: ${nonCanonical.sort().join(", ")}`,
+    };
   }
 
   // Vortäuschungs-Prüfung (Goldene Regel 3): markiert der Renderer etwas, das weder

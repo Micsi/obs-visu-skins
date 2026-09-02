@@ -2,7 +2,7 @@
   "name": "@obs-visu-skins/terminal",
   "version": "0.0.0",
   "private": true,
-  "description": "Terminal-Skin für obs Visu — Konsolen-/Listendarstellung über alle neun Kern-Typen des Vertrags 1.10 (LED, Block-Bars, Inline-Sparkline). Renderer pro Typ; kein State, kein Datenfork.",
+  "description": "Terminal-Skin für obs Visu — Konsolen-/Listendarstellung über alle neun Kern-Typen des Vertrags 1.11 (LED, Block-Bars, Inline-Sparkline). Renderer pro Typ; kein State, kein Datenfork.",
   "type": "module",
   "main": "renderers.ts",
   "types": "renderers.ts",

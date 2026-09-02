@@ -6,7 +6,7 @@
 // der Host übersetzt Gesten auf die kanonischen Aktionen und besitzt allein den State.
 //
 // ---------------------------------------------------------------------------
-// Vertragsstand: targetsContract "1.10" (vorher "1.1").
+// Vertragsstand: targetsContract "1.11" (vorher "1.1").
 //
 // Der Nachzug über neun Minor-Versionen ist bewusst pro Fläche entschieden, nicht
 // bloß eine erhöhte Zahl im Manifest:
@@ -36,6 +36,11 @@
 //     Auch `role` steht nicht mehr in `honors`: terminal hat keine `roleMap` und
 //     eine einspaltige Liste hat keinen Rollen-Footprint, die Deklaration war ein
 //     ungedeckter Anspruch.
+//   • v1.11 `LayerItem.link` (Seitensprung, Upstream #1194): folgt derselben
+//     Entscheidung. Das Feld hängt am Layer-Item, und Layer sind bei terminal
+//     bewusst nicht honoriert; ohne Layer-Stack gibt es kein Element, an dem ein
+//     `link` hängen könnte. Additiv und optional: ein Skin, der es ignoriert,
+//     bleibt vollständig gültig. An den Renderern ist nichts zu ändern.
 // ---------------------------------------------------------------------------
 
 import type { CoreWidgetType, Renderer } from "@obs/visu-contract";
@@ -59,7 +64,7 @@ export type RendererMap = Partial<Record<TerminalWidgetType, Renderer>>;
 /**
  * Listen-Zeilen-Renderer je Kern-Typ — reine `Renderer`-Funktionen (eine Zeile pro
  * Gerät, monospace-/konsolenartig, kein Raster). Vollständig für ALLE neun Kern-Typen
- * des Vertrags 1.10. Adressierung über den Typ-Schlüssel (tiles[type]); die in
+ * des Vertrags 1.11. Adressierung über den Typ-Schlüssel (tiles[type]); die in
  * manifest.json deklarierten Aktionen werden hier exakt gespiegelt — nicht verdrahtete
  * Aktionen (light.setDim, jalousie.setSlat, media.setVolume) werden ANGEZEIGT, aber nie
  * als Bedienelement vorgetäuscht. Der Konformitäts-Generator rechnet daraus `full`

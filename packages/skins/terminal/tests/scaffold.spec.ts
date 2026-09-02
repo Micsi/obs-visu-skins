@@ -1,4 +1,4 @@
-// Manifest-Test: belegt, dass der Terminal-Skin gegen den aktuellen Vertrag (1.10)
+// Manifest-Test: belegt, dass der Terminal-Skin gegen den aktuellen Vertrag
 // deklariert ist und dass die Deklaration ehrlich ist — jede verdrahtete Aktion ist
 // eine kanonische Aktion des Vertrags, `unsupported` ist bewusst leer.
 
@@ -27,8 +27,9 @@ describe("terminal skin manifest", () => {
 
   it("zielt auf den aktuellen Vertragsstand und bleibt eine Liste", () => {
     expect(m.name).toBe("terminal");
-    expect(m.targetsContract).toBe("1.10");
-    // Der Skin darf nicht hinter dem Vertrag herhinken (das war der Anlass des Bumps).
+    // Gegen den Vertrag gemessen, nicht gegen ein Literal: ein Literal bleibt grün,
+    // während der Skin hinter dem Vertrag herhinkt (so blieben neun Minor-Versionen
+    // unbemerkt). Diese Zeile wird rot, sobald der Vertrag ohne den Skin weiterzieht.
     expect(m.targetsContract).toBe(contractVersion);
     // Terminal nutzt schlichte Listendarstellung, kein Grid (Issue #11).
     expect(m.layout.model).toBe("list");

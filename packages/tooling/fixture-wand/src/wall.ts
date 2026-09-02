@@ -16,11 +16,20 @@
 import type { CoreWidgetType, Ctx, Device, Renderer, Tokens } from "@obs/visu-contract";
 import fixtures from "@obs/visu-contract/fixtures.json" with { type: "json" };
 
-/** Was die Wand vom Skin braucht: Kacheln je Typ + die bewusste Abwahl. */
+/** Was die Wand vom Skin braucht: Kacheln je Typ + die Manifest-Aussagen dazu. */
 export interface SkinTiles {
   readonly tiles: Partial<Record<CoreWidgetType, Renderer>>;
   /** `manifest.unsupported` — bewusst nicht unterstützte Typen (kein gap). */
   readonly unsupported?: readonly string[];
+  /**
+   * `manifest.widgets` — die Deklaration je Typ. Ohne sie klassifiziert die Wand
+   * allein nach "existiert ein Renderer" und widerspricht dem Report: ein Typ mit
+   * Renderer, aber ohne Deklaration ist dort `gap`, hier waere er `ok`; ein Typ,
+   * der `unsupported` deklariert ist und trotzdem einen Renderer hat, ist dort
+   * `unsupported`, hier waere er `ok`. Die Wand ist die menschliche Sicht auf
+   * DENSELBEN Lauf — sie darf ihn nicht anders lesen.
+   */
+  readonly widgets?: Readonly<Record<string, unknown>>;
 }
 
 /** Status eines Wand-Feldes — dieselben Stufen wie im Konformitäts-Report. */
@@ -52,6 +61,7 @@ export function buildWall(skin: SkinTiles, tokens: Tokens, ctx: Ctx): WallCell[]
   const cells: WallCell[] = [];
   const fx = fixtures as unknown as FixtureMap;
   const unsupported = new Set(skin.unsupported ?? []);
+  const declared = skin.widgets;
 
   for (const type of Object.keys(fx)) {
     if (NON_TYPE_KEYS.has(type)) continue;
@@ -81,6 +91,11 @@ export function buildWall(skin: SkinTiles, tokens: Tokens, ctx: Ctx): WallCell[]
         continue;
       }
 
+      // Reihenfolge wie in `classify`: bewusste Abwahl schlaegt den Renderer, und
+      // ein undeklarierter Typ ist eine Luecke — auch wenn er rendert.
+      const declaredHere = declared === undefined || Object.hasOwn(declared, type);
+      const status: CellStatus = unsupported.has(type) ? "unsupported" : declaredHere ? "ok" : "gap";
+
       try {
         cells.push({
           type: wtype,
@@ -88,7 +103,7 @@ export function buildWall(skin: SkinTiles, tokens: Tokens, ctx: Ctx): WallCell[]
           device,
           vnode: render(device, tokens, ctx),
           hasRenderer: true,
-          status: "ok",
+          status,
         });
       } catch (err: unknown) {
         cells.push({
