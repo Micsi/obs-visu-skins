@@ -15,15 +15,24 @@ import { h, isVNode } from "vue";
  * driving a stub PageHost so no app/host is needed.
  */
 
-function findAll(node: unknown, cls: string, acc: any[] = []): any[] {
+interface VNodeish {
+  props?: Record<string, unknown> | null;
+  children?: unknown;
+}
+function findAll(node: unknown, cls: string, acc: VNodeish[] = []): VNodeish[] {
   if (!node || typeof node !== "object") return acc;
-  const v = node as any;
-  const klass = Array.isArray(v.props?.class) ? v.props.class.join(" ") : (v.props?.class ?? "");
+  const v = node as VNodeish;
+  const rawClass = v.props?.class;
+  const klass = Array.isArray(rawClass) ? rawClass.join(" ") : (rawClass ?? "");
   if (typeof klass === "string" && klass.split(" ").includes(cls)) acc.push(v);
   const kids = v.children;
   if (Array.isArray(kids)) for (const c of kids) findAll(c, cls, acc);
   else if (kids && typeof kids === "object") findAll(kids, cls, acc);
   return acc;
+}
+/** Read a prop as a callable and invoke it (test helper; props are loosely typed). */
+function callProp(node: VNodeish | undefined, name: string): void {
+  (node?.props?.[name] as (() => void) | undefined)?.();
 }
 
 function stubHost(over: Partial<PageHost> = {}): PageHost {
@@ -78,7 +87,7 @@ describe("edomi page renderer", () => {
     const host = stubHost();
     const vnode = page(host);
     const egLink = findAll(vnode, "edomi-nav-link").find((n) => n.props?.["data-page"] === "eg");
-    egLink.props.onClick();
+    callProp(egLink, "onClick");
     expect(host.navigate).toHaveBeenCalledWith("eg");
   });
 
@@ -86,7 +95,7 @@ describe("edomi page renderer", () => {
     const vnode = page(stubHost());
     const items = findAll(vnode, "edomi-item");
     expect(items).toHaveLength(1);
-    const style = items[0].props.style as Record<string, string>;
+    const style = items[0].props?.style as Record<string, string>;
     expect(style.position).toBe("absolute");
     expect(style.left).toContain("* 10)");
     expect(style.width).toContain("* 4)");
@@ -101,7 +110,7 @@ describe("edomi page renderer", () => {
     const wrap = findAll(vnode, "edomi-popup-wrap");
     expect(wrap).toHaveLength(1);
     const close = findAll(vnode, "edomi-popup-close")[0];
-    close.props.onClick();
+    callProp(close, "onClick");
     expect(host.closePopup).toHaveBeenCalledWith("bad");
   });
 });
