@@ -8,7 +8,7 @@
 // data fork — items reference devices by id and the host renders their tiles.
 
 import { h, type VNode } from "vue";
-import type { NavNode, PageHost, PageLayer, PopupDescriptor } from "@obs/visu-contract";
+import type { LayerItem, NavNode, PageHost, PageLayer, PopupDescriptor } from "@obs/visu-contract";
 
 /** Absolute box from an author position (Edomi units = pixels). Emits plain `px`
  *  rather than `calc(var() * n)`: length*number typed arithmetic is invalid on
@@ -51,22 +51,83 @@ function navEntry(node: NavNode, host: PageHost): VNode {
   ]);
 }
 
+/**
+ * The jump affordance of a placed element (`LayerItem.link`, contract v1.12).
+ *
+ * Everything that needs KNOWLEDGE here is a host call:
+ *   - `host.resolveLink(link)` — what a click would do, WITHOUT doing it. A
+ *     LOCATION target, the `protected` PIN gate and an unknown node are already
+ *     decided when this returns; the skin only reads `kind`.
+ *   - `host.isLinkActive(link)` — target is the current page or an ancestor.
+ *   - `host.linkLabel(link)`   — the accessible name (host locale + node name).
+ *   - `host.followLink(link)`  — perform the canonical action.
+ *
+ * The skin therefore never touches `host.navTree`, never reads `NavNode.access`
+ * and never walks a parent chain — it decides only WHERE the affordance sits and
+ * WHAT it looks like (golden rule 4).
+ *
+ * A `<button role="link">` rather than an `<a>`: it is natively focusable and
+ * natively fires its click on Enter AND Space, so the skin maps no keyboard
+ * gesture of its own. It is stretched over the placed element, which is exactly
+ * #1194's case — an element with no click function of its own. DECLARED
+ * consequence (golden rule 3): on a LINKED item the jump owns the whole box, so
+ * a tile control inside it is display-only there; the item carries
+ * `data-link-covers="tile"` so that is inspectable in the DOM rather than a
+ * surprise. An item without a link is untouched.
+ */
+function linkOverlay(
+  link: NonNullable<LayerItem["link"]>,
+  active: boolean,
+  host: PageHost,
+): VNode | null {
+  const outcome = host.resolveLink(link);
+  // A target the host cannot resolve gets NO affordance: a dead-looking click
+  // area is worse than none. The item still marks it (`data-link-unknown`).
+  if (outcome.kind === "unknown") return null;
+  return h("button", {
+    class: ["edomi-link", outcome.kind === "gate" && "is-gated"].filter(Boolean),
+    type: "button",
+    // Announced as a link (it navigates), operated as a button (native keys).
+    role: "link",
+    "aria-label": host.linkLabel(link),
+    "aria-current": active ? "page" : undefined,
+    "data-link": link.targetNodeId,
+    "data-link-outcome": outcome.kind,
+    onClick: () => {
+      host.followLink(link);
+    },
+  });
+}
+
 /** One composed layer, its items placed absolutely by their author box. */
 function layerCanvas(layer: PageLayer, host: PageHost): VNode {
   return h(
     "div",
     { class: ["edomi-layer", `edomi-layer-${layer.origin}`], "data-layer": layer.id },
-    layer.items.map((item) =>
-      h(
+    layer.items.map((item) => {
+      const link = item.link;
+      // The author's active marker (`none`/`dot`/`bar`/`border`) is pure data; the
+      // skin draws it in its own language from the host's active verdict.
+      const active = link ? host.isLinkActive(link) : false;
+      const overlay = link ? linkOverlay(link, active, host) : null;
+      return h(
         "div",
         {
           class: "edomi-item",
           "data-id": item.id,
           style: item.position ? boxStyle(item.position) : undefined,
+          ...(link
+            ? {
+                "data-link": link.targetNodeId,
+                "data-link-indicator": link.activeIndicator ?? "none",
+                ...(active ? { "data-link-active": "true" } : {}),
+                ...(overlay ? { "data-link-covers": "tile" } : { "data-link-unknown": "true" }),
+              }
+            : {}),
         },
-        [host.renderTile(item.id) as VNode],
-      ),
-    ),
+        [host.renderTile(item.id) as VNode, ...(overlay ? [overlay] : [])],
+      );
+    }),
   );
 }
 

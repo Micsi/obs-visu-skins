@@ -9,6 +9,7 @@ import {
 import manifest from "../manifest.json";
 import { tiles, details, presets, page } from "../renderers";
 import { h, isVNode } from "vue";
+import { readFile } from "node:fs/promises";
 
 /**
  * @obs-visu-skins/edomi — the pixel POC skin.
@@ -58,16 +59,22 @@ function stubHost(over: Partial<PageHost> = {}): PageHost {
     openPopups: [],
     openPopup: vi.fn(),
     closePopup: vi.fn(),
+    // Page links are HOST services (contract v1.12): the stub answers, the skin
+    // asks. Defaults are the reachable case; a test overrides what it needs.
+    resolveLink: vi.fn((link) => ({ kind: "navigate" as const, pageId: link.targetNodeId })),
+    followLink: vi.fn((link) => ({ kind: "navigate" as const, pageId: link.targetNodeId })),
+    isLinkActive: vi.fn(() => false),
+    linkLabel: vi.fn((link) => `zur Seite ${link.targetNodeId}`),
     ...over,
   };
 }
 
 describe("edomi manifest", () => {
-  it("targets the current contract and honours position/nav/layers/popup", () => {
+  it("targets the current contract and honours position/nav/layers/popup/link", () => {
     expect(manifest.name).toBe("edomi");
     // Measured against the contract, not a literal (see ionic/terminal).
     expect(manifest.targetsContract).toBe(contractVersion);
-    for (const cap of ["position", "nav", "layers", "popup"]) {
+    for (const cap of ["position", "nav", "layers", "popup", "link"]) {
       expect(manifest.layout.honors).toContain(cap);
     }
     expect(manifest.unsupported).toEqual([]);
@@ -124,5 +131,138 @@ describe("edomi page renderer", () => {
     const close = findAll(vnode, "edomi-popup-close")[0];
     callProp(close, "onClick");
     expect(host.closePopup).toHaveBeenCalledWith("bad");
+  });
+});
+
+/* ---------------------------------------- page links (contract v1.12, #146) */
+
+/** A layer whose placed item carries a link, with the author's active marker. */
+const LINKED: PageLayer[] = [
+  {
+    id: "bad",
+    origin: "own",
+    order: 0,
+    items: [
+      {
+        id: "cam1",
+        position: { x: 10, y: 20, w: 4, h: 3 },
+        link: { targetNodeId: "keller", activeIndicator: "dot" },
+      },
+    ],
+  },
+];
+
+/**
+ * The point of these: the skin renders a real, named, keyboard-operable jump —
+ * and every DECISION behind it (LOCATION descent, PIN gate, unknown target,
+ * active state, accessible name) comes back from the host. The stub host below
+ * carries an EMPTY navTree on purpose: a skin that resolved anything itself
+ * could not produce the right affordance from it.
+ */
+function linkedHost(over: Partial<PageHost> = {}): PageHost {
+  return stubHost({
+    navTree: [],
+    currentPageId: "bad",
+    layersFor: (id: string): PageLayer[] => (id === "bad" ? LINKED : []),
+    ...over,
+  });
+}
+
+describe("edomi page links — the host resolves, the skin only draws", () => {
+  it("asks the host what the link would do, and draws a named link affordance", () => {
+    const host = linkedHost();
+    const vnode = page(host);
+
+    expect(host.resolveLink).toHaveBeenCalledWith({ targetNodeId: "keller", activeIndicator: "dot" });
+    const overlay = findAll(vnode, "edomi-link")[0];
+    expect(overlay).toBeDefined();
+    // A real link for assistive tech, natively focusable + Enter/Space-operable.
+    expect(overlay?.props?.role).toBe("link");
+    expect(overlay?.props?.type).toBe("button");
+    // The NAME comes from the host (golden rule 4), not from a skin-side lookup.
+    expect(overlay?.props?.["aria-label"]).toBe("zur Seite keller");
+    expect(host.linkLabel).toHaveBeenCalled();
+  });
+
+  it("a click follows the link through the HOST — the skin never navigates", () => {
+    const host = linkedHost();
+    const vnode = page(host);
+
+    callProp(findAll(vnode, "edomi-link")[0], "onClick");
+
+    expect(host.followLink).toHaveBeenCalledWith({ targetNodeId: "keller", activeIndicator: "dot" });
+    // The skin has no navigation of its own: `navigate(pageId)` stays untouched,
+    // because a link target may be a LOCATION the host has to descend first.
+    expect(host.navigate).not.toHaveBeenCalled();
+  });
+
+  it("draws the author's active indicator from the HOST's verdict", () => {
+    const inactive = findAll(page(linkedHost()), "edomi-item")[0];
+    expect(inactive?.props?.["data-link-indicator"]).toBe("dot");
+    expect(inactive?.props?.["data-link-active"]).toBeUndefined();
+
+    const host = linkedHost({ isLinkActive: vi.fn(() => true) });
+    const vnode = page(host);
+    const active = findAll(vnode, "edomi-item")[0];
+    expect(active?.props?.["data-link-active"]).toBe("true");
+    expect(host.isLinkActive).toHaveBeenCalledWith({ targetNodeId: "keller", activeIndicator: "dot" });
+    // The verdict is asked ONCE per item and reused for markup + affordance.
+    expect((host.isLinkActive as unknown as { mock: { calls: unknown[] } }).mock.calls).toHaveLength(1);
+    expect(findAll(vnode, "edomi-link")[0]?.props?.["aria-current"]).toBe("page");
+  });
+
+  it("a PIN-gated target still offers the jump — onto the PIN path", () => {
+    const host = linkedHost({
+      resolveLink: vi.fn(() => ({ kind: "gate" as const, pageId: "technik", accessNodeId: "keller" })),
+    });
+    const overlay = findAll(page(host), "edomi-link")[0];
+
+    expect(overlay?.props?.["data-link-outcome"]).toBe("gate");
+    const klass = overlay?.props?.class as string[];
+    expect(klass).toContain("is-gated");
+  });
+
+  it("an unknown target gets NO affordance, and says so in the DOM (rule 3)", () => {
+    const host = linkedHost({
+      resolveLink: vi.fn(() => ({ kind: "unknown" as const, targetNodeId: "keller" })),
+    });
+    const vnode = page(host);
+
+    expect(findAll(vnode, "edomi-link")).toHaveLength(0);
+    const item = findAll(vnode, "edomi-item")[0];
+    expect(item?.props?.["data-link-unknown"]).toBe("true");
+    // Still inspectable: the target is readable even without an affordance.
+    expect(item?.props?.["data-link"]).toBe("keller");
+  });
+
+  it("an item without a link is completely untouched (additive)", () => {
+    const item = findAll(page(stubHost()), "edomi-item")[0];
+    expect(item?.props?.["data-link"]).toBeUndefined();
+    expect(item?.props?.["data-link-covers"]).toBeUndefined();
+    expect(findAll(page(stubHost()), "edomi-link")).toHaveLength(0);
+  });
+
+  /**
+   * The structural half of golden rule 4, checked at the source rather than
+   * asserted in prose: the link code path may call host services and nothing
+   * else. If someone later re-adds a tree descent or an access check to the
+   * skin, this goes red.
+   */
+  it("the link code path contains no tree- or access-logic of its own", async () => {
+    const url = new URL("../src/page.ts", import.meta.url);
+    const src = await readFile(url, "utf8");
+    const start = src.indexOf("function linkOverlay");
+    const end = src.indexOf("/** The bounding extent");
+    expect(start).toBeGreaterThan(-1);
+    expect(end).toBeGreaterThan(start);
+    const region = src.slice(start, end);
+
+    for (const forbidden of ["navTree", ".access", ".children", "parent_id", "parentOf"]) {
+      expect(region, `link code must not touch ${forbidden}`).not.toContain(forbidden);
+    }
+    // What it DOES do is call the host.
+    for (const call of ["host.resolveLink", "host.followLink", "host.isLinkActive", "host.linkLabel"]) {
+      expect(region).toContain(call);
+    }
   });
 });
