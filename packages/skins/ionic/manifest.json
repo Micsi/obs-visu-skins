@@ -1,6 +1,6 @@
 {
   "name": "ionic",
-  "targetsContract": "1.9",
+  "targetsContract": "1.10",
   "font": { "family": "Manrope", "src": "./fonts/Manrope.woff2" },
   "renderers": "./renderers.ts",
   "unsupported": [],
