@@ -1,0 +1,27 @@
+{
+  "name": "edomi",
+  "targetsContract": "1.10",
+  "renderers": "./renderers.ts",
+  "unsupported": [],
+
+  "gestures": { "tap": "action", "longPress": "presets", "doubleTap": "openDetail" },
+
+  "widgets": {
+    "light": { "actions": ["toggle", "setDim"] },
+    "switch": { "actions": ["toggle"] },
+    "blind": { "actions": ["setPosition", "applyPreset", "lock", "unlock"] },
+    "jalousie": { "actions": ["setPosition", "setSlat", "applyPreset", "lock", "unlock", "stop"] },
+    "sensor": { "actions": [] },
+    "scene": { "actions": ["activateScene"] },
+    "media": { "actions": ["playPause", "stop", "next", "previous", "setVolume"] },
+    "camera": { "actions": ["refresh"] },
+    "climate": { "actions": ["setSetpoint"] }
+  },
+
+  "layout": {
+    "model": "grid",
+    "honors": ["order", "position", "nav", "layers", "popup"]
+  },
+
+  "themes": ["dark"]
+}

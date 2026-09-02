@@ -14,7 +14,7 @@ import { main } from "./cli.js";
 
 // Jeder Skin im Workspace. Neue Skins hier ergänzen (+ devDependency in package.json),
 // damit das Gate sie mitprüft.
-const SKINS = ["@obs-visu-skins/ionic", "@obs-visu-skins/terminal"] as const;
+const SKINS = ["@obs-visu-skins/ionic", "@obs-visu-skins/terminal", "@obs-visu-skins/edomi"] as const;
 
 describe("Konformitäts-Gate (alle Skins)", () => {
   for (const pkg of SKINS) {

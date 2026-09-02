@@ -9,6 +9,7 @@
     { "path": "./packages/tooling/contract-ref" },
     { "path": "./packages/skins/ionic" },
     { "path": "./packages/skins/terminal" },
+    { "path": "./packages/skins/edomi" },
     { "path": "./packages/tooling/conformance" },
     { "path": "./packages/tooling/create-skin" },
     { "path": "./packages/tooling/fixture-wand" }
