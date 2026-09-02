@@ -119,9 +119,11 @@
   pointer-events: none;
   z-index: 100;
 }
+/* Dimming is purely visual and independent of modality: a dimmed non-modal popup
+   must NOT block controls behind it. Only a MODAL popup captures pointer input on
+   the wrapper (exclusive open). */
 .edomi-popup-wrap.is-dimmed {
   background: rgba(0, 0, 0, 0.45);
-  pointer-events: auto;
 }
 .edomi-popup-wrap.is-modal {
   pointer-events: auto;
@@ -136,9 +138,13 @@
 }
 /* A centered popup is centred by the wrapper's grid `place-items`; it MUST stay a
    positioning context (relative) so its absolute close button + composed layers
-   anchor to the card, not the fixed viewport wrapper. */
+   anchor to the card, not the fixed viewport wrapper. Its layers are absolutely
+   positioned (no intrinsic size), so a centered popup needs an explicit size to
+   contain them — a sensible viewport-relative default. */
 .edomi-popup.is-centered {
   position: relative;
+  width: min(90vw, 520px);
+  height: min(85vh, 400px);
 }
 .edomi-popup.has-shadow {
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);

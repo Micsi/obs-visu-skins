@@ -8,7 +8,11 @@
 // skin; only the page-level appearance differs (golden rule: renderer by type,
 // skin owns the how).
 
-import { tiles, details } from "@obs-visu-skins/ionic";
+import { tiles, details, presets } from "@obs-visu-skins/ionic";
 
-export { tiles, details };
+// Re-use the ionic content renderers AND its position-preset surface so a
+// blind/jalousie with configured presets keeps its long-press quick menu (the
+// manifest declares the matching `gestures`); the pixel precision comes from the
+// host placing tiles by their author box, not from bespoke content.
+export { tiles, details, presets };
 export { page } from "./src/page.js";

@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import type { PageHost, PageLayer, PopupDescriptor } from "@obs/visu-contract";
 
 import manifest from "../manifest.json";
-import { tiles, details, page } from "../renderers";
+import { tiles, details, presets, page } from "../renderers";
 import { h, isVNode } from "vue";
 
 /**
@@ -66,10 +66,14 @@ describe("edomi manifest", () => {
     expect(manifest.unsupported).toEqual([]);
   });
 
-  it("re-uses the ionic content renderers (tiles + details present)", () => {
+  it("re-uses the ionic content renderers incl. the preset surface + declares gestures", () => {
     expect(tiles).toBeTypeOf("object");
     expect(details).toBeTypeOf("object");
+    expect(presets).toBeTypeOf("object");
     expect(typeof page).toBe("function");
+    // presets keep the blind/jalousie long-press surface, so the manifest must
+    // declare the matching gesture that routes a long-press to them.
+    expect((manifest as { gestures?: { longPress?: string } }).gestures?.longPress).toBe("presets");
   });
 });
 

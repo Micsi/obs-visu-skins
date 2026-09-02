@@ -119,7 +119,10 @@ function popup(desc: PopupDescriptor, host: PageHost): VNode {
 export function page(host: PageHost): VNode {
   const pageId = host.currentPageId;
   const layers = pageId ? host.layersFor(pageId) : [];
-  return h("div", { class: "edomi-root" }, [
+  // `visu-root` + the ionic style hooks (data-stil/data-theme) so the re-used
+  // ionic content tiles — whose CSS is scoped under `.visu-root[data-stil]` —
+  // actually pick up their styling inside the Edomi page.
+  return h("div", { class: ["edomi-root", "visu-root"], "data-stil": "glass", "data-theme": "dark" }, [
     h("nav", { class: "edomi-nav", "aria-label": "Visu" }, [
       h(
         "ul",
