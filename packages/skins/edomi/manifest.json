@@ -23,5 +23,5 @@
     "honors": ["order", "grouping", "position", "nav", "layers", "popup"]
   },
 
-  "themes": ["light", "dark"]
+  "themes": ["dark"]
 }

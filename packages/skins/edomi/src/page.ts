@@ -69,9 +69,32 @@ function layerCanvas(layer: PageLayer, host: PageHost): VNode {
   );
 }
 
-/** A modal popup overlay: its own page's layers, host-owned open state. */
+/** The bounding extent (w/h in author units) of a set of layers' positioned items. */
+function layersExtent(layers: readonly PageLayer[]): { w: number; h: number } {
+  let w = 0;
+  let h = 0;
+  for (const layer of layers) {
+    for (const item of layer.items) {
+      if (!item.position) continue;
+      w = Math.max(w, item.position.x + item.position.w);
+      h = Math.max(h, item.position.y + item.position.h);
+    }
+  }
+  return { w, h };
+}
+
+/** A popup overlay: its own page's layers, host-owned open state. */
 function popup(desc: PopupDescriptor, host: PageHost): VNode {
   const centered = !desc.position;
+  const layers = host.layersFor(desc.id);
+  // A centered popup's layers are absolutely positioned (no intrinsic size), so
+  // size the card to contain them; fall back to the CSS default when it has none.
+  const ext = centered ? layersExtent(layers) : null;
+  const u = "var(--vz-pos-unit, 1px)";
+  const centeredStyle =
+    ext && (ext.w > 0 || ext.h > 0)
+      ? { width: `calc(${u} * ${ext.w})`, height: `calc(${u} * ${ext.h})` }
+      : undefined;
   return h(
     "div",
     {
@@ -90,7 +113,7 @@ function popup(desc: PopupDescriptor, host: PageHost): VNode {
             centered && "is-centered",
           ].filter(Boolean),
           "data-popup": desc.id,
-          style: desc.position ? boxStyle(desc.position) : undefined,
+          style: desc.position ? boxStyle(desc.position) : centeredStyle,
         },
         [
           h(
@@ -104,7 +127,7 @@ function popup(desc: PopupDescriptor, host: PageHost): VNode {
             "×",
           ),
           // The popup shows its own page's composed layers (id === popup id).
-          ...host.layersFor(desc.id).map((layer) => layerCanvas(layer, host)),
+          ...layers.map((layer) => layerCanvas(layer, host)),
         ],
       ),
     ],
@@ -119,11 +142,15 @@ function popup(desc: PopupDescriptor, host: PageHost): VNode {
 export function page(host: PageHost): VNode {
   const pageId = host.currentPageId;
   const layers = pageId ? host.layersFor(pageId) : [];
+  // A modal popup is exclusive: make the rest of the page inert so it drops out of
+  // the tab order + pointer/keyboard interaction (not just visually dimmed).
+  const hasModal = host.openPopups.some((p) => p.modal);
+  const inert = hasModal ? true : undefined;
   // `visu-root` + the ionic style hooks (data-stil/data-theme) so the re-used
   // ionic content tiles — whose CSS is scoped under `.visu-root[data-stil]` —
   // actually pick up their styling inside the Edomi page.
   return h("div", { class: ["edomi-root", "visu-root"], "data-stil": "glass", "data-theme": "dark" }, [
-    h("nav", { class: "edomi-nav", "aria-label": "Visu" }, [
+    h("nav", { class: "edomi-nav", "aria-label": "Visu", inert }, [
       h(
         "ul",
         { class: "edomi-nav-list" },
@@ -132,7 +159,7 @@ export function page(host: PageHost): VNode {
     ]),
     h(
       "div",
-      { class: "edomi-canvas", "data-page": pageId ?? "" },
+      { class: "edomi-canvas", "data-page": pageId ?? "", inert },
       layers.map((layer) => layerCanvas(layer, host)),
     ),
     ...host.openPopups.map((p) => popup(p, host)),
