@@ -83,8 +83,9 @@ function layersExtent(layers: readonly PageLayer[]): { w: number; h: number } {
   return { w, h };
 }
 
-/** A popup overlay: its own page's layers, host-owned open state. */
-function popup(desc: PopupDescriptor, host: PageHost): VNode {
+/** A popup overlay: its own page's layers, host-owned open state. `inert` makes a
+ *  sibling popup non-interactive while a modal popup is open (modal is exclusive). */
+function popup(desc: PopupDescriptor, host: PageHost, inert?: boolean): VNode {
   const centered = !desc.position;
   const layers = host.layersFor(desc.id);
   // A centered popup's layers are absolutely positioned (no intrinsic size), so
@@ -101,6 +102,7 @@ function popup(desc: PopupDescriptor, host: PageHost): VNode {
       class: ["edomi-popup-wrap", desc.dimBackdrop && "is-dimmed", desc.modal && "is-modal"].filter(
         Boolean,
       ),
+      inert: inert ? true : undefined,
     },
     [
       h(
@@ -162,6 +164,8 @@ export function page(host: PageHost): VNode {
       { class: "edomi-canvas", "data-page": pageId ?? "", inert },
       layers.map((layer) => layerCanvas(layer, host)),
     ),
-    ...host.openPopups.map((p) => popup(p, host)),
+    // A modal popup is exclusive: while one is open, non-modal sibling popups are
+    // inert too (the modal itself stays interactive).
+    ...host.openPopups.map((p) => popup(p, host, hasModal && !p.modal)),
   ]);
 }
