@@ -1,19 +1,23 @@
-// Fixture-Wand — Vollständigkeits-Test für den ionic-Skin.
+// Fixture-Wand — Vollständigkeits-Test für BEIDE Skins.
 //
 // Belegt: die Wand erzeugt für JEDEN Fixture-Zustand (Typ × Zustand) ein
 // nicht-leeres VNode, und der Nicht-Typ-Schlüssel `contractVersion` wird nicht
-// als Wand-Feld mitgezählt. Da ionic alle sechs Kern-Typen rendert, darf es
-// keine gap-Felder geben (sonst wäre die Vollständigkeitswand löchrig).
+// als Wand-Feld mitgezählt. ionic und terminal rendern alle neun Kern-Typen —
+// die Wand muss für beide grün sein (#13: Definition of Done eines Skins).
+// Fehlt ein Renderer, ist das Feld sichtbar `gap`; wirft er, ist es `broken`;
+// ein bewusst abgewählter Typ ist `unsupported` und damit KEIN Fehler.
 
 import { describe, expect, it } from "vitest";
 import { isVNode } from "vue";
 import * as ionic from "@obs-visu-skins/ionic";
+import * as terminal from "@obs-visu-skins/terminal";
 import fixtures from "@obs/visu-contract/fixtures.json" with { type: "json" };
 
 import { buildWall, type SkinTiles } from "../src/wall.js";
-import { tokensStub, ctxStub } from "../src/stubs.js";
+import { ionicTokens, terminalTokens, tokensStub, ctxStub } from "../src/stubs.js";
 
-const ionicSkin: SkinTiles = { tiles: ionic.tiles };
+const ionicSkin: SkinTiles = { tiles: ionic.tiles, unsupported: [] };
+const terminalSkin: SkinTiles = { tiles: terminal.tiles, unsupported: [] };
 
 /** Erwartete Anzahl Wand-Felder = Summe aller Zustände über alle Typ-Schlüssel. */
 function expectedCellCount(): number {
@@ -41,9 +45,41 @@ describe("fixture wall (ionic)", () => {
     }
   });
 
-  it("has no gaps — ionic renders all six core types", () => {
-    expect(cells.every((c) => c.hasRenderer)).toBe(true);
-    expect(cells.filter((c) => !c.hasRenderer)).toHaveLength(0);
+  it("has no gaps — ionic renders all nine core types", () => {
+    expect(cells.every((c) => c.status === "ok")).toBe(true);
+    expect(cells.filter((c) => c.status !== "ok")).toHaveLength(0);
+  });
+
+  it("marks a declared-unsupported type as skipped, not as a gap", () => {
+    const optedOut = buildWall(
+      { tiles: { light: ionic.tiles.light }, unsupported: ["media"] },
+      ionicTokens,
+      ctxStub(),
+    );
+    expect(
+      optedOut.filter((c) => c.type === "media").every((c) => c.status === "unsupported"),
+    ).toBe(true);
+    // Alles andere ohne Renderer bleibt eine echte gap.
+    expect(optedOut.some((c) => c.status === "gap")).toBe(true);
+  });
+
+  it("marks a throwing renderer as broken", () => {
+    const boom = buildWall(
+      {
+        tiles: {
+          ...ionic.tiles,
+          light: () => {
+            throw new Error("boom");
+          },
+        },
+      },
+      ionicTokens,
+      ctxStub(),
+    );
+    const lights = boom.filter((c) => c.type === "light");
+    expect(lights.length).toBeGreaterThan(0);
+    expect(lights.every((c) => c.status === "broken")).toBe(true);
+    expect(lights[0]?.error).toContain("boom");
   });
 
   it("marks a missing renderer as a visible gap (not silently skipped)", () => {
@@ -55,6 +91,21 @@ describe("fixture wall (ionic)", () => {
     expect(gapCells.filter((c) => c.hasRenderer).every((c) => c.type === "light")).toBe(true);
     for (const c of gapCells.filter((c) => !c.hasRenderer)) {
       expect(c.vnode).toBeNull();
+    }
+  });
+});
+
+describe("fixture wall (terminal)", () => {
+  const cells = buildWall(terminalSkin, terminalTokens, ctxStub());
+
+  it("covers every fixture state", () => {
+    expect(cells.length).toBe(expectedCellCount());
+  });
+
+  it("is green — terminal renders all nine core types without throwing", () => {
+    for (const c of cells) {
+      expect(c.status, `${c.type}.${c.state}`).toBe("ok");
+      expect(isVNode(c.vnode)).toBe(true);
     }
   });
 });

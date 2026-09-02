@@ -1,9 +1,15 @@
 // @obs-visu-skins/create-skin — Scaffold-Logik (Dev-Kit für Skin-Autoren).
 //
 // Erzeugt ein konformitäts-grünes Skin-Skelett unter packages/skins/<name>: ein
-// Verzeichnis mit package.json, manifest.json (alle sechs Kern-Typen deklariert,
-// `unsupported` Pflicht), renderers.ts (Platzhalter-Renderer je Typ, damit der
-// Konformitäts-Generator keine `gap` meldet), tsconfig.json und einem Scaffold-Test.
+// Verzeichnis mit package.json, manifest.json (ALLE Kern-Typen des aktuellen Vertrags
+// deklariert, `unsupported` als leere Pflichtangabe), renderers.ts (Platzhalter-Renderer
+// je Typ, damit der Konformitäts-Generator keine `gap` meldet), tsconfig.json und einem
+// Scaffold-Test.
+//
+// Vertragsstand: `targetsContract` kommt aus @obs/visu-contract selbst — ein Scaffold
+// kann so nicht hinter dem Vertrag zurückbleiben (genau das war bei terminal passiert:
+// Manifest auf 1.1 eingefroren). Aktionen bleiben leer, bis der Autor sie wirklich
+// markiert: das Scaffold soll nichts behaupten, was seine Platzhalter nicht tun.
 //
 // Designentscheidung (Onboarding): das frische Skin rendert SOFORT — jede Kachel ist
 // ein schlichter Platzhalter (Label · Typ · Zustand). Der Autor ersetzt die Platzhalter
@@ -15,8 +21,9 @@
 
 import { mkdirSync, writeFileSync, readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
+import { version as CONTRACT_VERSION } from "@obs/visu-contract";
 
-/** Die sechs stabilen v1-Kern-Typen — jedes Scaffold deklariert + rendert alle. */
+/** Die neun stabilen Kern-Typen — jedes Scaffold deklariert + rendert alle. */
 export const CORE_WIDGET_TYPES = [
   "light",
   "switch",
@@ -24,6 +31,9 @@ export const CORE_WIDGET_TYPES = [
   "jalousie",
   "sensor",
   "scene",
+  "media",
+  "camera",
+  "climate",
 ] as const;
 
 /** Layout-Modell des Scaffolds — `grid` (Default) oder `list`. */
@@ -89,20 +99,25 @@ function packageJson(name: string): string {
   return JSON.stringify(pkg, null, 2) + "\n";
 }
 
-/** Sinnvolle Default-Aktionen je Kern-Typ (kanonische Namen, CONTRACT §6). */
-const DEFAULT_ACTIONS: Record<(typeof CORE_WIDGET_TYPES)[number], string[]> = {
-  light: ["toggle", "setDim"],
-  switch: ["toggle"],
-  blind: ["setPosition", "lock", "unlock"],
-  jalousie: ["setPosition", "setSlat", "lock", "unlock"],
-  sensor: [],
-  scene: ["activateScene"],
-};
+/**
+ * Aktionen eines frischen Scaffolds: KEINE.
+ *
+ * Die Platzhalter-Kachel zeigt nur an und markiert keine einzige `data-action` — ein
+ * Manifest, das trotzdem den vollen kanonischen Satz deklariert, wäre exakt die
+ * Pauschal-Behauptung, die dieses Tooling aufdecken soll (Goldene Regel 3). Der
+ * Generator misst die Aktions-Achse am gerenderten Baum; ein frisches Skin ist damit
+ * ehrlich `display` und wächst auf `partial`/`full`, sobald der Autor Aktionen
+ * markiert UND deklariert. Welche Aktionen ein Typ kennt, steht im Vertrag
+ * (contract.schema.json §6) und im Authoring-Guide.
+ */
+function scaffoldActions(): string[] {
+  return [];
+}
 
 function manifestJson(name: string, layout: LayoutModel): string {
   const widgets: Record<string, { actions: string[] }> = {};
   for (const type of CORE_WIDGET_TYPES) {
-    widgets[type] = { actions: DEFAULT_ACTIONS[type] };
+    widgets[type] = { actions: scaffoldActions() };
   }
 
   const layoutBlock =
@@ -115,7 +130,9 @@ function manifestJson(name: string, layout: LayoutModel): string {
             gutter: 8,
             flow: "row",
           },
-          honors: ["order", "grouping", "role"],
+          // Boden (Goldene Regel 5). `role` wird bewusst NICHT beansprucht: das
+          // Scaffold bringt keine roleMap mit — deklariere es, sobald du eine hast.
+          honors: ["order", "grouping"],
         }
       : {
           model: "list",
@@ -124,14 +141,17 @@ function manifestJson(name: string, layout: LayoutModel): string {
             gutter: 0,
             flow: "column",
           },
-          honors: ["order", "grouping", "role"],
+          honors: ["order", "grouping"],
         };
 
   const manifest = {
     name,
-    targetsContract: "1.1",
+    targetsContract: CONTRACT_VERSION,
     renderers: "./renderers.ts",
-    unsupported: ["camera", "media", "climate"],
+    // Pflichtangabe (Goldene Regel 3) — leer, weil das Scaffold alle Kern-Typen
+    // rendert. Leer heißt nicht „vergessen": ein künftiger neuer Kern-Typ fällt so
+    // als `gap` auf, statt still abgewählt zu sein.
+    unsupported: [],
     widgets,
     layout: layoutBlock,
     themes: ["light", "dark"],
@@ -185,8 +205,9 @@ function placeholderTile(d: Device, t: Tokens, ctx: Ctx): VNode {
 }
 
 /**
- * Kachel-Renderer je Kern-Typ. Vollständig für alle sechs v1-Kern-Typen
- * (light · switch · blind · jalousie · sensor · scene), adressiert über den
+ * Kachel-Renderer je Kern-Typ. Vollständig für alle neun Kern-Typen
+ * (light · switch · blind · jalousie · sensor · scene · media · camera · climate),
+ * adressiert über den
  * Typ-Schlüssel (tiles[type]); spiegelt manifest.json → widgets, damit der
  * Konformitäts-Generator keine \`gap\` meldet.
  */
@@ -197,6 +218,9 @@ export const tiles: RendererMap = {
   jalousie: placeholderTile,
   sensor: placeholderTile,
   scene: placeholderTile,
+  media: placeholderTile,
+  camera: placeholderTile,
+  climate: placeholderTile,
 };
 
 /**
@@ -234,22 +258,32 @@ function scaffoldSpecTs(name: string, layout: LayoutModel): string {
 // Verschönern der Renderer durch echte Form-/Verhaltens-Tests (vgl. ionic/terminal).
 
 import { describe, expect, it } from "vitest";
-import type { SkinManifest } from "@obs/visu-contract";
+import { version as contractVersion, type SkinManifest } from "@obs/visu-contract";
 import manifest from "../manifest.json" with { type: "json" };
 import { details, tiles } from "../renderers.js";
 
-const CORE_TYPES = ["blind", "jalousie", "light", "scene", "sensor", "switch"];
+const CORE_TYPES = [
+  "blind",
+  "camera",
+  "climate",
+  "jalousie",
+  "light",
+  "media",
+  "scene",
+  "sensor",
+  "switch",
+];
 
 describe("${name} skin scaffold", () => {
-  it("declares a contract-shaped manifest with a ${layout} layout and all six core types", () => {
+  it("declares a contract-shaped manifest with a ${layout} layout and all core types", () => {
     const m = manifest as unknown as SkinManifest;
     expect(m.name).toBe("${name}");
-    expect(m.targetsContract).toBe("1.1");
+    // Das Scaffold zielt auf den aktuellen Vertrag — nie auf eine eingefrorene Zahl.
+    expect(m.targetsContract).toBe(contractVersion);
     expect(m.layout.model).toBe("${layout}");
-    // \`unsupported\` ist Pflichtangabe (golden rule 3).
-    expect(m.unsupported).toContain("camera");
-    expect(m.unsupported).toContain("media");
-    expect(m.unsupported).toContain("climate");
+    // \`unsupported\` ist Pflichtangabe (golden rule 3) — hier leer, weil alle
+    // Kern-Typen gerendert werden. Ein neuer Vertrags-Typ fällt so als gap auf.
+    expect(m.unsupported).toEqual([]);
     expect(Object.keys(m.widgets).sort()).toEqual([...CORE_TYPES].sort());
   });
 

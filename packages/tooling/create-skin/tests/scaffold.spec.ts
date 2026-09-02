@@ -1,6 +1,6 @@
 // End-to-End-Test des Scaffolds: lässt das CLI gegen ein TEMPORÄRES Ziel laufen und
 // validiert, dass das erzeugte Skin (a) die erwarteten Dateien hat, (b) ein Manifest
-// mit allen sechs Kern-Typen + dem gewählten Layout deklariert, (c) typecheckt und
+// mit allen neun Kern-Typen + dem gewählten Layout deklariert, (c) typecheckt und
 // (d) vom Konformitäts-Generator OHNE `gap` bewertet wird.
 //
 // Aufräumen ist Pflicht — kein Workspace-Müll wird eingecheckt. Der Typecheck braucht
@@ -16,7 +16,7 @@ import { fileURLToPath } from "node:url";
 import { afterAll, describe, expect, it } from "vitest";
 
 import { generateSupport } from "@obs-visu-skins/conformance";
-import type { SkinManifest } from "@obs/visu-contract";
+import { version as contractVersion, type SkinManifest } from "@obs/visu-contract";
 import { scaffoldSkin, scaffoldFiles } from "../index.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -61,11 +61,24 @@ describe("scaffoldSkin (end-to-end against a temporary target)", () => {
     expect(listManifest.layout.model).toBe("list");
     for (const m of [gridManifest, listManifest]) {
       expect(Object.keys(m.widgets).sort()).toEqual(
-        ["blind", "jalousie", "light", "scene", "sensor", "switch"].sort(),
+        [
+          "blind",
+          "camera",
+          "climate",
+          "jalousie",
+          "light",
+          "media",
+          "scene",
+          "sensor",
+          "switch",
+        ].sort(),
       );
-      expect(m.unsupported).toContain("camera");
-      expect(m.unsupported).toContain("media");
-      expect(m.unsupported).toContain("climate");
+      // Das Scaffold zielt auf den aktuellen Vertrag und wählt nichts pauschal ab.
+      expect(m.targetsContract).toBe(contractVersion);
+      expect(m.unsupported).toEqual([]);
+      expect(m.layout.honors).toEqual(["order", "grouping"]);
+      // Kein Typ behauptet eine Aktion, die die Platzhalter nicht markieren.
+      for (const entry of Object.values(m.widgets)) expect(entry?.actions).toEqual([]);
     }
   });
 
@@ -87,7 +100,18 @@ describe("scaffoldSkin (end-to-end against a temporary target)", () => {
       const { hasGap, report } = generateSupport({ manifest, tiles: mod.tiles });
       expect(hasGap).toBe(false);
       expect(report.summary.gap).toBe(0);
-      expect(report.summary.full).toBe(6);
+      expect(report.summary.broken).toBe(0);
+      // Die Platzhalter zeigen nur an und markieren keine data-action — ein frisches
+      // Scaffold ist deshalb EHRLICH `display` auf allen neun Typen, nicht `full`.
+      // Es behauptet nichts, was es nicht tut, und ist trotzdem gap-frei.
+      expect(report.summary.display).toBe(9);
+      expect(report.summary.full).toBe(0);
+      expect(report.summary.partial).toBe(0);
+      for (const type of Object.keys(report.widgets)) {
+        expect(report.widgets[type]?.actions, type).toMatch(/^0\/\d+$/);
+        // Keine unbelegte Deklaration: das Manifest verspricht keine Aktion.
+        expect(report.widgets[type]?.reason ?? "").not.toContain("declared but never marked");
+      }
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

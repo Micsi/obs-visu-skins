@@ -13,20 +13,24 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
 import type { SkinManifest } from "@obs/visu-contract";
-import { generateSupport, type RendererMap } from "./index.js";
+import { generateSupport, type RendererMap, type SkinInput } from "./index.js";
 
 interface SkinModule {
   readonly tiles: RendererMap;
+  /** Optionale Detail-/Preset-Flächen — die Aktions-Achse misst über alle. */
+  readonly details?: RendererMap;
+  readonly presets?: RendererMap;
 }
 
-async function loadSkin(
-  pkg: string,
-): Promise<{ manifest: SkinManifest; tiles: RendererMap; manifestPath: string }> {
+async function loadSkin(pkg: string): Promise<{ skin: SkinInput; manifestPath: string }> {
   const require = createRequire(import.meta.url);
   const mod = (await import(pkg)) as SkinModule;
   const manifestPath = require.resolve(`${pkg}/manifest.json`);
   const manifest = require(manifestPath) as SkinManifest;
-  return { manifest, tiles: mod.tiles, manifestPath };
+  return {
+    skin: { manifest, tiles: mod.tiles, details: mod.details, presets: mod.presets },
+    manifestPath,
+  };
 }
 
 async function main(argv: readonly string[]): Promise<number> {
@@ -35,14 +39,12 @@ async function main(argv: readonly string[]): Promise<number> {
   const pkg = args[0];
 
   if (!pkg) {
-    process.stderr.write(
-      "usage: obs-visu-conformance <skin-package-name> [--stdout]\n",
-    );
+    process.stderr.write("usage: obs-visu-conformance <skin-package-name> [--stdout]\n");
     return 2;
   }
 
-  const { manifest, tiles, manifestPath } = await loadSkin(pkg);
-  const { report, hasGap } = generateSupport({ manifest, tiles });
+  const { skin, manifestPath } = await loadSkin(pkg);
+  const { report, hasGap } = generateSupport(skin);
   const json = JSON.stringify(report, null, 2);
 
   if (toStdout) {
@@ -54,11 +56,12 @@ async function main(argv: readonly string[]): Promise<number> {
   }
 
   if (hasGap) {
-    const gaps = Object.entries(report.widgets)
-      .filter(([, e]) => e.level === "gap")
-      .map(([t, e]) => `  ${t}: ${e.reason ?? "gap"}`)
+    // gap UND broken sind Fehlerstufen (ARCHITECTURE.md §2) — beide werden benannt.
+    const failures = Object.entries(report.widgets)
+      .filter(([, e]) => e.level === "gap" || e.level === "broken")
+      .map(([t, e]) => `  ${t} [${e.level}]: ${e.reason ?? e.level}`)
       .join("\n");
-    process.stderr.write(`conformance gap in ${report.skin}:\n${gaps}\n`);
+    process.stderr.write(`conformance failure in ${report.skin}:\n${failures}\n`);
     return 1;
   }
   return 0;
@@ -66,8 +69,7 @@ async function main(argv: readonly string[]): Promise<number> {
 
 // Nur ausführen, wenn direkt als Skript gestartet (nicht beim Import in Tests).
 const invokedDirectly =
-  process.argv[1] !== undefined &&
-  fileURLToPath(import.meta.url) === process.argv[1];
+  process.argv[1] !== undefined && fileURLToPath(import.meta.url) === process.argv[1];
 
 if (invokedDirectly) {
   main(process.argv.slice(2))

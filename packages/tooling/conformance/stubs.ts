@@ -1,0 +1,93 @@
+// @obs-visu-skins/conformance — Tokens-/Ctx-Stubs für den headless Renderer-Lauf.
+//
+// Der Vertrag liefert nur Daten und Typen (Goldene Regel 7); die Ctx-Helfer kommen
+// im Betrieb aus dem Host. Für den Konformitätslauf (und die Fixture-Wand) braucht
+// es eine ehrliche, aber minimale Nachbildung: sie erfindet keine Gerätedaten,
+// sondern formuliert nur die zentralen Zustandstexte, die der Host sonst liefert.
+//
+// Bewusst KEIN State (Goldene Regel 4) — reine Funktionen über die Fixture-Daten.
+
+import type { Ctx, Device, Tokens } from "@obs/visu-contract";
+
+/** Neutrale Tokens: der headless Lauf prüft Struktur, nicht Farbe. */
+export const tokensStub: Tokens = {
+  accent: (token) => `var(--acc-${token})`,
+  accentInk: (token) => `var(--ink-${token})`,
+  font: "monospace",
+  space: (step) => `${step * 4}px`,
+};
+
+const FLOORS: Record<string, string> = {
+  Erdgeschoss: "EG",
+  Obergeschoss: "OG",
+  Untergeschoss: "UG",
+  Dachgeschoss: "DG",
+  Keller: "KG",
+};
+
+const nf = new Intl.NumberFormat("de-DE", { maximumFractionDigits: 2 });
+
+function fmt(v: number | string, dec?: number): string {
+  const n = typeof v === "number" ? v : Number(v);
+  if (!Number.isFinite(n)) return String(v);
+  return dec === undefined
+    ? nf.format(n)
+    : new Intl.NumberFormat("de-DE", {
+        minimumFractionDigits: dec,
+        maximumFractionDigits: dec,
+      }).format(n);
+}
+
+/**
+ * Der zentrale Zustandstext je Typ — die Formulierung, die im Betrieb aus dem Core
+ * kommt. Über den Typ-Schlüssel adressiert, kein switch mit stillem Default
+ * (Goldene Regel 2): ein unbekannter Typ liefert einen leeren Text und fällt damit
+ * in der Wand sichtbar auf.
+ */
+const STATE_TEXT: Record<string, (d: never) => string> = {
+  light: (d: Device & { on: boolean; dim: number | null }) =>
+    d.on ? (d.dim === null ? "Ein" : `Ein — ${fmt(d.dim)} %`) : "Aus",
+  switch: (d: Device & { on: boolean }) => (d.on ? "Ein" : "Aus"),
+  blind: (d: Device & { position: number }) =>
+    `${fmt(d.position)} % · ${d.position === 0 ? "Offen" : d.position === 100 ? "Zu" : "Teil"}`,
+  jalousie: (d: Device & { position: number; slat: number }) =>
+    `${fmt(d.position)} % · Lamelle ${fmt(d.slat)} %`,
+  sensor: (d: Device & { value: number | string; unit: string }) =>
+    `${fmt(d.value)} ${d.unit}`.trim(),
+  scene: (d: Device & { sub?: string }) => d.sub ?? "",
+  media: (d: Device & { playState: string; title: string | null }) =>
+    d.playState === "playing"
+      ? `Spielt — ${d.title ?? ""}`.trim()
+      : d.playState === "paused"
+        ? "Pause"
+        : "Gestoppt",
+  camera: (d: Device & { online: boolean }) => (d.online ? "Online" : "Offline"),
+  climate: (d: Device & { setpoint: number; current: number; unit: string }) =>
+    `${fmt(d.setpoint, 1)} ${d.unit} — Ist ${fmt(d.current, 1)} ${d.unit}`,
+};
+
+/** Ctx-Nachbildung für den headless Lauf; `overrides` für gezielte Testfälle. */
+export function ctxStub(overrides: Partial<Ctx> = {}): Ctx {
+  const stateText = (d: Device): string => {
+    const fn = STATE_TEXT[d.type];
+    return fn ? fn(d as never) : "";
+  };
+
+  return {
+    stateText,
+    stateParts: (d) => {
+      const text = stateText(d);
+      const cut = text.indexOf(" ");
+      return cut === -1
+        ? { word: text, rest: "" }
+        : { word: text.slice(0, cut), rest: text.slice(cut) };
+    },
+    hyphenate: (s) => s,
+    floorShort: (d) => (d.floor ? (FLOORS[d.floor] ?? d.floor) : ""),
+    icon: (_d, slot) => `icon:${slot}`,
+    nf: fmt,
+    warn: (d) =>
+      d.type === "sensor" && typeof d.status === "string" && /erhöht|hoch|warn/i.test(d.status),
+    ...overrides,
+  };
+}

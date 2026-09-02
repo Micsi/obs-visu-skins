@@ -1,0 +1,263 @@
+/* @obs-visu-skins/terminal — Skin-Stylesheet.
+ *
+ * Terminal ist eine Konsolen-/Listenoptik: eine Zeile pro Gerät, Monospace,
+ * "Raum · Label   <Zustand>   [Befehle]". Kein Raster, keine Kacheln
+ * (Issue #11: Kern als Liste). Alles ist unter `.t-root[data-theme]` gescoped,
+ * damit das Stylesheet neben anderen Skins im selben Dokument leben kann.
+ *
+ * Farben (Goldene Regel 6, AA): Text (fg/dim) und alle Akzente liegen in BEIDEN
+ * Themes über 4.5:1 gegen den jeweiligen Hintergrund — nachgemessen in
+ * tests/contrast.spec.ts, das genau diese Token-Werte aus dieser Datei liest.
+ * Der Akzent trägt hier nur LED, Block-Bar und Sparkline (Nicht-Text, 3:1 wäre
+ * genug) — die 4.5:1 sind bewusst Reserve.
+ */
+
+.t-root {
+  --t-font: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  --t-row-min: 44px;
+  --t-gap: 8px;
+
+  font-family: var(--t-font);
+  font-size: 13px;
+  line-height: 1.35;
+  background: var(--t-bg);
+  color: var(--t-fg);
+
+  /* Die Liste misst sich an ihrem EIGENEN Platz, nicht am Viewport: derselbe Skin
+     steht mal in einer schmalen App-Spalte, mal in der breiten Fixture-Wand. Eine
+     Container-Query trifft beide Fälle, eine Media-Query nur den einen. */
+  container-type: inline-size;
+}
+
+/* Dark = die Vorgabe eines Terminals. */
+.t-root,
+.t-root[data-theme="dark"] {
+  --t-bg: #0b0e14;
+  --t-fg: #e6edf3;
+  --t-dim: #9aa7b4;
+  --t-line: #222a35;
+  --t-surface: #151a22;
+  /* Unbefüllte Balkenspur (die ░-Glyphen). Eigener Token, weil das VORDERGRUND ist
+     und nicht die Trennlinie — die Spur muss sich von der Füllung abheben, nicht vom
+     Grund. Gemessen wird darum Füllung↔Spur, siehe tests/contrast.spec.ts. */
+  --t-bar-track: #222a35;
+  /* Inaktiver LED-Punkt: eigener Token statt Deckkraft auf --t-dim — so hält er
+     die Nicht-Text-Schwelle 3:1 auch in der gedimmten (gesperrt/readonly) Zeile. */
+  --t-led-off: #78838f;
+
+  --t-acc-orange: #ffa657;
+  --t-acc-teal: #56d4c4;
+  --t-acc-violet: #c0a8ff;
+  --t-acc-green: #7ee787;
+  --t-acc-blue: #79c0ff;
+  --t-acc-rose: #ff9fb2;
+  --t-acc-amber: #ffd166;
+  --t-acc-slate: #a9b4c4;
+}
+
+.t-root[data-theme="light"] {
+  --t-bg: #f6f7f9;
+  --t-fg: #11151b;
+  --t-dim: #4c5663;
+  --t-line: #d8dce3;
+  --t-surface: #ffffff;
+  --t-bar-track: #d8dce3;
+  --t-led-off: #6b7480;
+
+  --t-acc-orange: #9a4b00;
+  --t-acc-teal: #00625b;
+  --t-acc-violet: #5b3fbf;
+  --t-acc-green: #1f6b2e;
+  --t-acc-blue: #0b5cad;
+  --t-acc-rose: #a32447;
+  --t-acc-amber: #7a5300;
+  --t-acc-slate: #4a5461;
+}
+
+/* ------------------------------------------------------------------ Zeile */
+
+/* Die Zeile UMBRICHT statt überzulaufen: reicht der Platz nicht, rutscht die
+ * Befehlsspalte auf eine eigene Zeile und ihre Knöpfe umbrechen untereinander.
+ * Ohne das erzwingen die nicht schrumpfbaren Befehle (bis zu sechs bei einem
+ * Rollladen mit Presets) eine Naturbreite von ~1000 px und die ganze Seite
+ * scrollt horizontal — auf einem 390-px-Gerät unbrauchbar. */
+.t-root .t-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px var(--t-gap);
+  min-height: var(--t-row-min);
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--t-line);
+  background: transparent;
+}
+
+.t-root .t-row:focus-visible,
+.t-root .t-cmd:focus-visible {
+  outline: 2px solid var(--acc, var(--t-fg));
+  outline-offset: -2px;
+}
+
+/* Label-Spalte: Raum (gedimmt) · Name (Vordergrund). Darf bis auf ~12 Zeichen
+ * schrumpfen und kürzt dann mit Ellipse, statt die Zeile aufzuspannen. */
+.t-root .t-label {
+  flex: 1 1 16ch;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.t-root .t-room,
+.t-root .t-sep {
+  color: var(--t-dim);
+}
+.t-root .t-name {
+  color: var(--t-fg);
+}
+
+/* Zustands-Spalte. `min-width: 0` + `overflow: hidden` sind hier die eigentliche
+ * Schrumpf-Erlaubnis: ohne sie halten die nowrap-Kinder die Spalte auf ihrer
+ * Naturbreite fest und der Inhalt läuft aus der Zeile heraus. */
+.t-root .t-state {
+  flex: 1 1 20ch;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--t-dim);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+.t-root .t-state > * {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* Block-Bar und Sparkline sind Zeichen-Grafik fester Länge — sie dürfen nicht
+   auf ein paar Zeichen zusammengekürzt werden, sonst lügt der Balken. */
+.t-root .t-state > .t-bar,
+.t-root .t-state > .t-spark {
+  flex: 0 0 auto;
+  overflow: visible;
+}
+.t-root .t-state b {
+  color: var(--t-fg);
+  font-weight: 600;
+}
+.t-root .t-unit {
+  color: var(--t-dim);
+}
+.t-root .t-sub,
+.t-root .t-status {
+  color: var(--t-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.t-root .t-status.is-warn {
+  color: var(--t-acc-amber);
+}
+
+/* LED: der Statuspunkt vor dem Label. */
+.t-root .t-led {
+  flex: 0 0 auto;
+  width: 1ch;
+  /* Inaktiv: gedimmt, aber sichtbar — eine Zeile ohne erkennbaren Punkt liest sich
+     wie ein Rendering-Fehler. Der Zustand steht ohnehin als Text daneben. */
+  color: var(--t-led-off);
+}
+.t-root .t-led[data-led="on"] {
+  color: var(--acc, var(--t-fg));
+}
+.t-root .t-led[data-led="warn"] {
+  color: var(--t-acc-amber);
+}
+.t-root .t-led[data-led="dead"] {
+  color: var(--t-led-off);
+}
+
+/* Block-Bar + Sparkline: reine Zeichen-Grafik, Monospace-treu. */
+.t-root .t-bar,
+.t-root .t-spark {
+  letter-spacing: 0;
+  color: var(--acc, var(--t-fg));
+}
+.t-root .t-bar-rest {
+  color: var(--t-bar-track);
+}
+.t-root .t-minmax {
+  flex: 0 0 auto;
+  margin-left: auto;
+  color: var(--t-dim);
+}
+
+/* Befehle. Rutschen als Block auf eine eigene Zeile, wenn Label + Zustand den
+   Platz brauchen; innerhalb des Blocks umbrechen die Knöpfe selbst. */
+.t-root .t-cmds {
+  flex: 0 1 auto;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  margin-left: auto;
+  gap: 4px;
+}
+.t-root .t-cmd {
+  font: inherit;
+  color: var(--t-fg);
+  background: var(--t-surface);
+  border: 1px solid var(--t-line);
+  border-radius: 3px;
+  padding: 2px 6px;
+  min-height: 28px;
+  cursor: pointer;
+}
+.t-root .t-cmd[disabled] {
+  color: var(--t-dim);
+  cursor: not-allowed;
+}
+.t-root .t-row.is-locked .t-state,
+.t-root .t-row.is-readonly {
+  opacity: 0.85;
+}
+.t-root .t-locktag {
+  color: var(--t-dim);
+}
+
+/* ------------------------------------------------- schmale Spalte (Mobil) ---
+ * Unter ~520 px reicht der Platz nicht für "Label | Zustand | Befehle" in einer
+ * Zeile: das Label bliebe auf drei Zeichen gekürzt. Dann stapelt die Zeile —
+ * Label, Zustand, Befehle untereinander, alles voll lesbar. Reihenfolge und
+ * Gruppierung bleiben unangetastet (Goldene Regel 5). */
+@container (max-width: 520px) {
+  .t-root .t-row {
+    flex-direction: column;
+    align-items: stretch;
+    row-gap: 2px;
+    padding: 8px 10px;
+  }
+  .t-root .t-label,
+  .t-root .t-state {
+    flex: 0 0 auto;
+    width: 100%;
+  }
+  .t-root .t-state {
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .t-root .t-cmds {
+    justify-content: flex-start;
+    margin-left: 0;
+    margin-top: 2px;
+  }
+  .t-root .t-minmax {
+    margin-left: 0;
+  }
+  /* Der LED-Punkt bleibt beim Label, nicht als eigene Stapelzeile. */
+  .t-root .t-led {
+    position: absolute;
+    margin-left: -1.4ch;
+  }
+  .t-root .t-row {
+    position: relative;
+    padding-left: 2.2ch;
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "$comment": "Skin-Namespace 'skin.terminal.*' — nur terminal-eigene Befehls-/Statuswörter (CONTRACT-v1.md §5, Ctx.t). Kern-Zustandstexte liefert der Host über ctx.stateText/stateParts.",
+  "skin": {
+    "terminal": {
+      "cmd": {
+        "on": "an",
+        "off": "aus",
+        "open": "auf",
+        "close": "zu",
+        "lock": "sperren",
+        "unlock": "öffnen",
+        "run": "start",
+        "play": "play",
+        "pause": "pause",
+        "stop": "stop",
+        "next": "vor",
+        "previous": "zurück",
+        "warmer": "wärmer",
+        "cooler": "kälter",
+        "refresh": "neu"
+      },
+      "state": {
+        "open": "Offen",
+        "closed": "Zu",
+        "partial": "Teil",
+        "slat": "Lamelle",
+        "setpoint": "Soll",
+        "current": "Ist",
+        "volume": "Vol",
+        "online": "online",
+        "offline": "offline",
+        "noSignal": "kein Bild",
+        "locked": "gesperrt",
+        "readonly": "nicht schreibbar"
+      }
+    }
+  }
+}

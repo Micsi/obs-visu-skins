@@ -1,0 +1,38 @@
+{
+  "$comment": "Skin namespace 'skin.terminal.*' — terminal-only command/status words (CONTRACT-v1.md §5, Ctx.t). Core state text comes from the host via ctx.stateText/stateParts.",
+  "skin": {
+    "terminal": {
+      "cmd": {
+        "on": "on",
+        "off": "off",
+        "open": "open",
+        "close": "close",
+        "lock": "lock",
+        "unlock": "unlock",
+        "run": "run",
+        "play": "play",
+        "pause": "pause",
+        "stop": "stop",
+        "next": "next",
+        "previous": "prev",
+        "warmer": "warmer",
+        "cooler": "cooler",
+        "refresh": "refresh"
+      },
+      "state": {
+        "open": "Open",
+        "closed": "Closed",
+        "partial": "Part",
+        "slat": "Slat",
+        "setpoint": "Set",
+        "current": "Now",
+        "volume": "Vol",
+        "online": "online",
+        "offline": "offline",
+        "noSignal": "no image",
+        "locked": "locked",
+        "readonly": "read-only"
+      }
+    }
+  }
+}
