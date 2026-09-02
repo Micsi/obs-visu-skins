@@ -1,6 +1,6 @@
 // End-to-End-Test des Scaffolds: lässt das CLI gegen ein TEMPORÄRES Ziel laufen und
 // validiert, dass das erzeugte Skin (a) die erwarteten Dateien hat, (b) ein Manifest
-// mit allen sechs Kern-Typen + dem gewählten Layout deklariert, (c) typecheckt und
+// mit allen neun Kern-Typen + dem gewählten Layout deklariert, (c) typecheckt und
 // (d) vom Konformitäts-Generator OHNE `gap` bewertet wird.
 //
 // Aufräumen ist Pflicht — kein Workspace-Müll wird eingecheckt. Der Typecheck braucht
@@ -16,7 +16,7 @@ import { fileURLToPath } from "node:url";
 import { afterAll, describe, expect, it } from "vitest";
 
 import { generateSupport } from "@obs-visu-skins/conformance";
-import type { SkinManifest } from "@obs/visu-contract";
+import { version as contractVersion, type SkinManifest } from "@obs/visu-contract";
 import { scaffoldSkin, scaffoldFiles } from "../index.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -61,11 +61,22 @@ describe("scaffoldSkin (end-to-end against a temporary target)", () => {
     expect(listManifest.layout.model).toBe("list");
     for (const m of [gridManifest, listManifest]) {
       expect(Object.keys(m.widgets).sort()).toEqual(
-        ["blind", "jalousie", "light", "scene", "sensor", "switch"].sort(),
+        [
+          "blind",
+          "camera",
+          "climate",
+          "jalousie",
+          "light",
+          "media",
+          "scene",
+          "sensor",
+          "switch",
+        ].sort(),
       );
-      expect(m.unsupported).toContain("camera");
-      expect(m.unsupported).toContain("media");
-      expect(m.unsupported).toContain("climate");
+      // Das Scaffold zielt auf den aktuellen Vertrag und wählt nichts pauschal ab.
+      expect(m.targetsContract).toBe(contractVersion);
+      expect(m.unsupported).toEqual([]);
+      expect(m.layout.honors).toEqual(["order", "grouping"]);
     }
   });
 
@@ -87,7 +98,11 @@ describe("scaffoldSkin (end-to-end against a temporary target)", () => {
       const { hasGap, report } = generateSupport({ manifest, tiles: mod.tiles });
       expect(hasGap).toBe(false);
       expect(report.summary.gap).toBe(0);
-      expect(report.summary.full).toBe(6);
+      expect(report.summary.broken).toBe(0);
+      // Acht Typen mit vollständigem Aktionssatz; sensor kennt im Vertrag keine
+      // Aktion und ist damit "display" — nicht "full" (der Generator vergibt die Stufe).
+      expect(report.summary.full).toBe(8);
+      expect(report.summary.display).toBe(1);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

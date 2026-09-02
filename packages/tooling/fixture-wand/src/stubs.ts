@@ -1,32 +1,37 @@
-// Minimaler Tokens-/Ctx-Stub, damit die reinen Skin-Renderer aufrufbar sind.
-// Orientiert an packages/skins/ionic/tests/_vnode.ts (tokensStub/ctxStub).
+// Tokens-/Ctx-Stubs für die Wand.
 //
-// Goldene Regel 1/4: der Skin/das Tool besitzt NIE State. Diese Stubs liefern nur
-// die Sandbox-Helfer aus dem Vertrag (Tokens/Ctx) — kein echter Core nötig, der
-// lebt in der App, nicht hier. Die Wand ruft Renderer rein funktional auf.
+// Der Ctx-Stub ist DERSELBE wie im Konformitäts-Generator (@obs-visu-skins/conformance):
+// Wand und support.json sollen denselben Lauf zeigen, nicht zwei Nachbildungen mit
+// unterschiedlichen Zustandstexten. Skin-spezifisch bleiben nur die Tokens — jeder Skin
+// benennt seine Akzent-Variablen selbst (ionic: --vz-acc-*, terminal: --t-acc-*), und
+// die Wand muss die echten Variablen setzen, sonst zeigt sie Fallback statt Skin.
+//
+// Goldene Regel 1/4: das Tool besitzt keinen State; die Renderer werden rein
+// funktional aufgerufen.
 
-import type { Ctx, Device, Tokens } from "@obs/visu-contract";
+import type { Tokens } from "@obs/visu-contract";
 
-export const tokensStub: Tokens = {
-  // Ionic-Palette: ionic.css definiert --vz-acc-<token> / --vz-accent-ink, nicht
-  // --acc-<token>/--ink-<token>. Die Renderer setzen den Rückgabewert als --acc auf
-  // die Kachel — damit die Wand echte Akzentfarben zeigt, müssen das die realen
-  // Ionic-Variablen sein, sonst zeigen alle akzentabhängigen Flächen Fallback/leer.
-  accent: (token) => `var(--vz-acc-${token})`,
-  accentInk: () => `var(--vz-accent-ink, var(--vz-fg))`,
-  font: "Manrope",
-  space: (step) => `${step * 4}px`,
-};
+export { ctxStub } from "@obs-visu-skins/conformance";
 
-export function ctxStub(overrides: Partial<Ctx> = {}): Ctx {
+/** Tokens, die auf die CSS-Variablen eines konkreten Skins zeigen. */
+export function tokensFor(accentPrefix: string, inkVar: string, font: string): Tokens {
   return {
-    stateText: () => "",
-    stateParts: () => ({ word: "", rest: "" }),
-    hyphenate: (s) => s,
-    floorShort: () => "",
-    icon: (_d: Device, slot: string) => `icon:${slot}`,
-    nf: (v) => String(v),
-    warn: () => false,
-    ...overrides,
+    accent: (token) => `var(${accentPrefix}${token})`,
+    accentInk: () => `var(${inkVar})`,
+    font,
+    space: (step) => `${step * 4}px`,
   };
 }
+
+/** Ionic-Palette: ionic.css definiert --vz-acc-<token> / --vz-accent-ink. */
+export const ionicTokens: Tokens = tokensFor(
+  "--vz-acc-",
+  "--vz-accent-ink, var(--vz-fg)",
+  "Manrope",
+);
+
+/** Terminal-Palette: terminal.css definiert --t-acc-<token> auf .t-root. */
+export const terminalTokens: Tokens = tokensFor("--t-acc-", "--t-fg", "monospace");
+
+/** Rückwärtskompatibler Name für die bestehenden Wand-Tests (= ionic). */
+export const tokensStub: Tokens = ionicTokens;

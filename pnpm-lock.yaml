@@ -107,9 +107,15 @@ importers:
 
   packages/tooling/fixture-wand:
     dependencies:
+      '@obs-visu-skins/conformance':
+        specifier: workspace:*
+        version: link:../conformance
       '@obs-visu-skins/ionic':
         specifier: workspace:*
         version: link:../../skins/ionic
+      '@obs-visu-skins/terminal':
+        specifier: workspace:*
+        version: link:../../skins/terminal
       '@obs/visu-contract':
         specifier: link:/Volumes/Daten/Projekte/openbridge/openbridgeserver-visu-integrate/packages/contract
         version: link:../../../../openbridgeserver-visu-integrate/packages/contract

@@ -3,26 +3,40 @@
 // Baut aus @obs/visu-contract/fixtures.json die vollständige Liste aller
 // Typ × Zustand-Paare und ruft je Paar den Kachel-Renderer des gewählten Skins
 // rein funktional auf (renderers.tiles[type]). Dispatch ausschließlich über den
-// Typ-Schlüssel — niemals ein switch mit stillem Default. Fehlt ein Renderer für
-// einen Typ, wird das als sichtbarer `gap` markiert (renderer === null), nicht
-// still übersprungen (Goldene Regel 3: Lücken ehrlich zeigen).
+// Typ-Schlüssel — niemals ein switch mit stillem Default.
+//
+// Jedes Feld bekommt denselben Status, den auch der Konformitäts-Generator vergibt
+// (ARCHITECTURE.md §2), damit Wand und support.json dieselbe Sprache sprechen:
+//   • ok           — Renderer vorhanden, Fixture gerendert
+//   • unsupported  — der Skin hat den Typ bewusst abgewählt (Goldene Regel 3)
+//   • gap          — kein Renderer und keine Deklaration → rote Zelle = To-do
+//   • broken       — der Renderer wirft an dieser Fixture → rote Zelle = To-do
+// Ein fehlender Renderer wird also nie still übersprungen.
 
 import type { CoreWidgetType, Ctx, Device, Renderer, Tokens } from "@obs/visu-contract";
 import fixtures from "@obs/visu-contract/fixtures.json" with { type: "json" };
 
-/** Die einzige Renderer-Fläche, die die Wand vom Skin braucht: Kacheln je Typ. */
+/** Was die Wand vom Skin braucht: Kacheln je Typ + die bewusste Abwahl. */
 export interface SkinTiles {
   readonly tiles: Partial<Record<CoreWidgetType, Renderer>>;
+  /** `manifest.unsupported` — bewusst nicht unterstützte Typen (kein gap). */
+  readonly unsupported?: readonly string[];
 }
 
-/** Ein gerendertes Wand-Feld: Typ × Zustand, plus VNode oder gap-Markierung. */
+/** Status eines Wand-Feldes — dieselben Stufen wie im Konformitäts-Report. */
+export type CellStatus = "ok" | "unsupported" | "gap" | "broken";
+
+/** Ein Wand-Feld: Typ × Zustand, plus VNode oder Fehlermarkierung. */
 export interface WallCell {
   readonly type: CoreWidgetType;
   readonly state: string;
   readonly device: Device;
-  /** VNode-Ergebnis des Renderers, oder `null` wenn der Skin den Typ nicht rendert (gap). */
+  /** VNode-Ergebnis des Renderers, oder `null` wenn nichts gerendert wurde. */
   readonly vnode: unknown;
   readonly hasRenderer: boolean;
+  readonly status: CellStatus;
+  /** Fehlermeldung bei `broken`. */
+  readonly error?: string;
 }
 
 /** Schlüssel in fixtures.json, die KEIN Widget-Typ sind und übersprungen werden. */
@@ -37,6 +51,7 @@ type FixtureMap = Record<string, Record<string, Record<string, unknown>>>;
 export function buildWall(skin: SkinTiles, tokens: Tokens, ctx: Ctx): WallCell[] {
   const cells: WallCell[] = [];
   const fx = fixtures as unknown as FixtureMap;
+  const unsupported = new Set(skin.unsupported ?? []);
 
   for (const type of Object.keys(fx)) {
     if (NON_TYPE_KEYS.has(type)) continue;
@@ -54,13 +69,38 @@ export function buildWall(skin: SkinTiles, tokens: Tokens, ctx: Ctx): WallCell[]
       } as unknown as Device;
 
       const render = skin.tiles[wtype];
-      cells.push({
-        type: wtype,
-        state,
-        device,
-        vnode: render ? render(device, tokens, ctx) : null,
-        hasRenderer: typeof render === "function",
-      });
+      if (typeof render !== "function") {
+        cells.push({
+          type: wtype,
+          state,
+          device,
+          vnode: null,
+          hasRenderer: false,
+          status: unsupported.has(type) ? "unsupported" : "gap",
+        });
+        continue;
+      }
+
+      try {
+        cells.push({
+          type: wtype,
+          state,
+          device,
+          vnode: render(device, tokens, ctx),
+          hasRenderer: true,
+          status: "ok",
+        });
+      } catch (err: unknown) {
+        cells.push({
+          type: wtype,
+          state,
+          device,
+          vnode: null,
+          hasRenderer: true,
+          status: "broken",
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
     }
   }
 

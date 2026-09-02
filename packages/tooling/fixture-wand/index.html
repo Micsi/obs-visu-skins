@@ -33,11 +33,23 @@
         padding: 20px;
         align-items: start;
       }
+      /* Listen-Skins (terminal) wollen volle Zeilenbreite, kein Raster. */
+      .fw-grid.is-list {
+        grid-template-columns: 1fr;
+        gap: 8px;
+      }
       .fw-cell {
-        border: 1px solid rgba(255, 255, 255, 0.08);
+        border: 1px solid color-mix(in srgb, currentColor 18%, transparent);
         border-radius: 12px;
         padding: 12px;
-        background: rgba(255, 255, 255, 0.02);
+      }
+      .fw-cell.is-gap,
+      .fw-cell.is-broken {
+        border-color: #ff8a8a;
+      }
+      .fw-cell.is-unsupported {
+        border-style: dashed;
+        opacity: 0.75;
       }
       .fw-cell-head {
         display: flex;
@@ -45,12 +57,29 @@
         align-items: baseline;
         margin-bottom: 10px;
         font-size: 12px;
+        opacity: 0.85;
       }
       .fw-type {
         font-weight: 600;
       }
       .fw-state {
         opacity: 0.55;
+      }
+      .fw-controls {
+        display: flex;
+        gap: 16px;
+        margin-top: 10px;
+        font-size: 13px;
+      }
+      .fw-controls select {
+        font: inherit;
+        margin-left: 4px;
+      }
+      .fw-good {
+        color: #7ee787;
+      }
+      .fw-bad {
+        color: #ff8a8a;
       }
       .fw-gap {
         color: #ff8a8a;
@@ -59,6 +88,12 @@
         border: 1px dashed rgba(255, 138, 138, 0.5);
         border-radius: 8px;
         text-align: center;
+      }
+      .fw-skip {
+        font-size: 13px;
+        padding: 12px;
+        text-align: center;
+        opacity: 0.6;
       }
     </style>
   </head>

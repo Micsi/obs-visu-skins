@@ -35,9 +35,7 @@ async function main(argv: readonly string[]): Promise<number> {
   const pkg = args[0];
 
   if (!pkg) {
-    process.stderr.write(
-      "usage: obs-visu-conformance <skin-package-name> [--stdout]\n",
-    );
+    process.stderr.write("usage: obs-visu-conformance <skin-package-name> [--stdout]\n");
     return 2;
   }
 
@@ -54,11 +52,12 @@ async function main(argv: readonly string[]): Promise<number> {
   }
 
   if (hasGap) {
-    const gaps = Object.entries(report.widgets)
-      .filter(([, e]) => e.level === "gap")
-      .map(([t, e]) => `  ${t}: ${e.reason ?? "gap"}`)
+    // gap UND broken sind Fehlerstufen (ARCHITECTURE.md §2) — beide werden benannt.
+    const failures = Object.entries(report.widgets)
+      .filter(([, e]) => e.level === "gap" || e.level === "broken")
+      .map(([t, e]) => `  ${t} [${e.level}]: ${e.reason ?? e.level}`)
       .join("\n");
-    process.stderr.write(`conformance gap in ${report.skin}:\n${gaps}\n`);
+    process.stderr.write(`conformance failure in ${report.skin}:\n${failures}\n`);
     return 1;
   }
   return 0;
@@ -66,8 +65,7 @@ async function main(argv: readonly string[]): Promise<number> {
 
 // Nur ausführen, wenn direkt als Skript gestartet (nicht beim Import in Tests).
 const invokedDirectly =
-  process.argv[1] !== undefined &&
-  fileURLToPath(import.meta.url) === process.argv[1];
+  process.argv[1] !== undefined && fileURLToPath(import.meta.url) === process.argv[1];
 
 if (invokedDirectly) {
   main(process.argv.slice(2))
