@@ -222,12 +222,39 @@
   color: var(--t-dim);
 }
 
-/* ------------------------------------------------- schmale Spalte (Mobil) ---
- * Unter ~520 px reicht der Platz nicht für "Label | Zustand | Befehle" in einer
- * Zeile: das Label bliebe auf drei Zeichen gekürzt. Dann stapelt die Zeile —
- * Label, Zustand, Befehle untereinander, alles voll lesbar. Reihenfolge und
- * Gruppierung bleiben unangetastet (Goldene Regel 5). */
-@container (max-width: 520px) {
+/* ------------------------------------------------ breite Zeile: nicht kuerzen ---
+ * Oberhalb der Stapel-Schwelle war das Kuerzungsband NICHT weg: zwischen ~700 und
+ * ~1300 px kuerzte die Zeile weiter Labels ("Wintergarten · Jalou…") und schnitt
+ * Zustandsfragmente (" · Lamelle 0 %") ab. Ursache ist nicht die Schwelle, sondern
+ * die Schrumpf-Reihenfolge: `.t-label`/`.t-state` haben `flex-shrink: 1` und
+ * `min-width: 0`, also geben SIE nach, bevor die Zeile umbricht — obwohl die Zeile
+ * genau dafuer `flex-wrap: wrap` traegt ("reicht der Platz nicht, rutscht die
+ * Befehlsspalte auf eine eigene Zeile", siehe .t-row). Ein Boden auf der
+ * Inhaltsbreite kehrt die Reihenfolge um: erst umbricht die Befehlsspalte, und
+ * Label + Zustand bleiben vollstaendig lesbar.
+ *
+ * Bewusst NUR in der breiten Form. In der gestapelten (schmalen) Form sind Label
+ * und Zustand volle Zeilen; ein max-content-Boden wuerde dort genau den
+ * Horizontalscroll erzwingen, den die Stapelung vermeidet.
+ * 701px = komplementaer zur Stapel-Schwelle (max-width: 700px) unten. */
+@container (min-width: 701px) {
+  .t-root .t-label,
+  .t-root .t-state {
+    min-width: max-content;
+  }
+}
+
+/* ------------------------------------------- schmale Spalte (Mobil/Tablet) ---
+ * Unter ~700 px reicht der Platz nicht für "Label | Zustand | Befehle" in einer
+ * Zeile. Dann stapelt die Zeile — Label, Zustand, Befehle untereinander, alles
+ * voll lesbar. Reihenfolge und Gruppierung bleiben unangetastet (Goldene Regel 5).
+ *
+ * Die Schwelle lag bei 520 px und damit UNTER dem Bereich, in dem die einzeilige
+ * Form schon nicht mehr trägt: zwischen rund 530 und 1000 px kürzte die Zeile
+ * Labels ("Wintergarten · Jalou…") und schnitt Zustandsfragmente (" · Lamelle 0 %")
+ * ab — gestapelt hätte derselbe Inhalt vollständig gepasst. Die Schwelle gehört
+ * also an das obere Ende dieses Bandes, nicht an sein unteres. */
+@container (max-width: 700px) {
   .t-root .t-row {
     flex-direction: column;
     align-items: stretch;

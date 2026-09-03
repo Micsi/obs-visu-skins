@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@obs-visu-skins/conformance": "workspace:*",
+    "@obs-visu-skins/edomi": "workspace:*",
     "@obs-visu-skins/ionic": "workspace:*",
     "@obs-visu-skins/terminal": "workspace:*",
     "@obs/visu-contract": "link:/Volumes/Daten/Projekte/openbridge/openbridgeserver-visu-integrate/packages/contract"

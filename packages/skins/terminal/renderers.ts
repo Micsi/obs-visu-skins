@@ -27,7 +27,7 @@
 //   • v1.9 Layering (`position`/`layers`/`popup`) und v1.10 Page-Renderer:
 //     BEWUSST nicht übernommen. Terminal ist listenbasiert und misst sich am
 //     verfügbaren Platz statt an Autoren-Pixeln: terminal.css gibt der Zeile
-//     `flex-wrap` und eine Container-Query, die unter ~520 px auf Label/Zustand/
+//     `flex-wrap` und eine Container-Query, die unter ~700 px auf Label/Zustand/
 //     Befehle untereinander umstellt — geprüft in einer 371-px-Spalte, ohne
 //     Horizontalscroll und ohne gekürzte Labels. Ein Pixel-Layout, ein Layer-Stack
 //     oder modale Popups haben darin keine Entsprechung. `layout.honors` deklariert

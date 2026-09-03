@@ -21,6 +21,10 @@ import * as terminal from "@obs-visu-skins/terminal";
 import terminalManifest from "@obs-visu-skins/terminal/manifest.json" with { type: "json" };
 import terminalCss from "@obs-visu-skins/terminal/terminal.css?raw";
 
+import * as edomi from "@obs-visu-skins/edomi";
+import edomiManifest from "@obs-visu-skins/edomi/manifest.json" with { type: "json" };
+import edomiCss from "@obs-visu-skins/edomi/edomi.css?raw";
+
 import { buildWall, type WallCell } from "./wall.js";
 import { ctxStub, ionicTokens, terminalTokens } from "./stubs.js";
 
@@ -29,7 +33,9 @@ interface SkinEntry {
   readonly manifest: SkinManifest;
   readonly tiles: Partial<Record<CoreWidgetType, Renderer>>;
   readonly tokens: Tokens;
-  readonly css: string;
+  /** Stylesheets dieses Skins, in Ladereihenfolge. Mehrere, wenn ein Skin auf dem
+   *  Blatt eines anderen aufsetzt (edomi nutzt die ionic-Content-Renderer). */
+  readonly css: readonly string[];
   /** Wurzel-Element des Skins für ein Theme (Klasse + Attribute + CSS-Variablen). */
   root(theme: string): {
     class: string;
@@ -43,7 +49,7 @@ const SKINS: Record<string, SkinEntry> = {
     manifest: ionicManifest as unknown as SkinManifest,
     tiles: ionic.tiles,
     tokens: ionicTokens,
-    css: ionicCss,
+    css: [ionicCss],
     root(theme) {
       // ionic.css scoped seine Theme-Variablen unter .visu-root[data-theme]/[data-stil];
       // applyTweaks liefert genau diese Attribute + Variablen.
@@ -59,18 +65,48 @@ const SKINS: Record<string, SkinEntry> = {
     manifest: terminalManifest as unknown as SkinManifest,
     tiles: terminal.tiles,
     tokens: terminalTokens,
-    css: terminalCss,
+    css: [terminalCss],
     // terminal.css scoped alles unter .t-root[data-theme]; keine Tweaks.
     root: (theme) => ({ class: "t-root", attrs: { "data-theme": theme }, style: {} }),
   },
+  edomi: {
+    manifest: edomiManifest as unknown as SkinManifest,
+    // edomi re-exportiert die ionic-CONTENT-Renderer; eigen ist die Seite
+    // (Navigation, Layer, Popups) über `page`. Die Wand ist eine KACHEL-Wand:
+    // sie zeigt genau diese Content-Renderer je Fixture — der Seiten-Renderer
+    // steht hier nicht auf dem Prüfstand (dafür der Konformitätslauf).
+    tiles: edomi.tiles,
+    tokens: ionicTokens,
+    // edomi.css beginnt mit `@import "@obs-visu-skins/ionic/ionic.css"`; als
+    // ?raw-Text in ein <style> injiziert löst dieser Bare-Specifier nicht auf,
+    // darum steht das ionic-Blatt hier explizit davor.
+    css: [ionicCss, edomiCss],
+    root(theme) {
+      // Die Content-Kacheln sind unter .visu-root gescoped — NICHT unter
+      // .edomi-root: das ist die Seiten-Wurzel (grid + 100dvh) und würde das
+      // Wand-Raster zerlegen.
+      const t = ionic.applyTweaks({ theme } as never);
+      return {
+        class: "visu-root",
+        attrs: t.attrs as unknown as Record<string, string>,
+        style: t.style,
+      };
+    },
+  },
 };
 
-// Beide Stylesheets sind unter ihrer eigenen Wurzel gescoped und stören einander
-// nicht — einmal injizieren, dann schaltet nur noch die Wurzel um.
+// Alle Stylesheets sind unter ihrer eigenen Wurzel gescoped und stören einander
+// nicht — einmal injizieren, dann schaltet nur noch die Wurzel um. Geteilte
+// Blätter (ionic für ionic UND edomi) werden nach Inhalt entdoppelt.
+const injectedCss = new Set<string>();
 for (const skin of Object.values(SKINS)) {
-  const style = document.createElement("style");
-  style.textContent = skin.css;
-  document.head.appendChild(style);
+  for (const sheet of skin.css) {
+    if (injectedCss.has(sheet)) continue;
+    injectedCss.add(sheet);
+    const style = document.createElement("style");
+    style.textContent = sheet;
+    document.head.appendChild(style);
+  }
 }
 
 const STATUS_LABEL: Record<WallCell["status"], string> = {
