@@ -3,6 +3,7 @@
 // eine kanonische Aktion des Vertrags, `unsupported` ist bewusst leer.
 
 import { describe, expect, it } from "vitest";
+import { readFile } from "node:fs/promises";
 import { schema, version as contractVersion, type SkinManifest } from "@obs/visu-contract";
 import manifest from "../manifest.json" with { type: "json" };
 import { details, tiles } from "../renderers.js";
@@ -72,5 +73,36 @@ describe("terminal skin manifest", () => {
     expect(Object.keys(tiles).sort()).toEqual(Object.keys(m.widgets).sort());
     // Kein eigener detail-Renderer: Bedienung delegiert an das Host-Default-Detail (#11).
     expect(details).toEqual({});
+  });
+});
+
+/**
+ * Das Zeilen-Layout als CSS-Aussage. Diese Datei prueft sonst das Manifest; die
+ * Regel unten ist aber genauso eine Zusicherung an den Nutzer — "kein
+ * Horizontalscroll, nichts wird gekuerzt, was passt" — und war zweimal falsch.
+ */
+describe("terminal Zeilen-Layout (breite Form)", () => {
+  const css = () => readFile(new URL("../terminal.css", import.meta.url), "utf8");
+
+  it("gibt Label und Zustand einen Boden, deckelt ihn aber auf die Zeilenbreite", async () => {
+    const src = await css();
+    const wide = /@container\s*\(min-width:\s*701px\)\s*\{([\s\S]*?)\n\}/.exec(src);
+    expect(wide, "die breite Form muss es geben").not.toBeNull();
+    const body = wide![1]!;
+
+    // Der Boden ist da (sonst schrumpfen Label/Zustand vor der Befehlsspalte) …
+    expect(body).toMatch(/min-width:\s*min\(\s*max-content\s*,\s*100%\s*\)/);
+    // … und er ist NICHT nackt: ein ungedeckelter max-content-Boden ueberschreibt
+    // `min-width: 0`, und mit `white-space: nowrap` kann ein nutzergelieferter
+    // Wert dann weder schrumpfen noch umbrechen noch ellipsieren — er laeuft aus
+    // der Zeile heraus. Genau der Ueberlauf, den die Regel verhindern soll.
+    expect(body).not.toMatch(/min-width:\s*max-content\s*;/);
+  });
+
+  it("laesst die schmale (gestapelte) Form ohne jeden max-content-Boden", async () => {
+    const src = await css();
+    const narrow = /@container\s*\(max-width:\s*700px\)\s*\{([\s\S]*?)\n\}/.exec(src);
+    expect(narrow).not.toBeNull();
+    expect(narrow![1]!).not.toContain("max-content");
   });
 });
