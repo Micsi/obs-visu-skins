@@ -91,12 +91,38 @@ describe("terminal Zeilen-Layout (breite Form)", () => {
     const body = wide![1]!;
 
     // Der Boden ist da (sonst schrumpfen Label/Zustand vor der Befehlsspalte) …
-    expect(body).toMatch(/min-width:\s*min\(\s*max-content\s*,\s*100%\s*\)/);
+    const floors = [...body.matchAll(/min-width:\s*([^;]+);/g)].map((m) => m[1]!.trim());
+    expect(floors.length, "Label und Zustand brauchen je einen Boden").toBeGreaterThanOrEqual(2);
     // … und er ist NICHT nackt: ein ungedeckelter max-content-Boden ueberschreibt
     // `min-width: 0`, und mit `white-space: nowrap` kann ein nutzergelieferter
     // Wert dann weder schrumpfen noch umbrechen noch ellipsieren — er laeuft aus
     // der Zeile heraus. Genau der Ueberlauf, den die Regel verhindern soll.
     expect(body).not.toMatch(/min-width:\s*max-content\s*;/);
+    for (const floor of floors) {
+      expect(floor, `ungedeckelter Boden: ${floor}`).toMatch(/\bmin\(/);
+      expect(floor, `der Deckel fehlt: ${floor}`).toContain("100%");
+    }
+  });
+
+  it("schreibt keinen Boden, den der Browser verwirft", async () => {
+    // Die Lehre aus der Runde davor, und sie kostete eine ganze Welle: der Test
+    // pruefte die SCHREIBWEISE `min(max-content, 100%)` und war damit gruen,
+    // waehrend jeder Browser die Deklaration verwarf — intrinsische
+    // Schluesselwoerter (`max-content`, `min-content`, `fit-content`, `auto`,
+    // `stretch`) sind in einer CSS-Rechenfunktion nicht erlaubt. Der Boden fehlte
+    // ganz, das Kuerzungsband war zurueck, und nichts wurde rot.
+    //
+    // Geprueft wird deshalb die GUELTIGKEIT, ueber die ganze Datei: keine
+    // Rechenfunktion darf ein intrinsisches Schluesselwort enthalten. Kommentare
+    // sind ausgenommen — die Regel, warum es nicht geht, muss man aufschreiben
+    // duerfen, ohne dass der Waechter darueber stolpert.
+    const src = (await css()).replace(/\/\*[\s\S]*?\*\//g, "");
+    const intrinsic = /\b(?:min|max|clamp|calc)\(([^()]*)\)/g;
+    const bad: string[] = [];
+    for (const m of src.matchAll(intrinsic)) {
+      if (/\b(?:max-content|min-content|fit-content|stretch|auto)\b/.test(m[1]!)) bad.push(m[0]!);
+    }
+    expect(bad, `Rechenfunktion mit intrinsischem Schluesselwort: ${bad.join(" · ")}`).toEqual([]);
   });
 
   it("laesst die schmale (gestapelte) Form ohne jeden max-content-Boden", async () => {

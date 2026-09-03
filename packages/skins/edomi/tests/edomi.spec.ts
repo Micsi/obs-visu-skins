@@ -297,12 +297,40 @@ describe("edomi page links — the host resolves, the skin only draws", () => {
 
     const bodyId = body?.props?.id;
     expect(typeof bodyId, "the covered content needs an id to be referenced").toBe("string");
-    expect(bodyId).toBe("edomi-item-body-cam1");
+    expect(bodyId).toBeTruthy();
     // The description points AT the covered content, so the tile's text is read
     // out with the link instead of being dropped with it.
     expect(overlay?.props?.["aria-describedby"]).toBe(bodyId);
     // The name still comes from the host; the description is the added part.
     expect(overlay?.props?.["aria-label"]).toBe("zur Seite keller");
+  });
+
+  it("gives every rendered placement its OWN body id, not one per device", () => {
+    // The same device can be placed twice in one tree — the canvas shows the
+    // page's layers and an open popup shows its own. Deriving the id from the
+    // device id alone gave both elements the SAME id, and `aria-describedby`
+    // resolves such a reference to whichever comes first: a screen-reader user
+    // heard the other placement's tile.
+    const tree = page(
+      linkedHost({
+        openPopups: [{ id: "cam-popup", modal: false }],
+        // The popup shows its own page's layers — here the SAME item as the canvas.
+        layersFor: (id: string): PageLayer[] => (id === "bad" || id === "cam-popup" ? LINKED : []),
+      }),
+    );
+
+    const bodies = findAll(tree, "edomi-item-body");
+    expect(bodies.length, "the item is placed on the canvas AND in the popup").toBeGreaterThan(1);
+    const ids = bodies.map((b) => b?.props?.id);
+    expect(new Set(ids).size, `duplicate body ids: ${ids.join(", ")}`).toBe(ids.length);
+
+    // …and each overlay still describes the body it actually covers.
+    for (const item of findAll(tree, "edomi-item")) {
+      const body = findAll(item, "edomi-item-body")[0];
+      const overlay = findAll(item, "edomi-link")[0];
+      if (!body || !overlay) continue;
+      expect(overlay.props?.["aria-describedby"]).toBe(body.props?.id);
+    }
   });
 
   it("does not wrap — and so does not inert — an item without a link", () => {

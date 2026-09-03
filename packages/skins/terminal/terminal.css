@@ -238,19 +238,34 @@
  * Horizontalscroll erzwingen, den die Stapelung vermeidet.
  * 701px = komplementaer zur Stapel-Schwelle (max-width: 700px) unten.
  *
- * Der Boden ist GEDECKELT (`min(max-content, 100%)`), und das ist der Kern:
- * ein nackter `max-content`-Boden ueberschreibt das `min-width: 0` der Spalte,
- * und weil beide Felder `white-space: nowrap` tragen, konnte ein ueberlanges
- * Label oder ein langer Zustandstext dann weder schrumpfen noch umbrechen noch
- * ellipsieren — ein nutzergelieferter Wert erzwang genau den horizontalen
- * Ueberlauf, den diese Regel verhindern sollte. Mit dem Deckel gilt der Boden
- * nur, solange der Inhalt in die Zeile passt; darueber faellt die Spalte auf
- * die Zeilenbreite zurueck und kuerzt wieder mit Ellipse. Die Reihenfolge
- * (erst umbricht die Befehlsspalte) bleibt fuer jeden normalen Inhalt erhalten. */
+ * Der Boden ist GEDECKELT, und das ist der Kern: ein nackter `max-content`-Boden
+ * ueberschreibt das `min-width: 0` der Spalte, und weil beide Felder
+ * `white-space: nowrap` tragen, konnte ein ueberlanges Label oder ein langer
+ * Zustandstext dann weder schrumpfen noch umbrechen noch ellipsieren — ein
+ * nutzergelieferter Wert erzwang genau den horizontalen Ueberlauf, den diese
+ * Regel verhindern sollte.
+ *
+ * Der Deckel ist eine ZEICHENBREITE, kein Inhaltsmass, und das ist keine
+ * Bequemlichkeit: `min(max-content, 100%)` waere die woertliche Formulierung der
+ * Absicht, ist aber UNGUELTIGES CSS — intrinsische Schluesselwoerter sind in einer
+ * Rechenfunktion nicht erlaubt, der Browser verwirft die Deklaration, und der
+ * Boden fehlte damit ganz (das Kuerzungsband war zurueck, ohne dass irgendetwas
+ * rot wurde). Ein inhaltsbezogener Deckel traegt hier grundsaetzlich nicht: bei
+ * `nowrap` ist `min-content` gleich `max-content`, also liefert auch
+ * `fit-content(100%)` wieder die volle Textbreite.
+ *
+ * Deshalb ein Boden knapp oberhalb der jeweiligen `flex-basis` (16ch/20ch): er
+ * kehrt die Schrumpf-Reihenfolge fuer jeden normalen Inhalt um — erst umbricht
+ * die Befehlsspalte —, und `100%` faengt den Rest ab, damit ein einzelner
+ * ueberlanger Wert die Zeile nicht sprengen kann. Was darueber hinausgeht,
+ * kuerzt wieder mit Ellipse; das ist der bewusste Rest, den gueltiges CSS an
+ * dieser Stelle nicht ausraeumen kann. */
 @container (min-width: 701px) {
-  .t-root .t-label,
+  .t-root .t-label {
+    min-width: min(24ch, 100%);
+  }
   .t-root .t-state {
-    min-width: min(max-content, 100%);
+    min-width: min(28ch, 100%);
   }
 }
 

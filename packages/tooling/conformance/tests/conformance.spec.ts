@@ -712,6 +712,180 @@ describe("honors-Achse — der Deklarations-Slot wird gemessen, nicht geglaubt",
     ]);
   });
 
+  it("…auch, wenn der Render-Zeit-Aufruf in einer KOMPONENTE steckt", async () => {
+    // Der Schnitt oben hatte eine Lücke: das Auflösen der Komponenten passiert
+    // beim SAMMELN der Handler, und das stand hinter `probe.reset()`. Der
+    // Render-Zeit-Aufruf einer Komponente floss dadurch wieder ins Protokoll —
+    // dasselbe Loch, eine Ebene tiefer. Erst sammeln, dann leeren, dann feuern.
+    const Component = {
+      props: { host: { type: Object, required: true } },
+      render(this: {
+        $props: {
+          host: {
+            layersFor: (id: string) => { items: { link?: unknown }[] }[];
+            currentPageId: string;
+            followLink: (l: unknown) => unknown;
+          };
+        };
+      }) {
+        const svc = this.$props.host;
+        for (const layer of svc.layersFor(svc.currentPageId)) {
+          for (const item of layer.items) if (item.link) svc.followLink(item.link);
+        }
+        return h("div", null, []);
+      },
+    };
+    const page = (host: never) => h(Component as never, { host });
+    expect((await checkHonors(honorsSkin(["link"], page))).map((f) => f.problem)).toEqual([
+      "undelivered",
+    ]);
+  });
+
+  it("löst eine setup()-Komponente auf — die häufigste Composition-API-Form", async () => {
+    // `defineComponent({ setup() { return () => h(…) } })` hat WEDER einen
+    // aufrufbaren `type` NOCH ein `type.render`, solange Vue keine Instanz gebaut
+    // hat. Der Teilbaum blieb ungeprüft, und ein funktionierender Link in genau
+    // dieser Form galt als `undelivered`.
+    const Component = {
+      props: { host: { type: Object, required: true } },
+      setup(props: {
+        host: {
+          layersFor: (id: string) => { items: { link?: unknown }[] }[];
+          currentPageId: string;
+          followLink: (l: unknown) => unknown;
+        };
+      }) {
+        const svc = props.host;
+        return () => {
+          const children: VNode[] = [];
+          for (const layer of svc.layersFor(svc.currentPageId)) {
+            for (const item of layer.items) {
+              if (item.link)
+                children.push(h("button", { onClick: () => void svc.followLink(item.link) }));
+            }
+          }
+          return h("div", null, children);
+        };
+      },
+    };
+    const page = (host: never) => h(Component as never, { host });
+    expect(await checkHonors(honorsSkin(["link"], page))).toEqual([]);
+  });
+
+  it("…und auch die Form, in der setup() Bindungen statt einer Render-Funktion liefert", async () => {
+    const Component = {
+      props: { host: { type: Object, required: true } },
+      setup(props: { host: unknown }) {
+        return { svc: props.host };
+      },
+      render(this: {
+        svc: {
+          layersFor: (id: string) => { items: { link?: unknown }[] }[];
+          currentPageId: string;
+          followLink: (l: unknown) => unknown;
+        };
+      }) {
+        const svc = this.svc;
+        const children: VNode[] = [];
+        for (const layer of svc.layersFor(svc.currentPageId)) {
+          for (const item of layer.items) {
+            if (item.link)
+              children.push(h("button", { onClick: () => void svc.followLink(item.link) }));
+          }
+        }
+        return h("div", null, children);
+      },
+    };
+    const page = (host: never) => h(Component as never, { host });
+    expect(await checkHonors(honorsSkin(["link"], page))).toEqual([]);
+  });
+
+  it("zählt ein Komponenten-EREIGNIS nicht als Klick-Handler", async () => {
+    // `h({ emits: ['click'], … }, { onClick })` sieht aus wie ein Klick, ist aber
+    // ein Komponenten-Ereignis: Vue ruft den Listener NUR, wenn die Komponente
+    // selbst `emit('click')` ruft. Ein Nutzerklick erreicht ihn nie — der
+    // Probelauf rief ihn trotzdem direkt auf und nahm eine Seite ohne jede
+    // funktionierende Sprung-Affordanz ab.
+    const page = (host: never) => {
+      const svc = host as unknown as {
+        layersFor: (id: string) => { items: { link?: unknown }[] }[];
+        currentPageId: string;
+        followLink: (l: unknown) => unknown;
+      };
+      const link = svc.layersFor(svc.currentPageId)[0]?.items.find((i) => i.link)?.link;
+      const Emitter = { emits: ["click"], render: () => h("div", null, []) };
+      return h(Emitter as never, { onClick: () => void svc.followLink(link) });
+    };
+    expect((await checkHonors(honorsSkin(["link"], page))).map((f) => f.problem)).toEqual([
+      "undelivered",
+    ]);
+  });
+
+  it("…aber ohne `emits: ['click']` fällt der Listener durch und zählt weiter", async () => {
+    // Der Nachbarfall: deklariert die Komponente `click` NICHT, reicht Vue den
+    // Listener nach seinen Fallthrough-Regeln an das Wurzelelement weiter. Dann
+    // ist er sehr wohl ein echter Klick-Handler, und ihn wegzuwerfen hätte einen
+    // konformen Skin abgelehnt.
+    const page = (host: never) => {
+      const svc = host as unknown as {
+        layersFor: (id: string) => { items: { link?: unknown }[] }[];
+        currentPageId: string;
+        followLink: (l: unknown) => unknown;
+      };
+      const link = svc.layersFor(svc.currentPageId)[0]?.items.find((i) => i.link)?.link;
+      const Plain = { render: () => h("div", null, []) };
+      return h(Plain as never, { onClick: () => void svc.followLink(link) });
+    };
+    expect(await checkHonors(honorsSkin(["link"], page))).toEqual([]);
+  });
+
+  it("hält an, wo `stopImmediatePropagation` einen echten Klick anhielte", async () => {
+    // `mergeProps` legt mehrere Listener als Array unter EINEM Prop-Namen ab. Vue
+    // ruft sie mit DEMSELBEN Ereignis der Reihe nach und bricht ab, sobald einer
+    // `stopImmediatePropagation()` ruft. Der Probelauf feuerte jedes Glied einzeln
+    // mit frischem Ereignis — ein Array, dessen SPÄTERER Listener `followLink`
+    // ruft, bestand damit, obwohl ein echter Klick dort nie ankommt.
+    const page = (host: never) => {
+      const svc = host as unknown as {
+        layersFor: (id: string) => { items: { link?: unknown }[] }[];
+        currentPageId: string;
+        followLink: (l: unknown) => unknown;
+      };
+      const link = svc.layersFor(svc.currentPageId)[0]?.items.find((i) => i.link)?.link;
+      return h("button", {
+        onClick: [
+          (e: { stopImmediatePropagation: () => void }) => e.stopImmediatePropagation(),
+          () => void svc.followLink(link),
+        ],
+      });
+    };
+    expect((await checkHonors(honorsSkin(["link"], page))).map((f) => f.problem)).toEqual([
+      "undelivered",
+    ]);
+  });
+
+  it("…und ohne den Abbruch läuft dasselbe Array durch", async () => {
+    const page = (host: never) => {
+      const svc = host as unknown as {
+        layersFor: (id: string) => { items: { link?: unknown }[] }[];
+        currentPageId: string;
+        followLink: (l: unknown) => unknown;
+      };
+      const link = svc.layersFor(svc.currentPageId)[0]?.items.find((i) => i.link)?.link;
+      return h("button", { onClick: [() => {}, () => void svc.followLink(link)] });
+    };
+    expect(await checkHonors(honorsSkin(["link"], page))).toEqual([]);
+  });
+
+  it("hängt nicht an einem Handler, dessen Versprechen nie eintrifft", async () => {
+    // Der Probelauf ruft FREMDEN Code. Ohne Deckel hielt ein Handler, der auf
+    // einen Dienst wartet, den es hier nicht gibt, den ganzen Lauf an — das Gate
+    // lief in den CI-Timeout, statt einen Befund zu melden.
+    const page = () => h("button", { onClick: () => new Promise(() => {}) });
+    const findings = await checkHonors(honorsSkin(["link"], page as never));
+    expect(findings.map((f) => f.problem)).toEqual(["undelivered"]);
+  }, 20_000);
+
   it("…und ein Renderer, der beim Zeichnen fragt UND einen Handler setzt, bleibt sauber", async () => {
     // Der Nachbarfall zum Schnitt oben: das Verwerfen darf den Normalfall nicht
     // mitnehmen. edomi ruft beim Rendern `resolveLink`/`isLinkActive`/`linkLabel`.
