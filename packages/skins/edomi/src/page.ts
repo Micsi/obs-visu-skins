@@ -119,8 +119,29 @@ function linkOverlay(
   });
 }
 
+/**
+ * Hands out the ids that link descriptions point at, one per RENDERED
+ * PLACEMENT.
+ *
+ * Deriving the id from the device id alone was not enough: the same item can be
+ * placed more than once in one tree — the canvas shows a page's layers and an
+ * open popup shows its own, and a device may sit on both. Two elements then
+ * carried the SAME id, and `aria-describedby` resolves such a reference to
+ * whichever comes first: a screen-reader user heard another placement's tile.
+ *
+ * A counter passed through the render (not module state) keeps the ids unique
+ * within the tree AND deterministic for the same tree — the property the specs
+ * rely on.
+ */
+type BodyIds = { next: () => string };
+
+function bodyIds(): BodyIds {
+  let n = 0;
+  return { next: () => `edomi-item-body-${n++}` };
+}
+
 /** One composed layer, its items placed absolutely by their author box. */
-function layerCanvas(layer: PageLayer, host: PageHost): VNode {
+function layerCanvas(layer: PageLayer, host: PageHost, ids: BodyIds): VNode {
   return h(
     "div",
     { class: ["edomi-layer", `edomi-layer-${layer.origin}`], "data-layer": layer.id },
@@ -129,9 +150,9 @@ function layerCanvas(layer: PageLayer, host: PageHost): VNode {
       // The author's active marker (`none`/`dot`/`bar`/`border`) is pure data; the
       // skin draws it in its own language from the host's active verdict.
       const active = link ? host.isLinkActive(link) : false;
-      // The id the link's description points at (see `linkOverlay`). Derived from
-      // the item id, so it is stable across renders and unique per placed element.
-      const bodyId = `edomi-item-body-${item.id}`;
+      // The id the link's description points at (see `linkOverlay`), unique per
+      // rendered placement rather than per device (see `bodyIds`).
+      const bodyId = link ? ids.next() : "";
       const overlay = link ? linkOverlay(link, host, bodyId) : null;
       return h(
         "div",
@@ -190,7 +211,7 @@ function layersExtent(layers: readonly PageLayer[]): { w: number; h: number } {
 
 /** A popup overlay: its own page's layers, host-owned open state. `inert` makes a
  *  sibling popup non-interactive while a modal popup is open (modal is exclusive). */
-function popup(desc: PopupDescriptor, host: PageHost, inert?: boolean): VNode {
+function popup(desc: PopupDescriptor, host: PageHost, ids: BodyIds, inert?: boolean): VNode {
   const centered = !desc.position;
   const layers = host.layersFor(desc.id);
   // A centered popup's layers are absolutely positioned (no intrinsic size), so
@@ -236,7 +257,7 @@ function popup(desc: PopupDescriptor, host: PageHost, inert?: boolean): VNode {
             "×",
           ),
           // The popup shows its own page's composed layers (id === popup id).
-          ...layers.map((layer) => layerCanvas(layer, host)),
+          ...layers.map((layer) => layerCanvas(layer, host, ids)),
         ],
       ),
     ],
@@ -251,6 +272,9 @@ function popup(desc: PopupDescriptor, host: PageHost, inert?: boolean): VNode {
 export function page(host: PageHost): VNode {
   const pageId = host.currentPageId;
   const layers = pageId ? host.layersFor(pageId) : [];
+  // One counter for the WHOLE tree — canvas and popups draw from it, so a device
+  // placed on both gets two distinct body ids (see `bodyIds`).
+  const ids = bodyIds();
   // A modal popup is exclusive: make the rest of the page inert so it drops out of
   // the tab order + pointer/keyboard interaction (not just visually dimmed).
   const hasModal = host.openPopups.some((p) => p.modal);
@@ -275,10 +299,10 @@ export function page(host: PageHost): VNode {
     h(
       "div",
       { class: "edomi-canvas", "data-page": pageId ?? "", inert },
-      layers.map((layer) => layerCanvas(layer, host)),
+      layers.map((layer) => layerCanvas(layer, host, ids)),
     ),
     // A modal is exclusive: while one is open, every popup except the topmost modal
     // is inert too (two modals → only the last stays interactive).
-    ...host.openPopups.map((p, i) => popup(p, host, hasModal && i !== topModalIdx)),
+    ...host.openPopups.map((p, i) => popup(p, host, ids, hasModal && i !== topModalIdx)),
   ]);
 }
