@@ -347,6 +347,13 @@ const honorsSkin = (honors: string[], page?: (host: never) => unknown) => ({
   ...(page ? { page: page as never } : {}),
 });
 
+/**
+ * Der Prüfer misst schmal und sagt das auch so: EIN Klick-Handler im Baum ruft
+ * `followLink`. Nicht geprüft (und nicht behauptet): ob die Affordanz sichtbar,
+ * fokussierbar oder bedienbar ist, oder ob sie an DIESEM Item hängt. Das trennt
+ * verlässlich "zeichnet den Sprung" von "hat den Host nur gefragt" — mehr soll
+ * es nicht leisten.
+ */
 describe("honors-Achse — der Deklarations-Slot wird gemessen, nicht geglaubt", () => {
   it("kennt das Vokabular AUS dem Vertrag, nicht aus einer Kopie", () => {
     // Kommt die Liste aus dem Schema, wächst sie mit jedem Vertrags-Bump mit.
@@ -377,7 +384,7 @@ describe("honors-Achse — der Deklarations-Slot wird gemessen, nicht geglaubt",
     expect(findings.map((f) => f.problem)).toEqual(["undelivered"]);
   });
 
-  it("den Host nur zu FRAGEN reicht nicht — es muss eine Affordanz entstehen", () => {
+  it("den Host nur zu FRAGEN reicht nicht — followLink muss gerufen werden", () => {
     // Die Gegenprobe, die diesen Prüfer überhaupt erst geschärft hat: ein Skin,
     // der `isLinkActive` fürs Markup aufruft und den Sprung dann weglässt, kam
     // durch die frühere "hat gefragt"-Fassung glatt durch.
@@ -397,7 +404,7 @@ describe("honors-Achse — der Deklarations-Slot wird gemessen, nicht geglaubt",
     ]);
   });
 
-  it("`link` + eine aktivierbare Affordanz, die followLink ruft => sauber", () => {
+  it("`link` + ein Klick-Handler, der followLink ruft => sauber", () => {
     const page = (host: never) => {
       const h = host as unknown as {
         layersFor: (id: string) => { items: { link?: unknown }[] }[];

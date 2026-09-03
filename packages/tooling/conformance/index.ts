@@ -126,8 +126,8 @@ export const LAYOUT_HONORS: readonly string[] = Object.freeze([
 
 /**
  * Misst die `honors`-Achse. Kein I/O; der Page-Renderer wird einmal über einen
- * neutralen, protokollierenden {@link pageHostProbe} gefahren. Wirft er, ist das
- * derselbe Befund wie "fragt nichts an" - er liefert keine Affordanz.
+ * neutralen, protokollierenden {@link pageHostProbe} gefahren. Wirft er, zeichnet
+ * er nichts - derselbe Befund.
  */
 export function checkHonors(skin: SkinInput): HonorsFinding[] {
   const declared = skin.manifest.layout.honors ?? [];
@@ -158,12 +158,19 @@ export function checkHonors(skin: SkinInput): HonorsFinding[] {
       } catch {
         /* wie "zeichnet nichts": es entsteht keine Affordanz */
       }
-      // NICHT "hat den Host gefragt" — das wäre zu schwach: ein Skin, der
-      // `isLinkActive` fürs Markup aufruft und den Sprung dann NICHT zeichnet,
-      // käme damit durch (in einer Gegenprobe genau so passiert). Gemessen wird
-      // die Affordanz selbst: es muss etwas Aktivierbares geben, das den Link
-      // wirklich FOLGT. Also jeden Klick-Handler des gerenderten Baums auslösen
-      // und `followLink` verlangen.
+      // Gemessen wird genau EINES: IRGENDEIN Klick-Handler im gerenderten Baum
+      // ruft `host.followLink`. Nicht mehr — nicht, dass die Affordanz sichtbar,
+      // fokussierbar, aktivierbar oder überhaupt an DIESEM Item hängt. Ein
+      // Reviewer hat drei Renderer gebaut, die das hier grün passieren und
+      // trotzdem unbedienbar sind (`disabled`+`display:none`; ein nacktes,
+      // nicht fokussierbares `<div>`; ein Handler ohne Bezug zum Item).
+      //
+      // Diese schmale Messung ist trotzdem die richtige: sie trennt sicher
+      // "zeichnet den Sprung" von "hat den Host nur gefragt" — und genau daran
+      // scheiterte die erste Fassung, durch die ein Skin schlüpfte, der
+      // `isLinkActive` fürs Markup ruft und den Sprung weglässt. Der Rest
+      // (bedienbar, fokussierbar) ist Sache der Specs des Skins; hier wird
+      // NICHT behauptet, er sei geprüft.
       for (const fire of clickHandlers(tree)) {
         try {
           fire();
