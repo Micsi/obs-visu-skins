@@ -255,3 +255,29 @@ export function clickEventStub(): Record<string, unknown> {
   };
   return event;
 }
+
+/**
+ * Ein Klick-Ereignis, dessen `stopImmediatePropagation()` BEOBACHTBAR ist.
+ *
+ * Vue legt nach `mergeProps` mehrere Listener als Array unter einem Prop-Namen
+ * ab und ruft sie der Reihe nach mit DEMSELBEN Ereignis. Ruft ein früherer
+ * `stopImmediatePropagation()`, kommen die späteren gar nicht mehr dran. Der
+ * Probelauf feuerte jedes Array-Glied einzeln mit einem frischen Ereignis, dessen
+ * Methode ein No-op ist — ein Array, dessen SPÄTERER Listener `followLink` ruft,
+ * bestand damit, obwohl ein echter Klick ihn nie erreicht.
+ *
+ * Der Leser steht bewusst NEBEN dem Ereignis und nicht darin: ein Handler sieht
+ * genau die Fläche, die der Browser ihm gibt, und keine erfundene Abfrage, an der
+ * er sein Verhalten ausrichten könnte.
+ */
+export function clickEventProbe(): {
+  readonly event: Record<string, unknown>;
+  readonly immediateStopped: () => boolean;
+} {
+  let stopped = false;
+  const event = clickEventStub();
+  event.stopImmediatePropagation = () => {
+    stopped = true;
+  };
+  return { event, immediateStopped: () => stopped };
+}

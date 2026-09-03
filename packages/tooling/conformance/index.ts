@@ -45,11 +45,11 @@ import {
   type SupportReport,
   type SupportWidgetEntry,
 } from "@obs/visu-contract";
-import { clickEventStub, ctxStub, pageHostProbe, tokensStub } from "./stubs.js";
+import { clickEventProbe, ctxStub, pageHostProbe, tokensStub } from "./stubs.js";
 
 // Die Fixture-Wand nutzt denselben Ctx-/Tokens-Stub wie dieser Lauf — Wand und
 // support.json sollen dieselbe Prüfung zeigen, nicht zwei Nachbildungen.
-export { ctxStub, tokensStub, pageHostProbe, clickEventStub } from "./stubs.js";
+export { ctxStub, tokensStub, pageHostProbe, clickEventStub, clickEventProbe } from "./stubs.js";
 
 /**
  * Die stabilen Kern-Typen — **aus dem Vertragsschema abgeleitet**, nicht getippt:
@@ -178,7 +178,7 @@ export async function checkHonors(skin: SkinInput): Promise<HonorsFinding[]> {
       // (bedienbar, fokussierbar) ist Sache der Specs des Skins; hier wird
       // NICHT behauptet, er sei geprüft.
       //
-      // Der Handler bekommt ein Stellvertreter-Ereignis ({@link clickEventStub}).
+      // Der Handler bekommt ein Stellvertreter-Ereignis ({@link clickEventProbe}).
       // Ohne Argument warf jeder normale Vue-Handler an `event.preventDefault()`
       // — noch VOR `followLink` — und ein konformer Skin fiel durch, nur weil er
       // sein Klick-Ereignis anfasst.
@@ -189,12 +189,23 @@ export async function checkHonors(skin: SkinInput): Promise<HonorsFinding[]> {
       // `host.followLink` beim Rendern ruft und einen LEEREN Baum zurückgibt —
       // also genau der Fall, den `undelivered` fangen soll. (Im Browser wäre so
       // ein Renderer ohnehin kaputt: er navigiert beim blossen Anzeigen.)
+      //
+      // Die REIHENFOLGE trägt das: erst SAMMELN, dann leeren, dann feuern. Das
+      // Sammeln rendert Komponenten-VNodes aus (`expandComponent`), gehört also
+      // noch zur Zeichenphase — stand `reset()` davor, floss genau der
+      // Render-Zeit-Aufruf einer Komponente wieder ins Protokoll, den der Schnitt
+      // entfernen soll.
+      const dispatches = clickDispatches(tree);
       probe.reset();
-      for (const fire of clickHandlers(tree)) {
+      for (const fire of dispatches) {
         try {
           // Ein Handler, der erst nach einem `await` springt, wird MITGEZÄHLT:
           // der Rückgabewert wird abgewartet, bevor das Protokoll gelesen wird.
-          await fire(clickEventStub());
+          // GEDECKELT, weil der Handler fremder Code ist: ein Versprechen, das nie
+          // eintrifft (`new Promise(() => {})`, ein Warten auf einen Dienst, den es
+          // hier nicht gibt), hätte sonst den ganzen Lauf und mit ihm das CI-Gate
+          // angehalten, statt einen Befund zu erzeugen.
+          await withTimeout(fire());
         } catch {
           /* ein werfender Handler liefert keine Affordanz - zählt als nichts */
         }
@@ -232,6 +243,38 @@ type ClickHandler = (event: unknown) => unknown;
 const CLICK_PROP = /^on-?click(?:once|capture|passive)*$/i;
 
 /**
+ * Ein Klick, so wie der Browser ihn austrägt: EIN Ereignis durch die Listener
+ * EINES Prop-Namens, in ihrer Reihenfolge.
+ */
+type ClickDispatch = () => Promise<void>;
+
+/** Obergrenze für einen einzelnen Handler-Lauf. */
+const HANDLER_TIMEOUT_MS = 2000;
+
+/**
+ * Wartet auf den Handler, aber nicht ewig.
+ *
+ * Der Probelauf ruft FREMDEN Code. Ein Handler, dessen Versprechen nie eintrifft,
+ * hielt den ganzen Lauf an — das Gate lief in den CI-Timeout, statt den Skin als
+ * `undelivered` zu melden. Ein abgelaufener Handler zählt wie einer, der nichts
+ * getan hat: was er nach Ablauf noch ins Protokoll schreibt, ist keine Affordanz,
+ * die ein Nutzer erlebt.
+ */
+async function withTimeout(work: Promise<void>): Promise<void> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    await Promise.race([
+      work,
+      new Promise<void>((resolve) => {
+        timer = setTimeout(resolve, HANDLER_TIMEOUT_MS);
+      }),
+    ]);
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
+  }
+}
+
+/**
  * Die Listener unter EINEM Prop-Namen. Nach `mergeProps` (Vue mischt die
  * Listener zweier Prop-Objekte) steht dort ein ARRAY von Funktionen, kein
  * einzelner Handler — `typeof value === "function"` sah davon nichts.
@@ -244,13 +287,33 @@ function listenersOf(value: unknown, out: ClickHandler[] = [], depth = 0): Click
 }
 
 /**
+ * Macht aus den Listenern EINES Prop-Namens EINEN Klick.
+ *
+ * Vue ruft die Glieder eines Listener-Arrays nacheinander mit DEMSELBEN Ereignis
+ * und bricht ab, sobald eines `stopImmediatePropagation()` ruft. Der Probelauf
+ * feuerte sie einzeln mit je frischem Ereignis — ein Array, dessen späterer
+ * Listener `followLink` ruft, bestand damit, obwohl ein echter Klick dort nie
+ * ankommt. Ein Dispatch trägt jetzt ein Ereignis durch die ganze Kette und hält
+ * an, wo der Browser anhielte.
+ */
+function dispatchOf(listeners: readonly ClickHandler[]): ClickDispatch {
+  return async () => {
+    const { event, immediateStopped } = clickEventProbe();
+    for (const listener of listeners) {
+      if (immediateStopped()) return;
+      await listener(event);
+    }
+  };
+}
+
+/**
  * Rendert einen Komponenten-VNode aus, falls es einer ist.
  *
  * Ein Renderer darf seine Elemente durch eine Komponente ziehen
  * (`h(PageComponent, { host })`); erst deren Render-Funktion erzeugt das Markup.
  * Wer nur `props`/`children` des äusseren VNode liest, sieht davon nichts. Diese
  * eine Auflösung bedient BEIDE Traversierungen — die Aktions-Achse
- * ({@link collectActions}) und den `honors`-Probelauf ({@link clickHandlers}).
+ * ({@link collectActions}) und den `honors`-Probelauf ({@link clickDispatches}).
  * Getrennte Fassungen waren genau der Grund, warum die Aktions-Achse Komponenten
  * auflöste und der Probelauf nicht: ein komponentisierter Skin galt dort als
  * `undelivered`, obwohl sein DOM `followLink` ruft.
@@ -261,17 +324,44 @@ function listenersOf(value: unknown, out: ClickHandler[] = [], depth = 0): Click
  */
 function expandComponent(vnode: { type?: unknown; props?: unknown; children?: unknown }): unknown {
   const type = vnode.type;
-  const render =
-    typeof type === "function"
-      ? (type as (props?: unknown, ctx?: unknown) => unknown)
-      : type &&
-          typeof type === "object" &&
-          typeof (type as { render?: unknown }).render === "function"
-        ? (type as { render: (props?: unknown, ctx?: unknown) => unknown }).render
-        : undefined;
-  if (!render) return undefined;
   const props = (vnode.props ?? {}) as Record<string, unknown>;
   const slots = vnode.children;
+  const ctx = { slots, attrs: props, emit: () => {}, expose: () => {} };
+  const options = type && typeof type === "object" ? (type as Record<string, unknown>) : undefined;
+
+  // Die HÄUFIGSTE Komponentenform der Composition API — `defineComponent({ setup()
+  // { return () => h(…) } })` — hat WEDER einen aufrufbaren `type` NOCH ein
+  // `type.render`, solange Vue keine Instanz gebaut hat. Der Zweig gab hier
+  // `undefined` zurück, der Teilbaum blieb ungeprüft, und ein funktionierender
+  // Link in genau dieser Form galt als `undelivered`.
+  //
+  // `setup()` liefert entweder die Render-Funktion selbst (der Fall oben) oder ein
+  // Objekt mit Bindungen — dann rendert `type.render` mit diesen Bindungen als
+  // `this`. Beides wird bedient; wirft `setup` ohne echte Laufzeit, bleibt die
+  // Komponente ungemessen wie bisher.
+  let setupRender: ((props?: unknown, ctx?: unknown) => unknown) | undefined;
+  let setupState: Record<string, unknown> | undefined;
+  if (options && typeof options.setup === "function") {
+    try {
+      const produced = (options.setup as (p: unknown, c: unknown) => unknown)(props, ctx);
+      if (typeof produced === "function") {
+        setupRender = produced as (props?: unknown, ctx?: unknown) => unknown;
+      } else if (produced && typeof produced === "object") {
+        setupState = produced as Record<string, unknown>;
+      }
+    } catch {
+      /* ungemessen, nicht `broken` - siehe oben */
+    }
+  }
+
+  const render =
+    setupRender ??
+    (typeof type === "function"
+      ? (type as (props?: unknown, ctx?: unknown) => unknown)
+      : options && typeof options.render === "function"
+        ? (options.render as (props?: unknown, ctx?: unknown) => unknown)
+        : undefined);
+  if (!render) return undefined;
   // Der `this`-Stellvertreter für die Options-API. Vue ruft `render()` dort mit
   // dem Komponenten-Proxy, über den `this.host`, `this.$props` usw. laufen. Als
   // nackte Funktion aufgerufen warf so ein `render()` an seiner ersten Zeile,
@@ -282,27 +372,57 @@ function expandComponent(vnode: { type?: unknown; props?: unknown; children?: un
   // die der VNode mitbringt.
   const self = {
     ...props,
+    // Die Bindungen aus `setup()`, falls es welche statt einer Render-Funktion
+    // lieferte: `type.render` greift dort über `this` darauf zu.
+    ...(setupState ?? {}),
     $props: props,
     $attrs: props,
     $slots: slots ?? {},
     $emit: () => {},
   };
   try {
-    return render.call(self, props, { slots, attrs: props, emit: () => {}, expose: () => {} });
+    return render.call(self, props, ctx);
   } catch {
     return undefined;
   }
 }
 
 /**
- * Alle Klick-Handler eines gerenderten Baums (Vue-VNode-artig: `props` +
- * `children`), Komponenten eingeschlossen. Tiefenbegrenzt und zyklensicher genug
- * für einen headless Probelauf.
+ * Ob ein `onClick` an DIESEM VNode wirklich ein DOM-Klick-Listener ist.
+ *
+ * An einem Element-VNode (`type` ist ein String) immer. An einem KOMPONENTEN-VNode
+ * kommt es darauf an, was die Komponente deklariert: steht `click` in ihren
+ * `emits`, ist der Prop ein Komponenten-Ereignis und läuft NUR, wenn die
+ * Komponente selbst `emit('click')` ruft — ein Klick des Nutzers erreicht ihn
+ * nie. Der Probelauf rief ihn trotzdem direkt auf und nahm eine Seite ohne jede
+ * funktionierende Sprung-Affordanz ab.
+ *
+ * Deklariert sie `click` NICHT, fällt der Listener nach Vues Regeln als Attribut
+ * auf das Wurzelelement durch und ist damit sehr wohl ein echter Klick-Handler —
+ * deshalb wird er dann weiter gezählt.
  */
-function clickHandlers(node: unknown, out: ClickHandler[] = [], depth = 0): ClickHandler[] {
+function isDomClickTarget(type: unknown): boolean {
+  const component = type !== null && (typeof type === "object" || typeof type === "function");
+  const emits = component ? (type as { emits?: unknown }).emits : undefined;
+  if (Array.isArray(emits)) return !emits.includes("click");
+  if (emits !== null && typeof emits === "object") return !("click" in (emits as object));
+  // Der Ausschluss greift NUR bei einem nachweislich deklarierten `click`-Emit.
+  // Alles andere — Elemente, aber auch die VNode-ARTIGEN Bäume, mit denen die
+  // Gegenproben arbeiten — zählt weiter. Ein Wächter, der im Zweifel wegwirft,
+  // lehnte konforme Skins ab; das ist genau die Fehlalarm-Klasse, gegen die die
+  // übrigen Weitungen hier gebaut sind.
+  return true;
+}
+
+/**
+ * Alle Klicks eines gerenderten Baums (Vue-VNode-artig: `props` + `children`),
+ * Komponenten eingeschlossen — je Prop-Name EIN Dispatch, nicht je Listener.
+ * Tiefenbegrenzt und zyklensicher genug für einen headless Probelauf.
+ */
+function clickDispatches(node: unknown, out: ClickDispatch[] = [], depth = 0): ClickDispatch[] {
   if (depth > 64 || node === null || node === undefined || typeof node !== "object") return out;
   if (Array.isArray(node)) {
-    for (const child of node) clickHandlers(child, out, depth + 1);
+    for (const child of node) clickDispatches(child, out, depth + 1);
     return out;
   }
   const vnode = node as {
@@ -310,12 +430,16 @@ function clickHandlers(node: unknown, out: ClickHandler[] = [], depth = 0): Clic
     props?: Record<string, unknown> | null;
     children?: unknown;
   };
-  for (const [key, value] of Object.entries(vnode.props ?? {})) {
-    if (CLICK_PROP.test(key)) listenersOf(value, out);
+  if (isDomClickTarget(vnode.type)) {
+    for (const [key, value] of Object.entries(vnode.props ?? {})) {
+      if (!CLICK_PROP.test(key)) continue;
+      const listeners = listenersOf(value);
+      if (listeners.length > 0) out.push(dispatchOf(listeners));
+    }
   }
   const expanded = expandComponent(vnode);
-  if (expanded !== undefined) clickHandlers(expanded, out, depth + 1);
-  clickHandlers(vnode.children, out, depth + 1);
+  if (expanded !== undefined) clickDispatches(expanded, out, depth + 1);
+  clickDispatches(vnode.children, out, depth + 1);
   return out;
 }
 
