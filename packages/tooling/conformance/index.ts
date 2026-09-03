@@ -69,6 +69,9 @@ export {
   resolveNumber,
   tokensFor,
   parseRules,
+  declarations,
+  plainDeclarations,
+  allPlainDeclarations,
   type A11yInput,
   type Rgba,
 } from "./a11y.js";

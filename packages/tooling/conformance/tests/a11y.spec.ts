@@ -498,3 +498,222 @@ describe("Die anderen drei Auswege (Riegel 2 · 3 · 4)", () => {
     expect(r.findings.map((f) => f.problem)).toContain("exempt-without-reason");
   });
 });
+
+/* ====================================================================== */
+
+describe("Riegel 5-8 — die vier Auswege der zweiten Review-Runde", () => {
+  // Vier Löcher, durch die ein Skin `pass` bekommen konnte, ohne dass die Messung
+  // ihn deckte. Jede Spec fährt den Fall an, in dem der Wächter fallen MUSS, und
+  // daneben den Nachbarfall, in dem er still bleiben muss.
+
+  it("Riegel 8 — eine Farbe direkt in einer Regel wird gesehen, nicht übersprungen", () => {
+    // Der Scan erkannte ausschliesslich `--name`. `outline: 2px solid #d6a800`
+    // (edomi) und hartcodierte `color: #fff` (ionic) wurden damit WEDER
+    // klassifiziert NOCH gemessen: `status: "pass"` bei unzugänglichem Vordergrund.
+    const css = `${PASSING_CSS}.knopf:focus-visible{outline:2px solid #d6a800;}`;
+    const r = measure(PASSING_DECL, css);
+    expect(r.status).toBe("fail");
+    const hit = r.findings.find((f) => f.detail.includes("#d6a800"));
+    expect(hit, "die Farbe an den Token vorbei muss auftauchen").toBeDefined();
+    expect(hit!.problem).toBe("unclassified");
+  });
+
+  it("Riegel 8 — dieselbe Regel über einen deklarierten Token bleibt still", () => {
+    // Der Nachbarfall: der Weg AUS dem Befund heraus ist ein Token mit Rolle,
+    // nicht das Weglassen der Regel.
+    const css =
+      '.p[data-theme="dark"]{--bg:#ffffff;--fg:#000000;--dot:#767676;}' +
+      ".knopf:focus-visible{outline:2px solid var(--dot);}";
+    const r = measure(PASSING_DECL, css);
+    expect(r.findings).toEqual([]);
+    expect(r.status).toBe("pass");
+  });
+
+  it("Riegel 8 — schlägt NICHT auf `url(#…)` oder auf Text in Anführungszeichen an", () => {
+    // Ein Wächter mit falschem Alarm wird ignoriert.
+    const css =
+      `${PASSING_CSS}.g{fill:url(#verlauf);}` + '.h::after{content:"#1 von 3";border-radius:3px;}';
+    const r = measure(PASSING_DECL, css);
+    expect(r.findings).toEqual([]);
+    expect(r.status).toBe("pass");
+  });
+
+  it("Riegel 5 — ein Theme des Manifests, das a11y nicht kennt, ist ein Befund", () => {
+    // `manifest.themes` bietet `light` an, die Palette deklariert nur `dark`: die
+    // helle Palette wurde still übersprungen und der Report konnte `pass` sein.
+    const manifest = {
+      ...manifestWith(PASSING_DECL),
+      themes: ["dark", "light"],
+    } as unknown as SkinManifest;
+    const r = measureA11y({ manifest, styles: { [SHEET]: PASSING_CSS } });
+    expect(r.status).toBe("fail");
+    expect(r.findings.some((f) => f.detail.includes("light"))).toBe(true);
+  });
+
+  it("Riegel 5 — mit Begründung ausgenommen ist es wieder eine Aussage", () => {
+    const manifest = {
+      ...manifestWith({
+        ...PASSING_DECL,
+        themes: { dark: '.p[data-theme="dark"]', light: '.p[data-theme="light"]' },
+        exemptThemes: { light: "Nur ein Entwurf, im Produkt nicht wählbar." },
+      }),
+      themes: ["dark", "light"],
+    } as unknown as SkinManifest;
+    const r = measureA11y({ manifest, styles: { [SHEET]: PASSING_CSS } });
+    expect(r.findings).toEqual([]);
+    expect(r.status).toBe("pass");
+  });
+
+  it("Riegel 6 — eine Rolle, die es nicht gibt, macht den Token unsichtbar", () => {
+    // Manifeste kommen per Typ-Zusicherung aus JSON. `"role": "tetx"` fiel durch
+    // JEDE Schleife, galt dem Vollständigkeits-Scan aber als klassifiziert.
+    const decl = {
+      ...PASSING_DECL,
+      tokens: { ...PASSING_DECL.tokens, "--dot": { role: "tetx" } },
+    };
+    const r = measure(decl);
+    expect(r.status).toBe("fail");
+    const hit = r.findings.find((f) => f.detail.includes("--dot"));
+    expect(hit!.detail).toContain("tetx");
+  });
+
+  it('Riegel 7 — `"on": []` misst nichts und wird gemeldet', () => {
+    const decl = {
+      ...PASSING_DECL,
+      tokens: { ...PASSING_DECL.tokens, "--fg": { role: "text", on: [] } },
+    };
+    const r = measure(decl);
+    expect(r.status).toBe("fail");
+    expect(r.findings.some((f) => f.detail.includes('"on": []'))).toBe(true);
+    // …und der Token fällt trotzdem nicht aus der Messung: die leere Angabe fällt
+    // auf die strengere Lesart zurück (gegen alle Gründe).
+    expect(r.combinations).toBe(2);
+  });
+
+  it("Riegel 7 — ein gefülltes `on` bleibt unangetastet", () => {
+    const decl = {
+      ...PASSING_DECL,
+      tokens: { ...PASSING_DECL.tokens, "--fg": { role: "text", on: ["--bg"] } },
+    };
+    const r = measure(decl);
+    expect(r.findings).toEqual([]);
+    expect(r.status).toBe("pass");
+  });
+});
+
+describe("Der Rückfall-Boden borgt keine Farbe aus einem fremden Theme (F12)", () => {
+  // Der Boden wurde aus JEDER Deklaration JEDES Selektors gefüllt. Fehlte ein
+  // Token im dunklen Block, borgte die dunkle Messung ihn still aus dem hellen —
+  // eine unvollständige dunkle Palette konnte `pass` bekommen, statt den Token als
+  // fehlend zu melden. Der Mechanismus ist neu in dieser Welle; er hätte den
+  // Riegel, den er stützen soll, von hinten geöffnet.
+  const TWO_THEMES = {
+    stylesheet: SHEET,
+    themes: { dark: '.p[data-theme="dark"]', light: '.p[data-theme="light"]' },
+    grounds: [{ token: "--bg" }],
+    tokens: {
+      "--bg": { role: "ground" },
+      "--fg": { role: "text", on: ["--bg"] },
+    },
+  };
+
+  it("meldet einen Token, den NUR das andere Theme definiert, als fehlend", () => {
+    const css =
+      '.p[data-theme="dark"]{--bg:#000000;}' + '.p[data-theme="light"]{--bg:#ffffff;--fg:#000000;}';
+    const r = measure(TWO_THEMES, css);
+    expect(r.status).toBe("fail");
+    const hit = r.findings.find((f) => f.detail.includes("dark") && f.detail.includes("--fg"));
+    expect(hit, "--fg fehlt im dunklen Theme und muss auffallen").toBeDefined();
+    // Nur das helle Theme wurde wirklich gemessen.
+    expect(r.combinations).toBe(1);
+  });
+
+  it("borgt auch aus einem NACHFAHREN-Selektor des fremden Themes nichts", () => {
+    // `.p[data-theme="light"] .karte` gilt im dunklen Theme genauso wenig.
+    const css =
+      '.p[data-theme="dark"]{--bg:#000000;}' +
+      '.p[data-theme="light"]{--bg:#ffffff;}' +
+      '.p[data-theme="light"] .karte{--fg:#000000;}';
+    const r = measure(TWO_THEMES, css);
+    expect(r.status).toBe("fail");
+    expect(r.findings.some((f) => f.detail.includes("dark") && f.detail.includes("--fg"))).toBe(
+      true,
+    );
+  });
+
+  it("nimmt einen GEMEINSAMEN Block weiterhin in beide Themes auf", () => {
+    // Der Boden darf nicht zu eng werden: ionics `--ion-*`-Brücke unter
+    // `.visu-root` und terminals `.t-root`-Vorgaben stehen ausserhalb der
+    // Theme-Blöcke und gelten trotzdem in jedem Theme.
+    const css =
+      ".p{--fg:#000000;}" +
+      '.p[data-theme="dark"]{--bg:#ffffff;}' +
+      '.p[data-theme="light"]{--bg:#ffffff;}';
+    const r = measure(TWO_THEMES, css);
+    expect(r.findings).toEqual([]);
+    expect(r.combinations).toBe(2);
+    expect(r.status).toBe("pass");
+  });
+});
+
+describe("Zugestandene und unauflösbare Extreme dürfen kein `pass` sein (F14 · F15)", () => {
+  it("F14 — `checkedTweakExtremes: false` verhindert jetzt das Bestehen", () => {
+    // `unmeasuredTweaks` räumt einen farbwirksamen, nicht erfassbaren Tweak ein.
+    // Das Flag stand im Report und floss NIRGENDS ein: der Skin bekam `pass` und
+    // `aa: true`, und das CLI hielt das Gate für bestanden, weil es nur den Status
+    // prüft. Ein eingeräumt ungeprüftes Extrem ist eine Lücke in der Messung.
+    const decl = {
+      ...PASSING_DECL,
+      unmeasuredTweaks: {
+        stil: "Schaltet ein anderes Regelwerk frei, keine Variablen-Achse — ungeprüft.",
+      },
+    };
+    const r = measure(decl, PASSING_CSS, { stil: { type: "select", options: ["glass", "ios"] } });
+    // Alles andere ist sauber: keine Verstösse, keine Deklarations-Befunde …
+    expect(r.violationCount).toBe(0);
+    expect(r.findings).toEqual([]);
+    // … und trotzdem kein `pass`, weil die Extreme zugestanden ungeprüft sind.
+    expect(r.checkedTweakExtremes).toBe(false);
+    expect(r.status).toBe("fail");
+    expect(r.aa).toBe(false);
+  });
+
+  it("F14 — derselbe Skin ohne das Zugeständnis besteht", () => {
+    const decl = {
+      ...PASSING_DECL,
+      neutralTweaks: { stil: "Reine Geometrie, verschiebt keinen Farbwert." },
+    };
+    const r = measure(decl, PASSING_CSS, { stil: { type: "select", options: ["glass", "ios"] } });
+    expect(r.checkedTweakExtremes).toBe(true);
+    expect(r.status).toBe("pass");
+  });
+
+  it("F15 — ein Vordergrund, der erst am Extrem unauflösbar wird, wird gemeldet", () => {
+    // Unauflösbare Vordergründe wurden NUR am Default-Stopp gemeldet. Ein Tweak,
+    // der auf eine benannte CSS-Farbe abbildet, lieferte am Default einen
+    // messbaren Hexwert und an jedem Extrem `null` — und der Report sagte weiter
+    // `checkedTweakExtremes: true` und `pass`, obwohl dort nichts gemessen wurde.
+    const decl = {
+      ...PASSING_DECL,
+      tokens: { ...PASSING_DECL.tokens, "--dot": { role: "graphic", on: ["--bg"] } },
+      tweakAxes: [{ tweak: "ton", cssVar: "--dot" }],
+    };
+    const r = measure(decl, PASSING_CSS, { ton: { type: "select", options: ["red"] } });
+    expect(r.tweakStops).toEqual(["default", "ton=red"]);
+    const hit = r.findings.find((f) => f.problem === "unresolvable");
+    expect(hit, "der Stopp, an dem nichts mehr auflösbar ist, muss auftauchen").toBeDefined();
+    expect(hit!.detail).toContain("ton=red");
+    expect(r.status).toBe("fail");
+  });
+
+  it("F15 — ein Extrem, das auflösbar bleibt, erzeugt keinen Befund", () => {
+    const decl = {
+      ...PASSING_DECL,
+      tokens: { ...PASSING_DECL.tokens, "--dot": { role: "graphic", on: ["--bg"] } },
+      tweakAxes: [{ tweak: "ton", cssVar: "--dot" }],
+    };
+    const r = measure(decl, PASSING_CSS, { ton: { type: "select", options: ["#595959"] } });
+    expect(r.findings).toEqual([]);
+    expect(r.status).toBe("pass");
+  });
+});

@@ -152,6 +152,85 @@ export function allDeclarations(sources: readonly string[]): [string, string, st
   return out;
 }
 
+/**
+ * Kaskadiert dieser Selektor in das gemessene Theme?
+ *
+ * Nein, wenn er den Selektor eines ANDEREN Themes trägt und den eigenen nicht:
+ * `.visu-root[data-theme="light"] .foo` gilt im dunklen Theme nicht. Ein Block,
+ * dessen Selektorliste beide nennt, gilt in beiden — deshalb wird je Selektor
+ * entschieden und der Block genommen, sobald EINER von ihnen passt.
+ *
+ * Warum das zählt: der Rückfall-Boden wurde vorher aus JEDER Deklaration in JEDEM
+ * Selektor gefüllt. Fehlte `--fg` im dunklen Block, borgte die dunkle Messung ihn
+ * still aus dem hellen — eine unvollständige dunkle Palette konnte `pass`
+ * bekommen, statt den Token als fehlend zu melden.
+ */
+function cascadesInto(selector: string, own: string, foreign: readonly string[]): boolean {
+  if (own.length > 0 && selector.includes(own)) return true;
+  return !foreign.some((f) => f.length > 0 && selector.includes(f));
+}
+
+/**
+ * Der Kaskaden-Boden EINES Themes: jede Deklaration jedes Blocks, der in dieses
+ * Theme kaskadiert ({@link cascadesInto}), in Quelltextreihenfolge. Er liegt unter
+ * `base` und den Theme-Token, die ihn überschreiben, und fängt die Token auf, die
+ * ausserhalb der erklärten Blöcke definiert sind (ionics `--ion-*`-Brücke unter
+ * `.visu-root`).
+ */
+function themeEnv(
+  sources: readonly string[],
+  own: string,
+  foreign: readonly string[],
+): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const css of sources) {
+    for (const rule of parseRules(css)) {
+      if (!rule.selectors.some((sel) => cascadesInto(sel, own, foreign))) continue;
+      for (const [name, value] of declarations(rule.body)) out.set(name, value);
+    }
+  }
+  return out;
+}
+
+/**
+ * Alle GEWÖHNLICHEN Deklarationen eines Rumpfes (`color: #fff`) — alles, was KEINE
+ * Custom Property ist. Der Gegenpart zu {@link declarations}, und der Grund, warum
+ * es ihn braucht: der Vollständigkeits-Scan erkannte ausschliesslich `--name` und
+ * sah `outline: 2px solid #d6a800` oder `color: #fff` deshalb NIE — weder
+ * klassifiziert noch gemessen. Ein Skin konnte damit `a11y.status: "pass"`
+ * bekommen und trotzdem unzugängliche Vordergründe ausliefern.
+ *
+ * Getrennt am obersten Klammer-Level, damit ein `;` in `url(…)` oder in einer
+ * `rgba(…)`-Liste nicht mitten in einem Wert schneidet.
+ */
+export function plainDeclarations(body: string): [string, string][] {
+  const out: [string, string][] = [];
+  for (const part of splitTop(body, ";")) {
+    const cut = part.indexOf(":");
+    if (cut <= 0) continue;
+    const name = part.slice(0, cut).trim();
+    const value = part.slice(cut + 1).trim();
+    if (name.length === 0 || value.length === 0) continue;
+    if (name.startsWith("--")) continue; // die haben ihren eigenen Scan
+    if (!/^[a-z-]+$/i.test(name)) continue; // kein Eigenschaftsname
+    out.push([name, value]);
+  }
+  return out;
+}
+
+/** Wie {@link allDeclarations}, aber für die gewöhnlichen Deklarationen. */
+export function allPlainDeclarations(sources: readonly string[]): [string, string, string][] {
+  const out: [string, string, string][] = [];
+  for (const css of sources) {
+    for (const rule of parseRules(css)) {
+      for (const [name, value] of plainDeclarations(rule.body)) {
+        out.push([rule.selectors.join(", "), name, value]);
+      }
+    }
+  }
+  return out;
+}
+
 /** Steht dieser Selektor überhaupt in einem der Stylesheets? */
 export function hasSelector(sources: readonly string[], selector: string): boolean {
   return sources.some((css) => parseRules(css).some((r) => r.selectors.includes(selector)));
@@ -432,6 +511,19 @@ export function measureA11y(input: A11yInput): SupportA11y {
     }
   }
 
+  // Riegel 5: die a11y-Themes gegen die ECHTEN Themes des Manifests. Ohne diesen
+  // Abgleich war "ein Theme gar nicht erst nennen" der stillste Ausweg von allen:
+  // ein Skin, der `light` und `dark` anbietet, aber nur `dark` deklariert, liess
+  // die halbe Palette ungemessen — und der Report konnte `pass` sein. Ein Theme
+  // wegzulassen muss dieselbe begründete Aussage sein wie es auszunehmen.
+  for (const theme of input.manifest.themes ?? []) {
+    if (theme in decl.themes || theme in exemptThemes) continue;
+    findings.push({
+      problem: "selector-missing",
+      detail: `manifest.themes bietet ${theme} an, a11y.themes kennt es nicht — diese Palette ist ungemessen. Nenne ihren Selektor oder nimm sie mit Begründung in exemptThemes auf.`,
+    });
+  }
+
   for (const selector of [
     ...(decl.base ? [decl.base] : []),
     ...measuredThemes.map(([, sel]) => sel),
@@ -442,6 +534,21 @@ export function measureA11y(input: A11yInput): SupportA11y {
         detail: `${selector} steht in keinem der deklarierten Stylesheets`,
       });
     }
+  }
+
+  // Riegel 6: die ROLLE selbst prüfen. Manifeste kommen per Typ-Zusicherung aus
+  // JSON, ohne Schema-Validierung — ein Tippfehler (`"role": "tetx"`) fiel damit
+  // durch JEDE Schleife hier (weder exempt noch ground noch text/graphic), während
+  // der Vollständigkeits-Scan den Token als klassifiziert ansah, weil sein Name in
+  // `tokens` steht. Lieferte irgendein anderer Token eine Messung, konnte der
+  // Report `pass` sein: der Token war unsichtbar, nicht ausgenommen.
+  for (const [token, entry] of Object.entries(decl.tokens)) {
+    const role = (entry as { role?: unknown }).role;
+    if (typeof role === "string" && A11Y_ROLES.includes(role)) continue;
+    findings.push({
+      problem: "unclassified",
+      detail: `${token} trägt die Rolle ${JSON.stringify(role)}, die es im Vertrags-Vokabular nicht gibt (${A11Y_ROLES.join(" · ")}) — der Token ist damit weder gemessen noch ausgenommen`,
+    });
   }
 
   // Ausnahmen ohne Begründung: eine Auslassung MUSS eine Aussage sein (Regel 3).
@@ -474,6 +581,18 @@ export function measureA11y(input: A11yInput): SupportA11y {
   }
 
   for (const [token, entry] of Object.entries(decl.tokens)) {
+    // Riegel 7: `"on": []` war ein stiller Ausweg. Nullish-Coalescing erhält ein
+    // ausdrücklich leeres Array, also erzeugte ein Text- oder Grafik-Token damit
+    // NULL Paarungen und keinen Befund; solange irgendein anderer Token gemessen
+    // wurde, blieb `measurements.length` ungleich null und der Report konnte
+    // `pass` sein. Leer ist keine Aussage — es wird gemeldet UND auf die strenge
+    // Lesart zurückgefallen (gegen alle Gründe), genau wie ein fehlendes `on`.
+    if (entry.on !== undefined && entry.on.length === 0) {
+      findings.push({
+        problem: "unclassified",
+        detail: `${token} nennt "on": [] — ein leerer Grund-Satz misst nichts. Nenne die Gründe, lass "on" ganz weg (dann gilt die strengere Lesart gegen alle), oder führe den Token als exempt mit Begründung.`,
+      });
+    }
     for (const on of entry.on ?? []) {
       if (!groundNames.has(on)) {
         findings.push({
@@ -574,15 +693,17 @@ export function measureA11y(input: A11yInput): SupportA11y {
   const measurements: A11yMeasurement[] = [];
   const violations: A11yMeasurement[] = [];
   /**
-   * Der Kaskaden-Boden: JEDE Deklaration aller Blätter, in Quelltextreihenfolge.
-   * Er liegt UNTER `base` und dem Theme, die ihn überschreiben. Ohne ihn wäre ein
-   * Token, der ausserhalb der erklärten Blöcke definiert ist, zwar klassifizierbar,
-   * aber nicht auflösbar — und ionics `--ion-color-primary-contrast` (Weiss auf dem
-   * gefüllten Akzent-Button) fiele erneut aus der Messung, diesmal durch die
-   * Hintertür "steht in keinem erklärten Block".
+   * Der Klassifikations-Boden: JEDE Deklaration aller Blätter. Er beantwortet nur
+   * die Frage "zeigt dieser Alias überhaupt auf eine Farbe?" (Riegel 1) und darf
+   * dafür themeübergreifend sein — MESSEN tut er nichts.
    */
   const envAll = new Map<string, string>();
   for (const [, name, value] of allDeclarations(sources)) envAll.set(name, value);
+
+  // Die Selektoren ALLER deklarierten Themes (auch der ausgenommenen): sie sind
+  // der Massstab dafür, welcher Block in ein gemessenes Theme kaskadiert und
+  // welcher zu einem fremden gehört.
+  const themeSelectors = Object.values(decl.themes);
 
   const base =
     sources.length > 0 && decl.base ? tokensFor(sources, decl.base) : new Map<string, string>();
@@ -591,21 +712,41 @@ export function measureA11y(input: A11yInput): SupportA11y {
   for (const [theme, selector] of measuredThemes) {
     if (sources.length === 0) break;
     const themeTokens = tokensFor(sources, selector);
+    /**
+     * Der Kaskaden-Boden DIESES Themes. Er liegt UNTER `base` und den Theme-Token,
+     * die ihn überschreiben, und fängt weiterhin die Token auf, die ausserhalb der
+     * erklärten Blöcke definiert sind (ionics `--ion-*`-Brücke unter `.visu-root`)
+     * — aber er borgt sich nichts mehr aus einem FREMDEN Theme. Vorher wurde er
+     * aus jeder Deklaration jedes Selektors gefüllt: fehlte `--fg` im dunklen
+     * Block, borgte die dunkle Messung ihn still aus dem hellen, und eine
+     * unvollständige dunkle Palette konnte `pass` bekommen.
+     */
+    const envTheme = themeEnv(
+      sources,
+      selector,
+      themeSelectors.filter((s) => s !== selector),
+    );
 
     for (const stop of stops) {
-      const env = new Map<string, string>([...envAll, ...base, ...themeTokens, ...stop.overrides]);
+      const env = new Map<string, string>([
+        ...envTheme,
+        ...base,
+        ...themeTokens,
+        ...stop.overrides,
+      ]);
 
       // 1) Gründe auflösen und die Kette zusammenmischen.
       const ground = new Map<string, Rgba>();
       for (const g of decl.grounds) {
         const resolved = resolveGround(g, decl.grounds, env);
         if (resolved === null) {
-          if (stop.label === "default") {
-            findings.push({
-              problem: "unresolvable",
-              detail: `${theme}: Grund ${g.token} = "${env.get(g.token) ?? "(fehlt)"}" ist nicht auflösbar`,
-            });
-          }
+          // An JEDEM Stopp, nicht nur am Default (siehe unten beim Vordergrund):
+          // ein Tweak kann einen Grund unauflösbar machen, den die Werkseinstellung
+          // noch auflöst.
+          findings.push({
+            problem: "unresolvable",
+            detail: `${theme}/${stop.label}: Grund ${g.token} = "${env.get(g.token) ?? "(fehlt)"}" ist nicht auflösbar`,
+          });
           continue;
         }
         if (resolved.a < 0.999) {
@@ -633,16 +774,23 @@ export function measureA11y(input: A11yInput): SupportA11y {
         }
         const color = resolveColor(raw, env);
         if (color === null) {
-          if (stop.label === "default") {
-            findings.push({
-              problem: "unresolvable",
-              detail: `${theme}: ${token} = "${raw}" ist nicht auflösbar — umschreiben oder exempt mit Begründung`,
-            });
-          }
+          // An JEDEM Stopp, nicht nur am Default. Vorher wurden unauflösbare
+          // Vordergründe an einem Tweak-Extrem still übersprungen: ein Tweak, der
+          // auf eine benannte CSS-Farbe abbildet (`red`), lieferte am Default einen
+          // messbaren Hexwert und an jedem Extrem `null` — und der Report sagte
+          // weiter `checkedTweakExtremes: true` und `pass`, obwohl an den Extremen
+          // gar nichts gemessen wurde.
+          findings.push({
+            problem: "unresolvable",
+            detail: `${theme}/${stop.label}: ${token} = "${raw}" ist nicht auflösbar — umschreiben oder exempt mit Begründung`,
+          });
           continue;
         }
         const threshold = entry.role === "text" ? THRESHOLDS.text : THRESHOLDS.graphic;
-        const targets = entry.on ?? decl.grounds.map((g) => g.token);
+        // Ein leeres `on` fällt auf die strenge Lesart zurück (gegen alle Gründe) —
+        // gemeldet wird es oben, gemessen wird es hier trotzdem.
+        const targets =
+          entry.on && entry.on.length > 0 ? entry.on : decl.grounds.map((g) => g.token);
         // Deckkraft je Token vor Deckkraft des Skins: ein Skin dimmt seine gesperrte
         // Kachel und seine Seitenüberschrift nicht — eine globale Liste erzeugte
         // Paarungen, die es auf dem Schirm nie gibt.
@@ -701,6 +849,30 @@ export function measureA11y(input: A11yInput): SupportA11y {
         });
       }
     }
+
+    // Riegel 8 — Farbe an den Token VORBEI. Der Scan oben erkennt ausschliesslich
+    // `--name`; `outline: 2px solid #d6a800` und ein hartcodiertes `color: #fff`
+    // wurden deshalb WEDER klassifiziert NOCH gemessen. Ein Skin konnte
+    // `a11y.status: "pass"` bekommen und trotzdem unzugängliche Vordergründe
+    // ausliefern — die grösste Lücke, die diese Fläche je hatte.
+    //
+    // Die Regel ist deshalb: in einem deklarierten Blatt kommt jede Farbe aus
+    // einem Token (`var(--…)`), der eine Rolle trägt. Eine Farbe direkt in einer
+    // gewöhnlichen Deklaration ist ein Befund — nicht, weil sie zwingend falsch
+    // wäre, sondern weil sie NICHT MESSBAR ist: sie hat keinen Namen, keine Rolle
+    // und keinen erklärten Grund, und ein stilles Überspringen wäre wieder genau
+    // der Ausweg, den diese Datei sonst überall zumauert.
+    for (const [selector, prop, value] of allPlainDeclarations(sources)) {
+      // Strings und `url()` tragen keine Farbe, können aber `#…` enthalten
+      // (`url(#gradient)`, `content: "#1"`) — sonst schlüge der Wächter falsch an,
+      // und ein falsch anschlagender Wächter wird ignoriert.
+      const probe = value.replace(/url\([^)]*\)/gi, "").replace(/"[^"]*"|'[^']*'/g, "");
+      if (!COLOR_BEARING.test(probe)) continue;
+      findings.push({
+        problem: "unclassified",
+        detail: `${selector}: ${prop}: ${value} — eine Farbe an a11y.tokens vorbei. Führe sie über einen deklarierten Token (var(--…)), sonst ist sie ungemessen.`,
+      });
+    }
   }
 
   const worst: Record<string, A11yMeasurement> = {};
@@ -716,7 +888,17 @@ export function measureA11y(input: A11yInput): SupportA11y {
         "die Deklaration erzeugte KEINE einzige Messung — ein Wächter, der nie fällt, beweist nichts",
     });
   }
-  const ok = violations.length === 0 && findings.length === 0 && measurements.length > 0;
+  // `checkedTweakExtremes` gehört IN das Urteil, nicht nur in den Report. Vorher
+  // wurde das Flag auf `false` gesetzt, wenn `unmeasuredTweaks` einen farbwirksamen
+  // Tweak einräumt — floss aber nirgends ein: ein Manifest konnte `status: "pass"`
+  // und `aa: true` bekommen, und `generateSupport` behandelte das Gate als
+  // bestanden, weil es nur den Status prüft. Ein eingeräumt ungeprüftes Extrem ist
+  // eine Lücke in der Messung, also kein `pass` (Goldene Regel 3 + 6).
+  const ok =
+    violations.length === 0 &&
+    findings.length === 0 &&
+    measurements.length > 0 &&
+    checkedTweakExtremes;
 
   const deduped = dedupe(findings);
   return {

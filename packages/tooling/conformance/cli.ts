@@ -25,10 +25,10 @@ interface SkinModule {
 }
 
 /**
- * Liest die in `manifest.a11y.stylesheet` deklarierten Dateien. Ein relativer Pfad
- * gilt relativ zum Manifest, alles andere wird als Paket-Export aufgelöst — so kann
- * edomi ionics Stylesheet mitmessen, ohne einen Pfad quer durch den Workspace zu
- * raten. Eine unlesbare Datei wird NICHT geworfen: sie fehlt schlicht in `styles`,
+ * Liest die in `manifest.a11y.stylesheet` deklarierten Dateien. Ein Pfad mit `.`
+ * gilt relativ zum Manifest, ein absoluter Pfad gilt wie er dasteht, alles andere
+ * wird als Paket-Export aufgelöst — so kann edomi ionics Stylesheet mitmessen,
+ * ohne einen Pfad quer durch den Workspace zu raten. Eine unlesbare Datei wird NICHT geworfen: sie fehlt schlicht in `styles`,
  * und die Messung meldet sie als `stylesheet-unreadable` statt den Lauf zu kippen.
  */
 function loadStyles(
@@ -42,8 +42,13 @@ function loadStyles(
   const out: Record<string, string> = {};
   for (const entry of paths) {
     try {
-      const file =
-        entry.startsWith(".") || isAbsolute(entry)
+      // Ein ABSOLUTER Pfad wird unverändert genommen. Vorher lief er durch
+      // `join(dirname(manifestPath), entry)` und wurde damit hinter das
+      // Manifest-Verzeichnis gehängt — die ausdrücklich unterstützte absolute Form
+      // war deshalb IMMER `stylesheet-unreadable`, also nie benutzbar.
+      const file = isAbsolute(entry)
+        ? entry
+        : entry.startsWith(".")
           ? join(dirname(manifestPath), entry)
           : resolve(entry);
       out[entry] = readFileSync(file, "utf8");
@@ -142,4 +147,4 @@ if (invokedDirectly) {
     });
 }
 
-export { main, loadSkin };
+export { main, loadSkin, loadStyles };

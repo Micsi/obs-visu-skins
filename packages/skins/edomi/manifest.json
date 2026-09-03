@@ -430,6 +430,11 @@
           "--vz-accent"
         ],
         "reason": "wie --handle-background, im Zustand EIN"
+      },
+      "--edomi-accent": {
+        "role": "graphic",
+        "on": ["--vz-bg", "--vz-tile-bg", "--vz-tile-bg-strong", "--vz-solid", "--vz-solid-2"],
+        "reason": "Der eigene Akzent des Skins: Fokusring, Aktiv-Indikator und die dauerhafte Sprung-Marke des Links. Nicht-Text (WCAG 3:1). Er liegt auf dem Rand oder in der Ecke des platzierten Elements, also auf dem Seiten- oder Kachelgrund — nie auf einem Akzentgrund, deshalb sind die Akzent-Gruende hier nicht genannt."
       }
     }
   },

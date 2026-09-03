@@ -91,7 +91,11 @@ pnpm install        # neues Paket verlinken
   erlaubt — dann darf `link` aber auch nicht dastehen (Goldene Regel 3). Zeichnest du ihn,
   dann ausschliesslich über die Host-Dienste `resolveLink` / `followLink` / `isLinkActive` /
   `linkLabel` am `PageHost`; ein eigener Abstieg durch den `navTree` ist ein Regelbruch
-  (Goldene Regel 4).
+  (Goldene Regel 4). Der Lauf MISST das: er fährt deinen Page-Renderer über einen
+  protokollierenden Host, ruft jeden gefundenen Klick-Handler mit einem
+  Stellvertreter-Ereignis auf (auch in Komponenten, auch hinter einem `await`) und
+  verlangt, dass einer davon `host.followLink` ruft. Fällt die Probe, steht der Befund
+  als `layout.honorsFindings` **in** `support.json` — nicht nur im Exit-Code des Laufs.
 - `renderers.ts` → ersetze `placeholderTile` Stück für Stück durch echte Renderer. Lagere
   pro Typ in `src/tiles/<type>.ts` aus (vgl. `packages/skins/terminal/src/tiles/`). Jede
   Funktion hat die Signatur `(d, t, ctx) => VNode` (Vue `h()`).
@@ -128,7 +132,8 @@ falsch), sondern nur die Semantik:
 
 ```jsonc
 "a11y": {
-  "stylesheet": "./mein.css",              // relativ zum Manifest, oder ein Paket-Export
+  "stylesheet": "./mein.css",              // `./…` relativ zum Manifest, `/…` absolut,
+                                            // alles andere ein Paket-Export
   "base": ":root",                          // optional: themenunabhängiger Token-Block
   "themes": { "dark": ".mein-root[data-theme=\"dark\"]" },
   "grounds": [
@@ -158,7 +163,7 @@ Vier Rollen, aus dem Vertrag (`contract.schema.json → a11y.roles`):
 | `exempt`  | —                  | bewusst ausgenommen, **`reason` ist Pflicht** |
 
 Jeder Weg AUS der Messung heraus muss eine **begründete Aussage** sein, nie ein
-Weglassen. Vier Riegel:
+Weglassen. Acht Riegel:
 
 1. **Farbe weglassen** → jede Farb-Deklaration in **jedem** Block deiner Stylesheets
    braucht eine Rolle, nicht nur die in `base`/`themes`. Ein dritter Block ist kein
@@ -173,7 +178,24 @@ Weglassen. Vier Riegel:
 4. **Tweak weglassen** → **jeder** Tweak aus `manifest.tweaks` muss eingeordnet sein:
    als messbare Achse (`tweakAxes`), als farbneutral (`neutralTweaks`, mit Grund) oder
    als farbwirksam-aber-hier-nicht-erfassbar (`unmeasuredTweaks`, mit Grund — und dann
-   ist `checkedTweakExtremes` **false**). Befund: `undeclared-tweak`.
+   ist `checkedTweakExtremes` **false**, und damit ist der Skin **nicht** `pass` —
+   ein eingeräumt ungeprüftes Extrem ist eine Lücke in der Messung, kein Bestehen).
+   Befund: `undeclared-tweak`.
+5. **Theme gar nicht nennen** → jedes Theme aus `manifest.themes` muss in `a11y.themes`
+   stehen oder mit Begründung in `exemptThemes`. Wer `light` und `dark` anbietet und nur
+   `dark` deklariert, lässt die halbe Palette ungemessen. Befund: `selector-missing`.
+6. **Rolle vertippen** → `role` wird gegen `contract.schema.json → a11y.roles` geprüft.
+   `"role": "tetx"` fiel sonst durch jede Schleife, galt Riegel 1 aber als
+   klassifiziert: der Token war unsichtbar, nicht ausgenommen. Befund: `unclassified`.
+7. **`"on": []`** → ein leerer Grund-Satz erzeugt null Paarungen. Er wird gemeldet und
+   fällt auf die strengere Lesart zurück (gegen alle Gründe). Lass `on` weg, wenn du
+   nicht einschränken willst; nimm `exempt` mit Begründung, wenn nicht gemessen werden
+   soll. Befund: `unclassified`.
+8. **Farbe an den Token vorbei** → in einem deklarierten Blatt kommt JEDE Farbe aus
+   einem Token mit Rolle. Eine Farbe direkt in einer gewöhnlichen Deklaration
+   (`outline: 2px solid #d6a800`, `color: #fff`) hat keinen Namen, keine Rolle und
+   keinen erklärten Grund und ist damit nicht messbar. Schreib sie als `var(--…)` auf
+   einen deklarierten Token. Befund: `unclassified`.
 
 Dazu:
 
@@ -187,6 +209,10 @@ Dazu:
 - **`undeclared` ≠ `pass`.** Ohne `a11y`-Block steht im Report ausdrücklich
   `"status": "undeclared"` — unterscheidbar von einem Skin, der deklariert und besteht
   (Goldene Regel 3).
+- **Themes borgen sich nichts.** Gemessen wird je Theme mit den Blöcken, die in DIESES
+  Theme kaskadieren. Ein gemeinsamer Block (`.mein-root { … }`) zählt in jedem Theme,
+  der Block eines anderen Themes in keinem. Fehlt ein Token im dunklen Block, ist das
+  ein Befund — kein stiller Griff in die helle Palette.
 
 Was der Lauf **nicht** misst (und auch nicht behauptet zu messen): ob ein Token wirklich
 dort steht, wo dein `on` es hinsetzt; Deckkräfte, die du nicht in `alphas` nennst;
