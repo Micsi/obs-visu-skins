@@ -1,32 +1,121 @@
 {
   "name": "terminal",
-  "targetsContract": "1.12",
+  "targetsContract": "1.13",
   "renderers": "./renderers.ts",
   "unsupported": [],
-
-  "gestures": { "tap": "action", "longPress": "openDetail" },
-
-  "widgets": {
-    "light": { "actions": ["toggle"] },
-    "switch": { "actions": ["toggle"] },
-    "blind": { "actions": ["setPosition", "applyPreset", "lock", "unlock"] },
-    "jalousie": { "actions": ["setPosition", "applyPreset", "lock", "unlock"] },
-    "sensor": { "actions": [] },
-    "scene": { "actions": ["activateScene"] },
-    "media": { "actions": ["playPause", "stop", "next", "previous"] },
-    "camera": { "actions": ["refresh"] },
-    "climate": { "actions": ["setSetpoint"] }
+  "gestures": {
+    "tap": "action",
+    "longPress": "openDetail"
   },
-
+  "widgets": {
+    "light": {
+      "actions": ["toggle"]
+    },
+    "switch": {
+      "actions": ["toggle"]
+    },
+    "blind": {
+      "actions": ["setPosition", "applyPreset", "lock", "unlock"]
+    },
+    "jalousie": {
+      "actions": ["setPosition", "applyPreset", "lock", "unlock"]
+    },
+    "sensor": {
+      "actions": []
+    },
+    "scene": {
+      "actions": ["activateScene"]
+    },
+    "media": {
+      "actions": ["playPause", "stop", "next", "previous"]
+    },
+    "camera": {
+      "actions": ["refresh"]
+    },
+    "climate": {
+      "actions": ["setSetpoint"]
+    }
+  },
   "layout": {
     "model": "list",
     "list": {
-      "row": { "minPx": 44 },
+      "row": {
+        "minPx": 44
+      },
       "gutter": 0,
       "flow": "column"
     },
     "honors": ["order", "grouping"]
   },
-
+  "a11y": {
+    "stylesheet": "./terminal.css",
+    "themes": {
+      "dark": ".t-root[data-theme=\"dark\"]",
+      "light": ".t-root[data-theme=\"light\"]"
+    },
+    "grounds": [
+      {
+        "token": "--t-bg"
+      },
+      {
+        "token": "--t-surface"
+      }
+    ],
+    "alphas": [1, 0.85],
+    "tokens": {
+      "--t-bg": {
+        "role": "ground",
+        "reason": "Zeilenfläche"
+      },
+      "--t-surface": {
+        "role": "ground",
+        "reason": "Befehlsknopf"
+      },
+      "--t-line": {
+        "role": "ground",
+        "reason": "Zeilentrenner und Knopfrahmen — Chrome, das den Grund gliedert, kein Vordergrund"
+      },
+      "--t-fg": {
+        "role": "text"
+      },
+      "--t-dim": {
+        "role": "text",
+        "reason": "Raumpräfix und Nebenangaben — Fließtext"
+      },
+      "--t-acc-amber": {
+        "role": "text",
+        "reason": "trägt .t-status.is-warn, also echten Text — deshalb 4.5:1 statt 3:1"
+      },
+      "--t-led-off": {
+        "role": "graphic",
+        "reason": "inaktiver LED-Punkt"
+      },
+      "--t-acc-orange": {
+        "role": "graphic"
+      },
+      "--t-acc-teal": {
+        "role": "graphic"
+      },
+      "--t-acc-violet": {
+        "role": "graphic"
+      },
+      "--t-acc-green": {
+        "role": "graphic"
+      },
+      "--t-acc-blue": {
+        "role": "graphic"
+      },
+      "--t-acc-rose": {
+        "role": "graphic"
+      },
+      "--t-acc-slate": {
+        "role": "graphic"
+      },
+      "--t-bar-track": {
+        "role": "exempt",
+        "reason": "die ░-Spur des Balkens. Sie ist Vordergrund, aber die Information des Balkens ist die Grenze Füllung↔Spur, nicht Spur↔Grund; gegen den Grund liegt sie bewusst bei ~1.3:1. Dieses Paar misst tests/contrast.spec.ts, weil der Vertrag nur Vordergrund↔Grund kennt."
+      }
+    }
+  },
   "themes": ["light", "dark"]
 }

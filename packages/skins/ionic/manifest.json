@@ -1,52 +1,418 @@
 {
   "name": "ionic",
-  "targetsContract": "1.12",
-  "font": { "family": "Manrope", "src": "./fonts/Manrope.woff2" },
+  "targetsContract": "1.13",
+  "font": {
+    "family": "Manrope",
+    "src": "./fonts/Manrope.woff2"
+  },
   "renderers": "./renderers.ts",
   "unsupported": [],
-
-  "gestures": { "tap": "action", "longPress": "presets", "doubleTap": "openDetail" },
-
-  "widgets": {
-    "light": { "actions": ["toggle", "setDim"] },
-    "switch": { "actions": ["toggle"] },
-    "blind": { "actions": ["setPosition", "applyPreset", "lock", "unlock"] },
-    "jalousie": { "actions": ["setPosition", "setSlat", "applyPreset", "lock", "unlock"] },
-    "sensor": { "actions": [] },
-    "scene": { "actions": ["activateScene"] },
-    "media": { "actions": ["playPause", "stop", "next", "previous", "setVolume"] },
-    "camera": { "actions": ["refresh"] },
-    "climate": { "actions": ["setSetpoint"] }
+  "gestures": {
+    "tap": "action",
+    "longPress": "presets",
+    "doubleTap": "openDetail"
   },
-
+  "widgets": {
+    "light": {
+      "actions": ["toggle", "setDim"]
+    },
+    "switch": {
+      "actions": ["toggle"]
+    },
+    "blind": {
+      "actions": ["setPosition", "applyPreset", "lock", "unlock"]
+    },
+    "jalousie": {
+      "actions": ["setPosition", "setSlat", "applyPreset", "lock", "unlock"]
+    },
+    "sensor": {
+      "actions": []
+    },
+    "scene": {
+      "actions": ["activateScene"]
+    },
+    "media": {
+      "actions": ["playPause", "stop", "next", "previous", "setVolume"]
+    },
+    "camera": {
+      "actions": ["refresh"]
+    },
+    "climate": {
+      "actions": ["setSetpoint"]
+    }
+  },
   "layout": {
     "model": "grid",
     "grid": {
-      "columns": { "min": 3, "max": 6, "default": 3, "configurable": true },
-      "cell": { "aspect": "1/1", "minPx": 112 },
+      "columns": {
+        "min": 3,
+        "max": 6,
+        "default": 3,
+        "configurable": true
+      },
+      "cell": {
+        "aspect": "1/1",
+        "minPx": 112
+      },
       "gutter": 7,
       "flow": "row"
     },
     "honors": ["order", "grouping", "role"],
     "roleMap": {
-      "feature": { "c": 2, "r": 2 },
-      "wide": { "c": 2, "r": 1 },
-      "tall": { "c": 1, "r": 2 },
-      "banner": { "c": 3, "r": 1 },
-      "default": { "c": 1, "r": 1 },
-      "compact": { "c": 1, "r": 1 }
+      "feature": {
+        "c": 2,
+        "r": 2
+      },
+      "wide": {
+        "c": 2,
+        "r": 1
+      },
+      "tall": {
+        "c": 1,
+        "r": 2
+      },
+      "banner": {
+        "c": 3,
+        "r": 1
+      },
+      "default": {
+        "c": 1,
+        "r": 1
+      },
+      "compact": {
+        "c": 1,
+        "r": 1
+      }
     }
   },
-
   "tweaks": {
-    "stil": { "type": "select", "options": ["glass", "ios", "md"], "default": "glass" },
-    "accentStyle": { "type": "select", "options": ["bar", "glow", "ring"], "default": "bar" },
-    "glassBlur": { "type": "slider", "min": 0, "max": 40, "step": 1, "default": 22 },
-    "tileAlpha": { "type": "slider", "min": 0.3, "max": 0.9, "step": 0.05, "default": 0.55 },
-    "cellScale": { "type": "slider", "min": 0.8, "max": 1.4, "step": 0.05, "default": 1 },
-    "edge": { "type": "slider", "min": 0, "max": 24, "step": 1, "default": 12 },
-    "glow": { "type": "slider", "min": 0, "max": 1.6, "step": 0.1, "default": 1 }
+    "stil": {
+      "type": "select",
+      "options": ["glass", "ios", "md"],
+      "default": "glass"
+    },
+    "accentStyle": {
+      "type": "select",
+      "options": ["bar", "glow", "ring"],
+      "default": "bar"
+    },
+    "glassBlur": {
+      "type": "slider",
+      "min": 0,
+      "max": 40,
+      "step": 1,
+      "default": 22
+    },
+    "tileAlpha": {
+      "type": "slider",
+      "min": 0.3,
+      "max": 0.9,
+      "step": 0.05,
+      "default": 0.55
+    },
+    "cellScale": {
+      "type": "slider",
+      "min": 0.8,
+      "max": 1.4,
+      "step": 0.05,
+      "default": 1
+    },
+    "edge": {
+      "type": "slider",
+      "min": 0,
+      "max": 24,
+      "step": 1,
+      "default": 12
+    },
+    "glow": {
+      "type": "slider",
+      "min": 0,
+      "max": 1.6,
+      "step": 0.1,
+      "default": 1
+    }
   },
-
+  "a11y": {
+    "stylesheet": "./ionic.css",
+    "base": ":root",
+    "themes": {
+      "light": ".visu-root[data-theme=\"light\"]",
+      "dark": ".visu-root[data-theme=\"dark\"]",
+      "image": ".visu-root[data-theme=\"image\"]"
+    },
+    "exemptThemes": {
+      "image": "Der Grund ist ein vom Benutzer gestelltes FOTO (--vz-bg-image), nicht eine Farbe des Skins. Gegen ein beliebiges Bild kann keine Palette AA garantieren; --vz-bg ist dort nur der Rückfall-Ton. Das Theme ist deshalb ausdrücklich ausgenommen statt scheinbar geprüft."
+    },
+    "grounds": [
+      {
+        "token": "--vz-bg"
+      },
+      {
+        "token": "--vz-tile-bg",
+        "over": "--vz-bg"
+      },
+      {
+        "token": "--vz-tile-bg-strong",
+        "over": "--vz-bg"
+      },
+      {
+        "token": "--vz-solid",
+        "over": "--vz-bg"
+      },
+      {
+        "token": "--vz-solid-2",
+        "over": "--vz-bg"
+      },
+      {
+        "token": "--vz-chip-bg",
+        "over": "--vz-tile-bg"
+      },
+      {
+        "token": "--vz-acc-orange"
+      },
+      {
+        "token": "--vz-acc-teal"
+      },
+      {
+        "token": "--vz-acc-violet"
+      },
+      {
+        "token": "--vz-acc-green"
+      },
+      {
+        "token": "--vz-acc-blue"
+      },
+      {
+        "token": "--vz-acc-rose"
+      },
+      {
+        "token": "--vz-acc-amber"
+      },
+      {
+        "token": "--vz-acc-slate"
+      },
+      {
+        "token": "--vz-accent"
+      }
+    ],
+    "alphas": [1],
+    "tokens": {
+      "--vz-acc-orange": {
+        "role": "graphic",
+        "on": ["--vz-bg", "--vz-tile-bg", "--vz-tile-bg-strong", "--vz-solid", "--vz-chip-bg"],
+        "reason": "Balkenfüllung, LED, Ring und Glow — Nicht-Text, aber bedeutungstragend Deckkraft: die gesperrte/readonly Kachel dimmt ihren Rumpf auf 0.7, ein inertes Bedienelement auf 0.55 — beides trifft diesen Token.",
+        "alphas": [1, 0.7, 0.55]
+      },
+      "--vz-acc-teal": {
+        "role": "graphic",
+        "on": ["--vz-bg", "--vz-tile-bg", "--vz-tile-bg-strong", "--vz-solid", "--vz-chip-bg"],
+        "reason": "Balkenfüllung, LED, Ring und Glow — Nicht-Text, aber bedeutungstragend Deckkraft: die gesperrte/readonly Kachel dimmt ihren Rumpf auf 0.7, ein inertes Bedienelement auf 0.55 — beides trifft diesen Token.",
+        "alphas": [1, 0.7, 0.55]
+      },
+      "--vz-acc-violet": {
+        "role": "graphic",
+        "on": ["--vz-bg", "--vz-tile-bg", "--vz-tile-bg-strong", "--vz-solid", "--vz-chip-bg"],
+        "reason": "Balkenfüllung, LED, Ring und Glow — Nicht-Text, aber bedeutungstragend Deckkraft: die gesperrte/readonly Kachel dimmt ihren Rumpf auf 0.7, ein inertes Bedienelement auf 0.55 — beides trifft diesen Token.",
+        "alphas": [1, 0.7, 0.55]
+      },
+      "--vz-acc-green": {
+        "role": "graphic",
+        "on": ["--vz-bg", "--vz-tile-bg", "--vz-tile-bg-strong", "--vz-solid", "--vz-chip-bg"],
+        "reason": "Balkenfüllung, LED, Ring und Glow — Nicht-Text, aber bedeutungstragend Deckkraft: die gesperrte/readonly Kachel dimmt ihren Rumpf auf 0.7, ein inertes Bedienelement auf 0.55 — beides trifft diesen Token.",
+        "alphas": [1, 0.7, 0.55]
+      },
+      "--vz-acc-blue": {
+        "role": "graphic",
+        "on": ["--vz-bg", "--vz-tile-bg", "--vz-tile-bg-strong", "--vz-solid", "--vz-chip-bg"],
+        "reason": "Balkenfüllung, LED, Ring und Glow — Nicht-Text, aber bedeutungstragend Deckkraft: die gesperrte/readonly Kachel dimmt ihren Rumpf auf 0.7, ein inertes Bedienelement auf 0.55 — beides trifft diesen Token.",
+        "alphas": [1, 0.7, 0.55]
+      },
+      "--vz-acc-rose": {
+        "role": "graphic",
+        "on": ["--vz-bg", "--vz-tile-bg", "--vz-tile-bg-strong", "--vz-solid", "--vz-chip-bg"],
+        "reason": "Balkenfüllung, LED, Ring und Glow — Nicht-Text, aber bedeutungstragend Deckkraft: die gesperrte/readonly Kachel dimmt ihren Rumpf auf 0.7, ein inertes Bedienelement auf 0.55 — beides trifft diesen Token.",
+        "alphas": [1, 0.7, 0.55]
+      },
+      "--vz-acc-amber": {
+        "role": "graphic",
+        "on": ["--vz-bg", "--vz-tile-bg", "--vz-tile-bg-strong", "--vz-solid", "--vz-chip-bg"],
+        "reason": "Balkenfüllung, LED, Ring und Glow — Nicht-Text, aber bedeutungstragend Deckkraft: die gesperrte/readonly Kachel dimmt ihren Rumpf auf 0.7, ein inertes Bedienelement auf 0.55 — beides trifft diesen Token.",
+        "alphas": [1, 0.7, 0.55]
+      },
+      "--vz-acc-slate": {
+        "role": "graphic",
+        "on": ["--vz-bg", "--vz-tile-bg", "--vz-tile-bg-strong", "--vz-solid", "--vz-chip-bg"],
+        "reason": "Balkenfüllung, LED, Ring und Glow — Nicht-Text, aber bedeutungstragend Deckkraft: die gesperrte/readonly Kachel dimmt ihren Rumpf auf 0.7, ein inertes Bedienelement auf 0.55 — beides trifft diesen Token.",
+        "alphas": [1, 0.7, 0.55]
+      },
+      "--vz-accent": {
+        "role": "graphic",
+        "on": ["--vz-bg", "--vz-tile-bg", "--vz-tile-bg-strong", "--vz-solid", "--vz-chip-bg"],
+        "reason": "der vom Host je Gerät gesetzte Akzent; der Boden ist orange Deckkraft: die gesperrte/readonly Kachel dimmt ihren Rumpf auf 0.7, ein inertes Bedienelement auf 0.55 — beides trifft diesen Token.",
+        "alphas": [1, 0.7, 0.55]
+      },
+      "--ink-orange": {
+        "role": "text",
+        "on": ["--vz-acc-orange"],
+        "reason": "Text AUF dem gefüllten Akzent (#19) — der Akzent ist hier der Grund, nicht der Vordergrund"
+      },
+      "--ink-teal": {
+        "role": "text",
+        "on": ["--vz-acc-teal"],
+        "reason": "Text AUF dem gefüllten Akzent (#19) — der Akzent ist hier der Grund, nicht der Vordergrund"
+      },
+      "--ink-violet": {
+        "role": "text",
+        "on": ["--vz-acc-violet"],
+        "reason": "Text AUF dem gefüllten Akzent (#19) — der Akzent ist hier der Grund, nicht der Vordergrund"
+      },
+      "--ink-green": {
+        "role": "text",
+        "on": ["--vz-acc-green"],
+        "reason": "Text AUF dem gefüllten Akzent (#19) — der Akzent ist hier der Grund, nicht der Vordergrund"
+      },
+      "--ink-blue": {
+        "role": "text",
+        "on": ["--vz-acc-blue"],
+        "reason": "Text AUF dem gefüllten Akzent (#19) — der Akzent ist hier der Grund, nicht der Vordergrund"
+      },
+      "--ink-rose": {
+        "role": "text",
+        "on": ["--vz-acc-rose"],
+        "reason": "Text AUF dem gefüllten Akzent (#19) — der Akzent ist hier der Grund, nicht der Vordergrund"
+      },
+      "--ink-amber": {
+        "role": "text",
+        "on": ["--vz-acc-amber"],
+        "reason": "Text AUF dem gefüllten Akzent (#19) — der Akzent ist hier der Grund, nicht der Vordergrund"
+      },
+      "--ink-slate": {
+        "role": "text",
+        "on": ["--vz-acc-slate"],
+        "reason": "Text AUF dem gefüllten Akzent (#19) — der Akzent ist hier der Grund, nicht der Vordergrund"
+      },
+      "--vz-accent-ink": {
+        "role": "text",
+        "on": ["--vz-accent"],
+        "reason": "Ink zum Host-Akzent"
+      },
+      "--vz-on": {
+        "role": "graphic",
+        "on": ["--vz-tile-bg", "--vz-chip-bg", "--vz-bg"],
+        "reason": "LED-Punkt EIN Deckkraft: die gesperrte/readonly Kachel dimmt ihren Rumpf auf 0.7, ein inertes Bedienelement auf 0.55 — beides trifft diesen Token.",
+        "alphas": [1, 0.7, 0.55]
+      },
+      "--vz-off": {
+        "role": "graphic",
+        "on": ["--vz-tile-bg", "--vz-chip-bg", "--vz-bg"],
+        "reason": "LED-Punkt AUS Deckkraft: die gesperrte/readonly Kachel dimmt ihren Rumpf auf 0.7, ein inertes Bedienelement auf 0.55 — beides trifft diesen Token.",
+        "alphas": [1, 0.7, 0.55]
+      },
+      "--vz-good": {
+        "role": "graphic",
+        "on": ["--vz-tile-bg", "--vz-chip-bg", "--vz-bg"],
+        "reason": "LED-Punkt OK Deckkraft: die gesperrte/readonly Kachel dimmt ihren Rumpf auf 0.7, ein inertes Bedienelement auf 0.55 — beides trifft diesen Token.",
+        "alphas": [1, 0.7, 0.55]
+      },
+      "--vz-warn": {
+        "role": "text",
+        "on": ["--vz-tile-bg", "--vz-bg"],
+        "reason": "färbt Warntext (.vz-… color) Deckkraft: die gesperrte/readonly Kachel dimmt ihren Rumpf auf 0.7, ein inertes Bedienelement auf 0.55 — beides trifft diesen Token.",
+        "alphas": [1, 0.7, 0.55]
+      },
+      "--vz-bad": {
+        "role": "text",
+        "on": ["--vz-chip-bg", "--vz-tile-bg", "--vz-bg"],
+        "reason": "färbt Fehlertext UND den Störungs-Punkt — als Text gemessen, das ist die strengere Schwelle Deckkraft: die gesperrte/readonly Kachel dimmt ihren Rumpf auf 0.7, ein inertes Bedienelement auf 0.55 — beides trifft diesen Token.",
+        "alphas": [1, 0.7, 0.55]
+      },
+      "--vz-bg": {
+        "role": "ground",
+        "reason": "Seitenfläche"
+      },
+      "--vz-fg": {
+        "role": "text",
+        "on": [
+          "--vz-bg",
+          "--vz-tile-bg",
+          "--vz-tile-bg-strong",
+          "--vz-solid",
+          "--vz-solid-2",
+          "--vz-chip-bg"
+        ],
+        "alphas": [1, 0.7, 0.55],
+        "reason": " Deckkraft: die gesperrte/readonly Kachel dimmt ihren Rumpf auf 0.7, ein inertes Bedienelement auf 0.55 — beides trifft diesen Token."
+      },
+      "--vz-fg-mute": {
+        "role": "text",
+        "on": [
+          "--vz-bg",
+          "--vz-tile-bg",
+          "--vz-tile-bg-strong",
+          "--vz-solid",
+          "--vz-solid-2",
+          "--vz-chip-bg"
+        ],
+        "reason": "Eyebrow, Einheit, Popup-Text — überall Fließtext Deckkraft: die gesperrte/readonly Kachel dimmt ihren Rumpf auf 0.7, ein inertes Bedienelement auf 0.55 — beides trifft diesen Token.",
+        "alphas": [1, 0.7, 0.55]
+      },
+      "--vz-fg-soft": {
+        "role": "text",
+        "on": ["--vz-bg", "--vz-tile-bg", "--vz-chip-bg"],
+        "reason": "Raum-Meta auf der Seite, Kamera-Platzhalter auf der Kachel Deckkraft: die gesperrte/readonly Kachel dimmt ihren Rumpf auf 0.7, ein inertes Bedienelement auf 0.55 — beides trifft diesen Token.",
+        "alphas": [1, 0.7, 0.55]
+      },
+      "--vz-tile-bg": {
+        "role": "ground",
+        "reason": "Kachelfläche; durchscheinend über --vz-bg"
+      },
+      "--vz-tile-bg-strong": {
+        "role": "ground",
+        "reason": "deckendere Kachel-/Sheet-Fläche"
+      },
+      "--vz-solid": {
+        "role": "ground",
+        "reason": "deckende Karte für die Stile ios/md"
+      },
+      "--vz-solid-2": {
+        "role": "ground",
+        "reason": "zweite Kartenfläche"
+      },
+      "--vz-chip-bg": {
+        "role": "ground",
+        "reason": "Chip-Fläche auf der Kachel"
+      },
+      "--vz-tile-border": {
+        "role": "exempt",
+        "reason": "0.5px-Kachelrand. Er begrenzt eine Gruppierung, nicht ein Bedienelement mit Zustand — WCAG 1.4.11 zielt auf Letzteres. Die Bedienelemente IN der Kachel tragen ihren eigenen Kontrast. Bewusst leise, damit die Glas-Optik trägt; wer das anders sieht, sieht es hier."
+      },
+      "--vz-divider": {
+        "role": "exempt",
+        "reason": "Trennlinie zwischen Listenzeilen — Dekoration; die Zeilen trennen sich schon über Abstand und Typografie"
+      },
+      "--vz-hairline": {
+        "role": "exempt",
+        "reason": "0.5px-Haarlinie an Chips und Sheets — Dekoration, keine Zustandsinformation"
+      },
+      "--vz-bg-grad": {
+        "role": "exempt",
+        "reason": "Verlauf, keine flache Farbe. Seine Endpunkte liegen zwischen --vz-bg und dessen Nachbarn; gemessen wird der Token --vz-bg."
+      },
+      "--vz-tile-shadow": {
+        "role": "exempt",
+        "reason": "Schattenliste, keine flache Farbe — kein Vordergrund, der Information trägt"
+      },
+      "--vz-bg-image": {
+        "role": "exempt",
+        "reason": "Foto-URL. Nur im Theme image aktiv, das als Ganzes ausgenommen ist."
+      }
+    },
+    "tweakAxes": [
+      {
+        "tweak": "tileAlpha",
+        "cssVar": "--vz-tile-alpha"
+      }
+    ]
+  },
   "themes": ["light", "dark", "image"]
 }

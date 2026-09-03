@@ -5,12 +5,17 @@
 // und er glaubt dem Manifest nicht: die Stufe wird an dem gemessen, was die Renderer
 // beim headless-Lauf über den Vertrags-Fixtures TATSÄCHLICH tun.
 //
-// Zwei Achsen, beide gemessen:
+// Drei Achsen, alle gemessen:
 //   • Render-Achse — jede Fixture jedes Typs wird durch jede vorhandene Renderer-
 //     Fläche (tile · detail · preset) gejagt. Wirft eine, ist der Typ `broken`.
 //   • Aktions-Achse — der zurückgegebene Baum wird nach `data-action` abgelaufen.
 //     Gezählt wird, was der Renderer MARKIERT, nicht was das Manifest behauptet.
 //     Ein Manifest-Eintrag ohne markierende Fixture hebt die Stufe daher nicht.
+//   • Farb-Achse (Vertrag 1.13, `a11y.ts`) — das echte Stylesheet des Skins wird
+//     gelesen, die Token werden aufgelöst und WCAG 2.1 darauf gerechnet, für jedes
+//     Theme UND an den Extremen jeder farbwirksamen Tweak-Achse. Der Skin
+//     deklariert nur die Semantik (Rolle · Grund · Ausnahme), die Werte misst der
+//     Generator. Ohne Deklaration: `undeclared` — nicht `pass` (Goldene Regel 3).
 //
 // Für jeden CoreWidgetType …
 //   • in manifest.unsupported                                       → "unsupported"
@@ -46,10 +51,27 @@ import {
   type SupportWidgetEntry,
 } from "@obs/visu-contract";
 import { ctxStub, pageHostProbe, tokensStub } from "./stubs.js";
+import { measureA11y } from "./a11y.js";
 
 // Die Fixture-Wand nutzt denselben Ctx-/Tokens-Stub wie dieser Lauf — Wand und
 // support.json sollen dieselbe Prüfung zeigen, nicht zwei Nachbildungen.
 export { ctxStub, tokensStub, pageHostProbe } from "./stubs.js";
+// Die Farb-Achse liegt in a11y.ts, wird aber von hier mit-exportiert: wer den
+// Generator benutzt, soll nicht wissen muessen, dass sie in einer zweiten Datei steht.
+export {
+  measureA11y,
+  THRESHOLDS,
+  A11Y_ROLES,
+  contrast,
+  composite,
+  luminance,
+  resolveColor,
+  resolveNumber,
+  tokensFor,
+  parseRules,
+  type A11yInput,
+  type Rgba,
+} from "./a11y.js";
 
 /**
  * Die stabilen Kern-Typen — **aus dem Vertragsschema abgeleitet**, nicht getippt:
@@ -84,6 +106,13 @@ export interface SkinInput {
   /** Der optionale Ganzseiten-Renderer (Vertrag 1.10) - gebraucht, um die
    *  `honors`-Achse zu MESSEN statt zu glauben. */
   readonly page?: PageRenderer;
+  /**
+   * Der Quelltext jedes in `manifest.a11y.stylesheet` genannten Stylesheets,
+   * nach dem deklarierten Pfad geschluesselt (Vertrag 1.13). Das Lesen macht der
+   * Aufrufer — `generateSupport` bleibt damit rein und ohne Dateisystem testbar.
+   * Fehlt eine Quelle, ist das ein BEFUND in `a11y.findings`, kein stiller Erfolg.
+   */
+  readonly styles?: Readonly<Record<string, string>>;
 }
 
 /**
@@ -505,8 +534,18 @@ export function generateSupport(
       model: manifest.layout.model,
       honors: manifest.layout.honors ?? [],
     },
+    // Die Farb-Achse (Vertrag 1.13). Sie steht IMMER im Report — auch wenn der
+    // Skin nichts deklariert: dann als `undeclared`, ausdruecklich unterscheidbar
+    // von `pass` (Goldene Regel 3). AA ist Pflicht (Regel 6), deshalb zaehlt alles
+    // ausser `pass` unten als harter Fehler.
+    a11y: measureA11y({ manifest, styles: skin.styles }),
   };
 
   const honors = checkHonors(skin);
-  return { report, hasGap: summary.gap > 0 || summary.broken > 0 || honors.length > 0, honors };
+  const a11yFailed = report.a11y?.status !== "pass";
+  return {
+    report,
+    hasGap: summary.gap > 0 || summary.broken > 0 || honors.length > 0 || a11yFailed,
+    honors,
+  };
 }

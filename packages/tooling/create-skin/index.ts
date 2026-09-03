@@ -39,6 +39,23 @@ export const CORE_WIDGET_TYPES: readonly string[] = Object.freeze(
     .map(([type]) => type),
 );
 
+/**
+ * Die Akzent-Palette des Vertrags (§2). Das Scaffold bringt sie vollstaendig mit,
+ * weil `t.accent(d.accent)` genau diese acht Schluessel aufloest — ein Skin mit nur
+ * einem Akzent-Token faellt in der Fixture-Wand auf den Fallback zurueck und zeigt
+ * nicht seine eigene Optik.
+ */
+const ACCENT_TOKENS = [
+  "orange",
+  "teal",
+  "violet",
+  "green",
+  "blue",
+  "rose",
+  "amber",
+  "slate",
+] as const;
+
 /** Layout-Modell des Scaffolds — `grid` (Default) oder `list`. */
 export type LayoutModel = "grid" | "list";
 
@@ -83,6 +100,9 @@ function packageJson(name: string): string {
     exports: {
       ".": "./renderers.ts",
       "./manifest.json": "./manifest.json",
+      // Das Stylesheet ist ein Export, weil `manifest.a11y.stylesheet` darauf zeigt
+      // und ein anderer Skin es mitmessen koennen muss (edomi tut das mit ionic.css).
+      [`./${name}.css`]: `./${name}.css`,
     },
     scripts: {
       test: "vitest run --typecheck",
@@ -157,9 +177,166 @@ function manifestJson(name: string, layout: LayoutModel): string {
     unsupported: [],
     widgets,
     layout: layoutBlock,
+    // Palette-Deklaration (Vertrag 1.13, Goldene Regel 6). Ohne sie meldet der
+    // Konformitaetslauf `a11y: undeclared` und wird rot — AA ist Pflicht, nicht Kuer.
+    // Deklariert wird nur die SEMANTIK; die Farbwerte liest der Generator aus der
+    // erzeugten <name>.css. Wer die Palette dreht, wird dort gemessen, nicht hier.
+    a11y: a11yBlock(name),
     themes: ["light", "dark"],
   };
   return JSON.stringify(manifest, null, 2) + "\n";
+}
+
+/**
+ * Die Palette-Deklaration des Scaffolds. Sie ist bewusst klein: zwei Gruende
+ * (Flaeche + Karte), zwei Themes, keine Deckkraft und keine farbwirksame
+ * Tweak-Achse — genau das, was `<name>.css` mitbringt. Waechst der Skin, waechst
+ * diese Deklaration mit ihm; eine Farbe im erklaerten Block OHNE Rolle hier ist ein
+ * Befund (`unclassified`) und macht den Lauf rot.
+ */
+function a11yBlock(name: string): Record<string, unknown> {
+  const root = `.${name}-root`;
+  return {
+    stylesheet: `./${name}.css`,
+    themes: {
+      dark: `${root}[data-theme="dark"]`,
+      light: `${root}[data-theme="light"]`,
+    },
+    grounds: [
+      { token: "--s-bg" },
+      { token: "--s-surface" },
+      // Die Akzente sind zugleich GRUND: --s-accent-ink steht auf ihnen.
+      ...ACCENT_TOKENS.map((t) => ({ token: `--s-acc-${t}` })),
+    ],
+    alphas: [1],
+    tokens: {
+      "--s-bg": { role: "ground", reason: "Seitenflaeche" },
+      "--s-surface": { role: "ground", reason: "Kachelflaeche" },
+      "--s-line": {
+        role: "ground",
+        reason: "Kachelrand — gliedert den Grund, traegt keine Zustandsinformation",
+      },
+      // `on` steht ausdruecklich da: fehlt es, misst der Generator gegen JEDEN
+      // Grund — auch gegen die Akzente, auf denen diese beiden nie stehen. Der
+      // strengere Default ist Absicht; einschraenken muss man hinschreiben.
+      "--s-fg": { role: "text", on: ["--s-bg", "--s-surface"] },
+      "--s-dim": {
+        role: "text",
+        on: ["--s-bg", "--s-surface"],
+        reason: "Typzeile und Nebenangaben — Flieasstext",
+      },
+      "--s-accent-ink": {
+        role: "text",
+        reason: "Text AUF einem akzentgefuellten Element; gemessen gegen die Akzente",
+        on: ACCENT_TOKENS.map((t) => `--s-acc-${t}`),
+      },
+      ...Object.fromEntries(
+        ACCENT_TOKENS.map((t) => [
+          `--s-acc-${t}`,
+          {
+            role: "graphic",
+            reason: "Akzentstreifen der Kachel — Nicht-Text (WCAG 1.4.11)",
+            on: ["--s-bg", "--s-surface"],
+          },
+        ]),
+      ),
+    },
+  };
+}
+
+/**
+ * Stylesheet des Scaffolds: eine AA-sichere Startpalette in beiden Themes plus die
+ * paar Regeln, die die Platzhalter-Kachel sichtbar machen.
+ *
+ * Die Werte sind nicht geraten — sie sind die des terminal-Skins, dessen Palette
+ * gemessen ueber 4.5:1 (Text) bzw. 3:1 (Grafik) liegt. Ein frisches Skin startet
+ * damit GRUEN und nicht "noch ungemessen": der Autor faengt bei bestandenem AA an
+ * und sieht sofort, wenn seine eigene Farbwahl darunter faellt.
+ */
+function stylesheetCss(name: string): string {
+  const root = `.${name}-root`;
+  return `/* @obs-visu-skins/${name} — Skin-Stylesheet (Scaffold).
+ *
+ * Alles ist unter ${root}[data-theme] gescoped, damit dieses Stylesheet neben
+ * anderen Skins im selben Dokument leben kann.
+ *
+ * AA (Goldene Regel 6): Welcher Token welche Rolle traegt, steht in
+ * manifest.json -> a11y.tokens; die WERTE misst der Konformitaetslauf aus GENAU
+ * dieser Datei. Drehst du eine Farbe unter 4.5:1 (Text) bzw. 3:1 (Grafik), wird
+ * der Lauf rot — probier es aus, bevor du dich darauf verlaesst.
+ */
+
+${root} {
+  --s-font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --s-radius: 10px;
+  --s-gap: 8px;
+
+  font-family: var(--s-font);
+  background: var(--s-bg);
+  color: var(--s-fg);
+}
+
+/* Dark ist die Vorgabe: greift auch ohne data-theme. */
+${root},
+${root}[data-theme="dark"] {
+  --s-bg: #0b0e14;
+  --s-surface: #151a22;
+  --s-line: #222a35;
+  --s-fg: #e6edf3;
+  --s-dim: #9aa7b4;
+  --s-accent-ink: #0b0e14;
+
+  --s-acc-orange: #ffa657;
+  --s-acc-teal: #56d4c4;
+  --s-acc-violet: #c0a8ff;
+  --s-acc-green: #7ee787;
+  --s-acc-blue: #79c0ff;
+  --s-acc-rose: #ff9fb2;
+  --s-acc-amber: #ffd166;
+  --s-acc-slate: #a9b4c4;
+}
+
+${root}[data-theme="light"] {
+  --s-bg: #f6f7f9;
+  --s-surface: #ffffff;
+  --s-line: #d8dce3;
+  --s-fg: #11151b;
+  --s-dim: #4c5663;
+  --s-accent-ink: #ffffff;
+
+  --s-acc-orange: #9a4b00;
+  --s-acc-teal: #00625b;
+  --s-acc-violet: #5b3fbf;
+  --s-acc-green: #1f6b2e;
+  --s-acc-blue: #0b5cad;
+  --s-acc-rose: #a32447;
+  --s-acc-amber: #7a5300;
+  --s-acc-slate: #4a5461;
+}
+
+${root} .skin-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid var(--s-line);
+  border-left: 3px solid var(--acc, var(--s-acc-slate));
+  border-radius: var(--s-radius);
+  background: var(--s-surface);
+}
+
+${root} .skin-tile__label {
+  font-weight: 600;
+  color: var(--s-fg);
+}
+
+${root} .skin-tile__type,
+${root} .skin-tile__state {
+  font-size: 12px;
+  color: var(--s-dim);
+}
+`;
 }
 
 function renderersTs(name: string): string {
@@ -297,6 +474,35 @@ describe("${name} skin scaffold", () => {
     // details darf leer bleiben (Host-Default).
     expect(details).toBeTypeOf("object");
   });
+
+  it("declares its palette, so AA is measured and not merely hoped for", () => {
+    // Vertrag 1.13 / Goldene Regel 6: ohne diesen Block meldet der Konformitaetslauf
+    // \`a11y: undeclared\` — ausdruecklich NICHT dasselbe wie bestanden.
+    const a11y = (manifest as unknown as SkinManifest).a11y;
+    expect(a11y, "manifest.a11y").toBeDefined();
+    expect(a11y!.stylesheet).toBe("./${name}.css");
+    // Jede Farbe der erklaerten Bloecke braucht eine Rolle; fehlt eine, ist das im
+    // Lauf ein Befund (\`unclassified\`) und kein stilles Ueberspringen.
+    // Jede Farbe der erklaerten Bloecke ist gefuehrt: die acht Akzente, die drei
+    // Gruende/Linien, die zwei Textfarben und die Ink auf dem Akzent.
+    expect(Object.keys(a11y!.tokens).sort()).toEqual([
+      "--s-acc-amber",
+      "--s-acc-blue",
+      "--s-acc-green",
+      "--s-acc-orange",
+      "--s-acc-rose",
+      "--s-acc-slate",
+      "--s-acc-teal",
+      "--s-acc-violet",
+      "--s-accent-ink",
+      "--s-bg",
+      "--s-dim",
+      "--s-fg",
+      "--s-line",
+      "--s-surface",
+    ]);
+    expect(Object.keys(a11y!.themes).sort()).toEqual(["dark", "light"]);
+  });
 });
 `;
 }
@@ -320,6 +526,7 @@ export function scaffoldFiles(options: ScaffoldOptions): ScaffoldFile[] {
     { path: "package.json", contents: packageJson(name) },
     { path: "manifest.json", contents: manifestJson(name, layout) },
     { path: "renderers.ts", contents: renderersTs(name) },
+    { path: `${name}.css`, contents: stylesheetCss(name) },
     { path: "tsconfig.json", contents: tsconfigJson() },
     { path: "tests/scaffold.spec.ts", contents: scaffoldSpecTs(name, layout) },
   ];

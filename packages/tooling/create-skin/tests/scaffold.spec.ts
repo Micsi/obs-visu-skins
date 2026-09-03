@@ -97,7 +97,15 @@ describe("scaffoldSkin (end-to-end against a temporary target)", () => {
         tiles: Record<string, unknown>;
       };
 
-      const { hasGap, report } = generateSupport({ manifest, tiles: mod.tiles });
+      // Wie das CLI: die in `manifest.a11y.stylesheet` genannte Datei wird GELESEN
+      // und mitgegeben. Ohne sie meldet die Farb-Achse `stylesheet-unreadable` — der
+      // Generator misst Farbe, er raet sie nicht.
+      const styles: Record<string, string> = {};
+      for (const sheet of [manifest.a11y?.stylesheet ?? []].flat()) {
+        styles[sheet] = readFileSync(join(dir, sheet), "utf8");
+      }
+
+      const { hasGap, report } = generateSupport({ manifest, tiles: mod.tiles, styles });
       expect(hasGap).toBe(false);
       expect(report.summary.gap).toBe(0);
       expect(report.summary.broken).toBe(0);
@@ -112,6 +120,15 @@ describe("scaffoldSkin (end-to-end against a temporary target)", () => {
         // Keine unbelegte Deklaration: das Manifest verspricht keine Aktion.
         expect(report.widgets[type]?.reason ?? "").not.toContain("declared but never marked");
       }
+
+      // Goldene Regel 6: das frische Skin ist AA-GEMESSEN gruen, nicht ungemessen.
+      // `pass` statt `undeclared` ist der ganze Unterschied — und die Zahl der
+      // Paarungen belegt, dass wirklich etwas gerechnet wurde (ein Waechter, der
+      // nichts misst, faellt nie).
+      expect(report.a11y?.status).toBe("pass");
+      expect(report.a11y?.violationCount).toBe(0);
+      expect(report.a11y?.combinations).toBeGreaterThan(0);
+      expect(report.a11y?.checkedTweakExtremes).toBe(true);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

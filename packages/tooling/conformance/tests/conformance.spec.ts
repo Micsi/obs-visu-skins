@@ -23,11 +23,37 @@ import {
 
 const ionic = ionicManifest as unknown as SkinManifest;
 
+/**
+ * Eine winzige, BESTANDENE Palette. Seit Vertrag 1.13 ist `a11y` Pflicht: ein Skin
+ * ohne Deklaration meldet `undeclared` und setzt `hasGap`. Diese Specs prüfen aber
+ * die WIDGET-Achse — sie brauchen eine Palette, die trägt, damit `hasGap` weiter
+ * genau das bedeutet, was hier gemeint ist. Die Farben sind terminals gemessene
+ * Werte (Text 14.9:1), also sicher über der Schwelle.
+ */
+const AA_STYLES = {
+  "./stub.css": '.stub[data-theme="dark"]{--x-bg:#0b0e14;--x-fg:#e6edf3;}',
+} as const;
+const AA_DECL = {
+  stylesheet: "./stub.css",
+  themes: { dark: '.stub[data-theme="dark"]' },
+  grounds: [{ token: "--x-bg" }],
+  tokens: {
+    "--x-bg": { role: "ground" as const },
+    "--x-fg": { role: "text" as const },
+  },
+};
+
 describe("generateSupport — ionic (vollständig)", () => {
   it("meldet keine gap/broken und deckt alle neun Kern-Typen ab", () => {
-    const { report, hasGap } = generateSupport({ manifest: ionic, tiles });
+    const { report } = generateSupport({ manifest: ionic, tiles });
 
-    expect(hasGap).toBe(false);
+    // Bewusst NICHT `hasGap`: das Flag deckt seit Vertrag 1.13 auch die Farb-Achse
+    // ab, und ionics Palette ist dort gemessen rot (theme-unabhängige Akzente auf
+    // hellem Grund). Diese Spec prüft die WIDGET-Achse — die ist sauber, und die
+    // Farb-Achse hat ihre eigenen Specs. Ein `hasGap`-false hier würde die
+    // Farbmessung stillstellen, statt sie zu prüfen.
+    expect(report.summary.gap).toBe(0);
+    expect(report.summary.broken).toBe(0);
     expect(report.skin).toBe("ionic");
     // Der Report reicht die Zielversion des Manifests durch. Bewusst gegen den
     // Vertrag gemessen statt gegen ein Literal: ein Literal hier bliebe gruen,
@@ -176,6 +202,7 @@ describe("generateSupport — gap-hart", () => {
         jalousie: { actions: ["setPosition"] },
       },
       layout: { model: "grid", honors: ["order"] },
+      a11y: AA_DECL,
     };
     const partialTiles: RendererMap = {
       light: marking("toggle"),
@@ -184,7 +211,11 @@ describe("generateSupport — gap-hart", () => {
       jalousie: marking("setPosition"),
     };
 
-    const { report, hasGap } = generateSupport({ manifest, tiles: partialTiles });
+    const { report, hasGap } = generateSupport({
+      manifest,
+      tiles: partialTiles,
+      styles: AA_STYLES,
+    });
 
     expect(hasGap).toBe(false);
     expect(report.widgets.sensor?.level).toBe("unsupported");
@@ -214,11 +245,13 @@ describe("generateSupport — gap-hart", () => {
         switch: { actions: ["toggle"] },
       },
       layout: { model: "list", honors: ["order"] },
+      a11y: AA_DECL,
     };
 
     const { report, hasGap } = generateSupport({
       manifest,
       tiles: { light: silent, switch: silent },
+      styles: AA_STYLES,
     });
 
     // Unbelegte Behauptung ist kein harter Fehler — aber sie hebt die Stufe nicht
@@ -291,9 +324,14 @@ describe("generateSupport — gap-hart", () => {
       // brauchen laut Vertrag keine Deklaration je Widget.
       widgets: { blind: { actions: ["setPosition"] } },
       layout: { model: "grid", honors: ["order"] },
+      a11y: AA_DECL,
     };
 
-    const { report, hasGap } = generateSupport({ manifest, tiles: { blind: hostMarks } });
+    const { report, hasGap } = generateSupport({
+      manifest,
+      tiles: { blind: hostMarks },
+      styles: AA_STYLES,
+    });
 
     expect(hasGap).toBe(false);
     expect(report.widgets.blind?.level).not.toBe("broken");

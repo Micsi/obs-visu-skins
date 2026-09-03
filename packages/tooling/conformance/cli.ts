@@ -8,8 +8,8 @@
 //   obs-visu-conformance @obs-visu-skins/ionic
 //   obs-visu-conformance @obs-visu-skins/ionic --stdout
 
-import { writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { readFileSync, writeFileSync } from "node:fs";
+import { dirname, isAbsolute, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
 import type { PageRenderer, SkinManifest } from "@obs/visu-contract";
@@ -24,6 +24,36 @@ interface SkinModule {
   readonly page?: PageRenderer;
 }
 
+/**
+ * Liest die in `manifest.a11y.stylesheet` deklarierten Dateien. Ein relativer Pfad
+ * gilt relativ zum Manifest, alles andere wird als Paket-Export aufgelöst — so kann
+ * edomi ionics Stylesheet mitmessen, ohne einen Pfad quer durch den Workspace zu
+ * raten. Eine unlesbare Datei wird NICHT geworfen: sie fehlt schlicht in `styles`,
+ * und die Messung meldet sie als `stylesheet-unreadable` statt den Lauf zu kippen.
+ */
+function loadStyles(
+  manifest: SkinManifest,
+  manifestPath: string,
+  resolve: (id: string) => string,
+): Record<string, string> {
+  const declared = manifest.a11y?.stylesheet;
+  if (declared === undefined) return {};
+  const paths = typeof declared === "string" ? [declared] : [...declared];
+  const out: Record<string, string> = {};
+  for (const entry of paths) {
+    try {
+      const file =
+        entry.startsWith(".") || isAbsolute(entry)
+          ? join(dirname(manifestPath), entry)
+          : resolve(entry);
+      out[entry] = readFileSync(file, "utf8");
+    } catch {
+      /* bleibt ungelesen -> a11y meldet `stylesheet-unreadable` */
+    }
+  }
+  return out;
+}
+
 async function loadSkin(pkg: string): Promise<{ skin: SkinInput; manifestPath: string }> {
   const require = createRequire(import.meta.url);
   const mod = (await import(pkg)) as SkinModule;
@@ -36,6 +66,7 @@ async function loadSkin(pkg: string): Promise<{ skin: SkinInput; manifestPath: s
       details: mod.details,
       presets: mod.presets,
       page: mod.page,
+      styles: loadStyles(manifest, manifestPath, (id) => require.resolve(id)),
     },
     manifestPath,
   };
@@ -67,10 +98,25 @@ async function main(argv: readonly string[]): Promise<number> {
     // gap UND broken sind Fehlerstufen (ARCHITECTURE.md §2) — beide werden benannt,
     // und seit Vertrag 1.12 auch die `honors`-Achse (der Deklarations-Slot, auf den
     // sich das Host-Verhalten stützt).
+    const a11y = report.a11y;
     const failures = Object.entries(report.widgets)
       .filter(([, e]) => e.level === "gap" || e.level === "broken")
       .map(([t, e]) => `  ${t} [${e.level}]: ${e.reason ?? e.level}`)
       .concat(honors.map((f) => `  honors:${f.token} [${f.problem}]: ${f.detail}`))
+      // Die Farb-Achse (Vertrag 1.13): AA ist Pflicht, also ist alles ausser `pass`
+      // ein Fehler — und `undeclared` wird ausdruecklich anders benannt als `fail`.
+      .concat(
+        a11y && a11y.status !== "pass"
+          ? [
+              `  a11y [${a11y.status}]: ${a11y.violationCount} Paarung(en) unter der Schwelle, ${a11y.findings.length} Befund(e) an der Deklaration`,
+              ...a11y.violations.map(
+                (v) =>
+                  `    ${v.theme}/${v.tweaks} ${v.token} @${v.alpha} auf ${v.ground}: ${v.ratio.toFixed(2)}:1 < ${v.threshold} (${v.role})`,
+              ),
+              ...a11y.findings.map((f) => `    [${f.problem}] ${f.detail}`),
+            ]
+          : [],
+      )
       .join("\n");
     process.stderr.write(`conformance failure in ${report.skin}:\n${failures}\n`);
     return 1;
