@@ -208,7 +208,36 @@ describe("edomi page links — the host resolves, the skin only draws", () => {
     expect(host.isLinkActive).toHaveBeenCalledWith({ targetNodeId: "keller", activeIndicator: "dot" });
     // The verdict is asked ONCE per item and reused for markup + affordance.
     expect((host.isLinkActive as unknown as { mock: { calls: unknown[] } }).mock.calls).toHaveLength(1);
-    expect(findAll(vnode, "edomi-link")[0]?.props?.["aria-current"]).toBe("page");
+  });
+
+  it('does NOT claim aria-current="page" for an ANCESTOR target', () => {
+    // `isLinkActive` is the host's BRANCH verdict — true for the current page OR
+    // an ancestor of it. Wiring it straight to `aria-current="page"` told
+    // assistive tech "this link points at the page you are on" for a link that
+    // navigates somewhere else entirely. The visual branch marker stays.
+    const host = linkedHost({ isLinkActive: vi.fn(() => true) });
+    const vnode = page(host);
+    expect(findAll(vnode, "edomi-item")[0]?.props?.["data-link-active"]).toBe("true");
+    // currentPageId is "bad", the link targets "keller" — an ancestor, not here.
+    expect(findAll(vnode, "edomi-link")[0]?.props?.["aria-current"]).toBeUndefined();
+  });
+
+  it('claims aria-current="page" only when the target IS the current page', () => {
+    const host = linkedHost({
+      isLinkActive: vi.fn(() => true),
+      resolveLink: vi.fn(() => ({ kind: "navigate" as const, pageId: "bad" })),
+    });
+    expect(findAll(page(host), "edomi-link")[0]?.props?.["aria-current"]).toBe("page");
+  });
+
+  it("a PIN-gated target never claims to be the current page", () => {
+    // `gate` leads onto the PIN path, not onto the page — even if the gated
+    // pageId happened to equal the current one, the click does not land there.
+    const host = linkedHost({
+      isLinkActive: vi.fn(() => true),
+      resolveLink: vi.fn(() => ({ kind: "gate" as const, pageId: "bad", accessNodeId: "keller" })),
+    });
+    expect(findAll(page(host), "edomi-link")[0]?.props?.["aria-current"]).toBeUndefined();
   });
 
   it("a PIN-gated target still offers the jump — onto the PIN path", () => {
@@ -292,6 +321,42 @@ describe("edomi page links — the host resolves, the skin only draws", () => {
     expect(item?.props?.["data-link"]).toBeUndefined();
     expect(item?.props?.["data-link-covers"]).toBeUndefined();
     expect(findAll(page(stubHost()), "edomi-link")).toHaveLength(0);
+  });
+
+  it("gives the jump a PERMANENTLY visible mark, not one that hangs on activeIndicator", async () => {
+    // `activeIndicator` marks by contract only whether the TARGET is active, and
+    // its documented default is `none`. With the mark gated on that state, a
+    // linked element had no content, no border and no background: on touch it
+    // looked like an ordinary tile whose own control is `inert` underneath and
+    // whose tap navigates. A declared capability owes an affordance.
+    const css = await readFile(new URL("../src/edomi.css", import.meta.url), "utf8");
+
+    // Every rule block whose selector list draws something ON `.edomi-link`.
+    const blocks = [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+      .map(([, sel, body]) => ({ sel: (sel ?? "").trim(), body: body ?? "" }))
+      .filter((r) => /\.edomi-link(?![\w-])/.test(r.sel));
+    expect(blocks.length, "the link must be styled at all").toBeGreaterThan(0);
+
+    const mark = blocks.filter(
+      (r) => /\.edomi-link[^,]*::after/.test(r.sel) && /content\s*:/.test(r.body),
+    );
+    expect(mark.length, "the stretched button needs a mark of its own").toBeGreaterThan(0);
+    // It carries colour (a shape nobody can see is not an affordance) …
+    expect(mark.some((r) => /var\(--edomi-accent\)/.test(r.body))).toBe(true);
+    // … and it is UNCONDITIONAL: no selector of the mark asks for the author's
+    // active state or indicator kind.
+    for (const r of mark) {
+      expect(r.sel, `the mark must not hang on author state: ${r.sel}`).not.toMatch(
+        /\[data-link-(active|indicator)/,
+      );
+    }
+    // The author's own indicator stays gated exactly as before — this spec adds a
+    // permanent mark, it does not turn `none` into `dot`.
+    const indicator = [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+      .map(([, sel]) => (sel ?? "").trim())
+      .filter((sel) => /data-link-indicator/.test(sel));
+    expect(indicator.length).toBeGreaterThan(0);
+    for (const sel of indicator) expect(sel).toMatch(/data-link-active/);
   });
 
   /**

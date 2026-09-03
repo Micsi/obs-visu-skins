@@ -97,7 +97,7 @@ describe("scaffoldSkin (end-to-end against a temporary target)", () => {
         tiles: Record<string, unknown>;
       };
 
-      const { hasGap, report } = generateSupport({ manifest, tiles: mod.tiles });
+      const { hasGap, report } = await generateSupport({ manifest, tiles: mod.tiles });
       expect(hasGap).toBe(false);
       expect(report.summary.gap).toBe(0);
       expect(report.summary.broken).toBe(0);
