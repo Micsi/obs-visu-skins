@@ -59,6 +59,9 @@ function navEntry(node: NavNode, host: PageHost): VNode {
  *     LOCATION target, the `protected` PIN gate and an unknown node are already
  *     decided when this returns; the skin only reads `kind`.
  *   - `host.isLinkActive(link)` — target is the current page or an ancestor.
+ *     That BRANCH verdict drives the author's visual indicator only; the
+ *     accessible `aria-current="page"` needs the narrower question, and gets it
+ *     from `resolveLink`'s `pageId` (see below).
  *   - `host.linkLabel(link, outcome)` — the accessible name. The outcome is
  *     handed back so the NAME carries the state: a PIN-gated target announces
  *     itself as gated, which a cursor or a colour cannot do on touch or to a
@@ -75,22 +78,26 @@ function navEntry(node: NavNode, host: PageHost): VNode {
  * gesture of its own. It is stretched over the placed element, which is exactly
  * #1194's case — an element with no click function of its own.
  */
-function linkOverlay(
-  link: NonNullable<LayerItem["link"]>,
-  active: boolean,
-  host: PageHost,
-): VNode | null {
+function linkOverlay(link: NonNullable<LayerItem["link"]>, host: PageHost): VNode | null {
   const outcome = host.resolveLink(link);
   // A target the host cannot resolve gets NO affordance: a dead-looking click
   // area is worse than none. The item still marks it (`data-link-unknown`).
   if (outcome.kind === "unknown") return null;
+  // `active` is the host's BRANCH verdict: the target is the current page OR an
+  // ancestor of it. That is the right input for the author's visual indicator —
+  // but NOT for `aria-current="page"`, which claims "this link points at the page
+  // you are on". On an ancestor target that claim is false: the link navigates
+  // somewhere else, and assistive tech would announce the user as already there.
+  // The page identity comes from the outcome the host just resolved, so the skin
+  // still walks no parent chain of its own (golden rule 4).
+  const isCurrentPage = outcome.kind === "navigate" && outcome.pageId === host.currentPageId;
   return h("button", {
     class: ["edomi-link", outcome.kind === "gate" && "is-gated"].filter(Boolean),
     type: "button",
     // Announced as a link (it navigates), operated as a button (native keys).
     role: "link",
     "aria-label": host.linkLabel(link, outcome),
-    "aria-current": active ? "page" : undefined,
+    "aria-current": isCurrentPage ? "page" : undefined,
     "data-link": link.targetNodeId,
     "data-link-outcome": outcome.kind,
     onClick: () => {
@@ -109,7 +116,7 @@ function layerCanvas(layer: PageLayer, host: PageHost): VNode {
       // The author's active marker (`none`/`dot`/`bar`/`border`) is pure data; the
       // skin draws it in its own language from the host's active verdict.
       const active = link ? host.isLinkActive(link) : false;
-      const overlay = link ? linkOverlay(link, active, host) : null;
+      const overlay = link ? linkOverlay(link, host) : null;
       return h(
         "div",
         {
