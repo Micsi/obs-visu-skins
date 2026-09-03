@@ -78,7 +78,11 @@ function navEntry(node: NavNode, host: PageHost): VNode {
  * gesture of its own. It is stretched over the placed element, which is exactly
  * #1194's case — an element with no click function of its own.
  */
-function linkOverlay(link: NonNullable<LayerItem["link"]>, host: PageHost): VNode | null {
+function linkOverlay(
+  link: NonNullable<LayerItem["link"]>,
+  host: PageHost,
+  describedBy: string,
+): VNode | null {
   const outcome = host.resolveLink(link);
   // A target the host cannot resolve gets NO affordance: a dead-looking click
   // area is worse than none. The item still marks it (`data-link-unknown`).
@@ -97,6 +101,15 @@ function linkOverlay(link: NonNullable<LayerItem["link"]>, host: PageHost): VNod
     // Announced as a link (it navigates), operated as a button (native keys).
     role: "link",
     "aria-label": host.linkLabel(link, outcome),
+    // The covered tile is `inert`, and inert content is hidden from assistive
+    // tech — not merely unfocusable. Without this reference a screen-reader user
+    // heard the navigation label and NOTHING ELSE: device name, state, warning,
+    // the whole display content of the tile was gone. The description carries it
+    // back onto the one element that is still exposed. (A referenced element is
+    // traversed by the accessible description computation even when it is itself
+    // hidden — the same mechanism `aria-describedby` uses for `display: none`
+    // help text.)
+    "aria-describedby": describedBy,
     "aria-current": isCurrentPage ? "page" : undefined,
     "data-link": link.targetNodeId,
     "data-link-outcome": outcome.kind,
@@ -116,7 +129,10 @@ function layerCanvas(layer: PageLayer, host: PageHost): VNode {
       // The author's active marker (`none`/`dot`/`bar`/`border`) is pure data; the
       // skin draws it in its own language from the host's active verdict.
       const active = link ? host.isLinkActive(link) : false;
-      const overlay = link ? linkOverlay(link, host) : null;
+      // The id the link's description points at (see `linkOverlay`). Derived from
+      // the item id, so it is stable across renders and unique per placed element.
+      const bodyId = `edomi-item-body-${item.id}`;
+      const overlay = link ? linkOverlay(link, host, bodyId) : null;
       return h(
         "div",
         {
@@ -135,13 +151,19 @@ function layerCanvas(layer: PageLayer, host: PageHost): VNode {
         overlay
           ? [
               // The overlay covers the tile for the POINTER (z-index). `inert`
-              // makes that true for keyboard and assistive tech too: without it
-              // a writable tile keeps its own `role="button" tabindex="0"
-              // aria-pressed` and becomes a second focus stop that announces a
-              // switch nobody can reach (WCAG 4.1.2) — the same double
-              // affordance the host steps back from at the cell level. `inert`
-              // is the mechanism this file already uses for nav + popups.
-              h("div", { class: "edomi-item-body", inert: true }, [
+              // makes that true for keyboard too: without it a writable tile
+              // keeps its own `role="button" tabindex="0" aria-pressed` and
+              // becomes a second focus stop that announces a switch nobody can
+              // reach with a mouse (WCAG 4.1.2) — the same double affordance the
+              // host steps back from at the cell level. `inert` is the mechanism
+              // this file already uses for nav + popups.
+              //
+              // But `inert` suppresses more than OPERABILITY: inert content is
+              // hidden from assistive tech, so the tile's whole INFORMATION —
+              // device name, state, warning — vanished with its focus stop. The
+              // wrapper therefore carries an id and the link describes itself by
+              // it: the content stays unoperable but stays readable.
+              h("div", { class: "edomi-item-body", id: bodyId, inert: true }, [
                 host.renderTile(item.id) as VNode,
               ]),
               overlay,

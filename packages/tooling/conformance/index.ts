@@ -182,6 +182,14 @@ export async function checkHonors(skin: SkinInput): Promise<HonorsFinding[]> {
       // Ohne Argument warf jeder normale Vue-Handler an `event.preventDefault()`
       // — noch VOR `followLink` — und ein konformer Skin fiel durch, nur weil er
       // sein Klick-Ereignis anfasst.
+      //
+      // ZWEI PHASEN, und die Trennung ist der ganze Punkt: was der Renderer
+      // WÄHREND des Zeichnens am Host fragt, wird verworfen; gezählt wird nur,
+      // was ein KLICK auslöst. Ohne diesen Schnitt bestand ein Renderer, der
+      // `host.followLink` beim Rendern ruft und einen LEEREN Baum zurückgibt —
+      // also genau der Fall, den `undelivered` fangen soll. (Im Browser wäre so
+      // ein Renderer ohnehin kaputt: er navigiert beim blossen Anzeigen.)
+      probe.reset();
       for (const fire of clickHandlers(tree)) {
         try {
           // Ein Handler, der erst nach einem `await` springt, wird MITGEZÄHLT:
@@ -207,6 +215,33 @@ export async function checkHonors(skin: SkinInput): Promise<HonorsFinding[]> {
 
 /** Ein Klick-Handler, so wie Vue ihn ruft: mit dem Ereignis, ggf. asynchron. */
 type ClickHandler = (event: unknown) => unknown;
+
+/**
+ * Die Prop-Namen, unter denen Vue einen Klick-Listener ablegt.
+ *
+ * Vue hängt die Ereignis-Modifikatoren an den Namen an (`.once` → `onClickOnce`,
+ * `.capture` → `onClickCapture`, `.passive` → `onClickPassive`, kombinierbar und
+ * in beliebiger Reihenfolge). Der Browser ruft sie alle als Klick-Handler; die
+ * Prüfung auf den EXAKTEN Namen `onClick` sah sie nicht, und eine gültige
+ * Sprung-Affordanz, deren `followLink` in einem `onClickOnce` steckt, fiel als
+ * `undelivered` durch.
+ *
+ * Bewusst am Ende verankert: `onClickOutside` (ein Komponenten-Emit) ist KEIN
+ * Klick-Listener und darf nicht mitzählen.
+ */
+const CLICK_PROP = /^on-?click(?:once|capture|passive)*$/i;
+
+/**
+ * Die Listener unter EINEM Prop-Namen. Nach `mergeProps` (Vue mischt die
+ * Listener zweier Prop-Objekte) steht dort ein ARRAY von Funktionen, kein
+ * einzelner Handler — `typeof value === "function"` sah davon nichts.
+ */
+function listenersOf(value: unknown, out: ClickHandler[] = [], depth = 0): ClickHandler[] {
+  if (depth > 8) return out;
+  if (typeof value === "function") out.push(value as ClickHandler);
+  else if (Array.isArray(value)) for (const v of value) listenersOf(v, out, depth + 1);
+  return out;
+}
 
 /**
  * Rendert einen Komponenten-VNode aus, falls es einer ist.
@@ -235,9 +270,25 @@ function expandComponent(vnode: { type?: unknown; props?: unknown; children?: un
         ? (type as { render: (props?: unknown, ctx?: unknown) => unknown }).render
         : undefined;
   if (!render) return undefined;
+  const props = (vnode.props ?? {}) as Record<string, unknown>;
+  const slots = vnode.children;
+  // Der `this`-Stellvertreter für die Options-API. Vue ruft `render()` dort mit
+  // dem Komponenten-Proxy, über den `this.host`, `this.$props` usw. laufen. Als
+  // nackte Funktion aufgerufen warf so ein `render()` an seiner ersten Zeile,
+  // die Ausnahme galt als leerer Teilbaum, und der Skin fiel als `undelivered`
+  // durch — dieselbe Fehlalarm-Klasse wie ein Handler ohne Ereignis-Argument.
+  // Ein Proxy wäre hier falsch: er beantwortete JEDEN Namen und verschöbe damit
+  // das Verhalten des Renderers; der Stellvertreter reicht genau die Props durch,
+  // die der VNode mitbringt.
+  const self = {
+    ...props,
+    $props: props,
+    $attrs: props,
+    $slots: slots ?? {},
+    $emit: () => {},
+  };
   try {
-    const slots = vnode.children;
-    return render(vnode.props ?? {}, { slots, attrs: vnode.props ?? {} });
+    return render.call(self, props, { slots, attrs: props, emit: () => {}, expose: () => {} });
   } catch {
     return undefined;
   }
@@ -260,9 +311,7 @@ function clickHandlers(node: unknown, out: ClickHandler[] = [], depth = 0): Clic
     children?: unknown;
   };
   for (const [key, value] of Object.entries(vnode.props ?? {})) {
-    if (/^on(Click|click)$/.test(key) && typeof value === "function") {
-      out.push(value as ClickHandler);
-    }
+    if (CLICK_PROP.test(key)) listenersOf(value, out);
   }
   const expanded = expandComponent(vnode);
   if (expanded !== undefined) clickHandlers(expanded, out, depth + 1);

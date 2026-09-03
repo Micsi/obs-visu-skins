@@ -43,7 +43,7 @@ importers:
         version: link:../ionic
       '@obs/visu-contract':
         specifier: link:/Volumes/Daten/Projekte/openbridge/openbridgeserver-visu-integrate/packages/contract
-        version: link:../../../../../../../../../../Volumes/Daten/Projekte/openbridge/openbridgeserver-visu-integrate/packages/contract
+        version: link:../../../../openbridgeserver-visu-integrate/packages/contract
     devDependencies:
       vitest:
         specifier: ^2.1.8
@@ -59,7 +59,7 @@ importers:
         version: 8.8.10(@stencil/core@4.43.5)(vue@3.5.35(typescript@5.9.3))
       '@obs/visu-contract':
         specifier: link:/Volumes/Daten/Projekte/openbridge/openbridgeserver-visu-integrate/packages/contract
-        version: link:../../../../../../../../../../Volumes/Daten/Projekte/openbridge/openbridgeserver-visu-integrate/packages/contract
+        version: link:../../../../openbridgeserver-visu-integrate/packages/contract
     devDependencies:
       vitest:
         specifier: ^2.1.8
@@ -72,7 +72,7 @@ importers:
     dependencies:
       '@obs/visu-contract':
         specifier: link:/Volumes/Daten/Projekte/openbridge/openbridgeserver-visu-integrate/packages/contract
-        version: link:../../../../../../../../../../Volumes/Daten/Projekte/openbridge/openbridgeserver-visu-integrate/packages/contract
+        version: link:../../../../openbridgeserver-visu-integrate/packages/contract
     devDependencies:
       vitest:
         specifier: ^2.1.8
@@ -85,7 +85,7 @@ importers:
     dependencies:
       '@obs/visu-contract':
         specifier: link:/Volumes/Daten/Projekte/openbridge/openbridgeserver-visu-integrate/packages/contract
-        version: link:../../../../../../../../../../Volumes/Daten/Projekte/openbridge/openbridgeserver-visu-integrate/packages/contract
+        version: link:../../../../openbridgeserver-visu-integrate/packages/contract
     devDependencies:
       '@obs-visu-skins/edomi':
         specifier: workspace:*
@@ -99,6 +99,9 @@ importers:
       vitest:
         specifier: ^2.1.8
         version: 2.1.9(@types/node@22.19.20)
+      vue:
+        specifier: ^3.5.13
+        version: 3.5.35(typescript@5.9.3)
 
   packages/tooling/contract-ref: {}
 
@@ -106,7 +109,7 @@ importers:
     dependencies:
       '@obs/visu-contract':
         specifier: link:/Volumes/Daten/Projekte/openbridge/openbridgeserver-visu-integrate/packages/contract
-        version: link:../../../../../../../../../../Volumes/Daten/Projekte/openbridge/openbridgeserver-visu-integrate/packages/contract
+        version: link:../../../../openbridgeserver-visu-integrate/packages/contract
     devDependencies:
       '@obs-visu-skins/conformance':
         specifier: workspace:*
@@ -137,7 +140,7 @@ importers:
         version: link:../../skins/terminal
       '@obs/visu-contract':
         specifier: link:/Volumes/Daten/Projekte/openbridge/openbridgeserver-visu-integrate/packages/contract
-        version: link:../../../../../../../../../../Volumes/Daten/Projekte/openbridge/openbridgeserver-visu-integrate/packages/contract
+        version: link:../../../../openbridgeserver-visu-integrate/packages/contract
     devDependencies:
       vite:
         specifier: ^5.4.11

@@ -285,6 +285,26 @@ describe("edomi page links — the host resolves, the skin only draws", () => {
     expect(findAll(item, "edomi-link")[0]?.props?.inert).toBeUndefined();
   });
 
+  it("suppresses the covered tile's OPERABILITY without hiding its information", () => {
+    // The regression the `inert` fix itself introduced: inert content is hidden
+    // from assistive tech, not merely unfocusable. A screen-reader user heard the
+    // navigation label and nothing else — device name, state, warning were gone.
+    // The link therefore describes itself by the wrapper it covers.
+    const host = linkedHost();
+    const item = findAll(page(host), "edomi-item")[0];
+    const body = findAll(item, "edomi-item-body")[0];
+    const overlay = findAll(item, "edomi-link")[0];
+
+    const bodyId = body?.props?.id;
+    expect(typeof bodyId, "the covered content needs an id to be referenced").toBe("string");
+    expect(bodyId).toBe("edomi-item-body-cam1");
+    // The description points AT the covered content, so the tile's text is read
+    // out with the link instead of being dropped with it.
+    expect(overlay?.props?.["aria-describedby"]).toBe(bodyId);
+    // The name still comes from the host; the description is the added part.
+    expect(overlay?.props?.["aria-label"]).toBe("zur Seite keller");
+  });
+
   it("does not wrap — and so does not inert — an item without a link", () => {
     const item = findAll(page(stubHost()), "edomi-item")[0];
     expect(findAll(item, "edomi-item-body")).toHaveLength(0);
