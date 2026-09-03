@@ -108,7 +108,12 @@ async function main(argv: readonly string[]): Promise<number> {
       .concat(
         a11y && a11y.status !== "pass"
           ? [
-              `  a11y [${a11y.status}]: ${a11y.violationCount} Paarung(en) unter der Schwelle, ${a11y.findings.length} Befund(e) an der Deklaration`,
+              `  a11y [${a11y.status}]: ${a11y.violationCount} Paarung(en) unter der Schwelle ` +
+                `(${a11y.violationBreakdown.atDefault} bei voller Deckkraft + Werkseinstellung, ` +
+                `${a11y.violationBreakdown.atTweakExtreme} nur am Tweak-Extrem, ` +
+                `${a11y.violationBreakdown.whenDimmed} nur gedimmt), ` +
+                `${a11y.findingCount} Befund(e) an der Deklaration` +
+                (a11y.checkedTweakExtremes ? "" : " - Tweak-Extreme NICHT vollstaendig geprueft"),
               ...a11y.violations.map(
                 (v) =>
                   `    ${v.theme}/${v.tweaks} ${v.token} @${v.alpha} auf ${v.ground}: ${v.ratio.toFixed(2)}:1 < ${v.threshold} (${v.role})`,

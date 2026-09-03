@@ -142,31 +142,48 @@ falsch), sondern nur die Semantik:
     "--dot":  { "role": "graphic", "on": ["--tile"] },
     "--grad": { "role": "exempt", "reason": "Verlauf, kein flaches Pixel" }
   },
-  "tweakAxes": [{ "tweak": "tileAlpha", "cssVar": "--tile-alpha" }]
+  "tweakAxes": [{ "tweak": "tileAlpha", "cssVar": "--tile-alpha" }],
+  "neutralTweaks":    { "edge": "Eckenradius — reine Geometrie" },
+  "unmeasuredTweaks": { "stil": "attributgeschaltet statt variablengetrieben" }
 }
 ```
 
 Vier Rollen, aus dem Vertrag (`contract.schema.json → a11y.roles`):
 
-| Rolle     | Schwelle              | wofür                                            |
-| --------- | --------------------- | ------------------------------------------------ |
-| `text`    | 4.5:1 (WCAG 1.4.3)    | alles, was Schrift einfärbt                       |
-| `graphic` | 3:1 (WCAG 1.4.11)     | bedeutungstragende Nicht-Text-Grafik              |
-| `ground`  | —                     | Fläche, gegen die gemessen wird                   |
-| `exempt`  | —                     | bewusst ausgenommen, **`reason` ist Pflicht**     |
+| Rolle     | Schwelle           | wofür                                         |
+| --------- | ------------------ | --------------------------------------------- |
+| `text`    | 4.5:1 (WCAG 1.4.3) | alles, was Schrift einfärbt                   |
+| `graphic` | 3:1 (WCAG 1.4.11)  | bedeutungstragende Nicht-Text-Grafik          |
+| `ground`  | —                  | Fläche, gegen die gemessen wird               |
+| `exempt`  | —                  | bewusst ausgenommen, **`reason` ist Pflicht** |
 
-Was dich davon abhält, dich grün zu deklarieren:
+Jeder Weg AUS der Messung heraus muss eine **begründete Aussage** sein, nie ein
+Weglassen. Vier Riegel:
 
-- **Vollständigkeit.** Jede Farb-Deklaration in einem erklärten Block MUSS eine Rolle
-  haben. Die unbequeme Farbe wegzulassen ist selbst der Befund (`unclassified`).
+1. **Farbe weglassen** → jede Farb-Deklaration in **jedem** Block deiner Stylesheets
+   braucht eine Rolle, nicht nur die in `base`/`themes`. Ein dritter Block ist kein
+   Versteck (ionics `--ion-*`-Brücke unter `.visu-root` war genau das). Befund:
+   `unclassified`.
+2. **Grund weglassen** → ein Token `role: "ground"` zu nennen und dann **nicht** in
+   `grounds` zu führen macht ihn komplett ungemessen. Erlaubt (eine Trennlinie ist
+   wirklich kein Vordergrund), aber nur mit `reason`; er steht dann als
+   `unmeasuredGrounds` im Report. Befund: `ground-without-reason`.
+3. **Theme weglassen** → `exemptThemes` braucht eine nicht-leere Begründung, genau
+   wie `exempt` bei einem Token.
+4. **Tweak weglassen** → **jeder** Tweak aus `manifest.tweaks` muss eingeordnet sein:
+   als messbare Achse (`tweakAxes`), als farbneutral (`neutralTweaks`, mit Grund) oder
+   als farbwirksam-aber-hier-nicht-erfassbar (`unmeasuredTweaks`, mit Grund — und dann
+   ist `checkedTweakExtremes` **false**). Befund: `undeclared-tweak`.
+
+Dazu:
+
 - **`on` ist eine Einschränkung, kein Muss.** Lässt du es weg, misst der Generator gegen
   JEDEN Grund — die strengere Lesart. Einschränken musst du hinschreiben (und dann steht
   im Report, worauf du dich festgelegt hast).
-- **Tweak-Extreme (CO5).** Jede Achse in `tweakAxes` wird an beiden Enden angefahren
-  (`slider` → `min`/`max`, `select` → jede Option). Ein Kontrast, der nur in der
-  Werkseinstellung hält, ist damit kein Bestehen mehr. Hat dein Skin keinen
-  farbwirksamen Tweak, lässt du `tweakAxes` weg — der Report zeigt dann
-  `tweakStops: ["default"]`, die Aussage bleibt also nachlesbar.
+- **Tweak-Extreme (CO5).** Jede Achse wird an beiden Enden angefahren (`slider` →
+  `min`/`max`, `select` → jede Option). Ein Kontrast, der nur in der Werkseinstellung
+  hält, ist kein Bestehen. Hat dein Skin gar keine Tweaks, zeigt der Report
+  `tweakStops: ["default"]` — die Aussage bleibt nachlesbar.
 - **`undeclared` ≠ `pass`.** Ohne `a11y`-Block steht im Report ausdrücklich
   `"status": "undeclared"` — unterscheidbar von einem Skin, der deklariert und besteht
   (Goldene Regel 3).
@@ -186,11 +203,28 @@ Der `a11y`-Block landet in `support.json`:
   "themes": ["dark", "light"], "tweakStops": ["default"],
   "combinations": 88,
   "worst": { "text": { "token": "--t-acc-amber", "ratio": 4.58, … } },
-  "violationCount": 0, "violations": [], "findings": []
+  "violationCount": 0,
+  "violationBreakdown": { "atDefault": 0, "atTweakExtreme": 0, "whenDimmed": 0 },
+  "violations": [], "findingCount": 0, "findings": [],
+  "unmeasuredGrounds": { "--t-line": "Zeilentrenner … kein Vordergrund" }
 }
 ```
 
-`worst` ist die knappste bestandene Paarung je Rolle — dein Abstand zur Schwelle.
+`worst` ist die knappste Messung je Rolle — bei `pass` dein Abstand zur Schwelle, bei
+`fail` derselbe Wert wie `violations[0]`, also der schlimmste Verstoss.
+
+`violationBreakdown` teilt die Verstösse disjunkt auf, weil eine Gesamtzahl irreführt:
+
+| Feld             | bedeutet                                                  |
+| ---------------- | --------------------------------------------------------- |
+| `atDefault`      | volle Deckkraft **und** Werkseinstellung — der harte Kern |
+| `atTweakExtreme` | volle Deckkraft, aber erst am Regler-Anschlag sichtbar    |
+| `whenDimmed`     | nur bei gedimmter Deckkraft (gesperrt/inert)              |
+
+WCAG 1.4.3 nimmt „inactive user interface components" ausdrücklich aus. Diese Fläche
+nimmt die Ausnahme **nicht** — sie misst konservativ. Sie benennt die Teilmenge aber,
+damit niemand sie als harten Verstoss verkauft. Wenn du eine Zahl zitierst, zitiere
+`atDefault`.
 
 Trage dein Skin ins CI-Gate ein und fahre es:
 

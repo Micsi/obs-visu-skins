@@ -12,7 +12,14 @@
 
 import { describe, expect, it } from "vitest";
 import type { SkinManifest } from "@obs/visu-contract";
-import { contrast, measureA11y, resolveColor, resolveNumber, THRESHOLDS } from "../a11y.js";
+import {
+  composite,
+  contrast,
+  measureA11y,
+  resolveColor,
+  resolveNumber,
+  THRESHOLDS,
+} from "../a11y.js";
 
 const SHEET = "./probe.css";
 
@@ -246,5 +253,248 @@ describe("Tweak-Extreme (CO5-Garantie)", () => {
     expect(r.tweakStops).toEqual(["default"]);
     // Trivial wahr, aber im Report ablesbar: `tweakStops` nennt genau einen Stopp.
     expect(r.checkedTweakExtremes).toBe(true);
+  });
+});
+
+describe("Deckkraft-Achse — sie darf nicht wegmutierbar sein", () => {
+  // Toter Winkel aus Runde 1: `composite()` konnte sein `alpha`-Argument ignorieren,
+  // und ALLE 41 Kontrollen blieben grün — obwohl diese Achse bei ionic 710 der 1050
+  // Verstösse erzeugt. Zwei Tests, die das jetzt unmöglich machen.
+
+  it("mischt mit der Deckkraft, die man ihr gibt — von Hand nachgerechnet", () => {
+    const white = { r: 255, g: 255, b: 255, a: 1 };
+    const black = { r: 0, g: 0, b: 0, a: 1 };
+    // Weiss zu 50 % über Schwarz = exakt die Hälfte jedes Kanals. Das ERGEBNIS ist
+    // deckend (a: 1), denn der Grund war es — gemischt wird ein Pixel, kein Layer.
+    expect(composite(white, black, 0.5)).toEqual({ r: 127.5, g: 127.5, b: 127.5, a: 1 });
+    expect(composite(white, black, 1)).toEqual({ r: 255, g: 255, b: 255, a: 1 });
+    // Deckkraft 0: der Grund bleibt unverändert stehen.
+    expect(composite(white, black, 0)).toEqual({ r: 0, g: 0, b: 0, a: 1 });
+  });
+
+  it("dieselbe Farbe besteht bei voller Deckkraft und fällt bei gedimmter", () => {
+    // Weiss auf Schwarz = 21:1. Dasselbe Weiss zu 30 % über Schwarz ergibt #4d4d4d
+    // und damit 2.8:1 — unter der Text-Schwelle. Wer die Deckkraft ignoriert, sieht
+    // hier zweimal 21:1 und dieser Test wird rot.
+    const css = '.p[data-theme="dark"]{--bg:#000000;--fg:#ffffff;}';
+    const decl = {
+      stylesheet: SHEET,
+      themes: { dark: '.p[data-theme="dark"]' },
+      grounds: [{ token: "--bg" }],
+      tokens: { "--bg": { role: "ground" }, "--fg": { role: "text" } },
+    };
+
+    const full = measure({ ...decl, alphas: [1] }, css);
+    expect(full.status).toBe("pass");
+    expect(full.worst.text?.ratio).toBe(21);
+
+    const dimmed = measure({ ...decl, alphas: [1, 0.3] }, css);
+    expect(dimmed.status).toBe("fail");
+    expect(dimmed.violationCount).toBe(1);
+    expect(dimmed.violations[0]!.alpha).toBe(0.3);
+    expect(dimmed.violations[0]!.ratio).toBeLessThan(4.5);
+    // Und die Aufteilung nennt die Teilmenge, statt sie in einer Gesamtzahl zu verstecken.
+    expect(dimmed.violationBreakdown).toEqual({
+      atDefault: 0,
+      atTweakExtreme: 0,
+      whenDimmed: 1,
+    });
+  });
+
+  it("führt die Deckkraft je Token vor der des Skins", () => {
+    const css = '.p[data-theme="dark"]{--bg:#000000;--fg:#ffffff;--dot:#ffffff;}';
+    const r = measure(
+      {
+        stylesheet: SHEET,
+        themes: { dark: '.p[data-theme="dark"]' },
+        grounds: [{ token: "--bg" }],
+        alphas: [1],
+        tokens: {
+          "--bg": { role: "ground" },
+          // Nur DIESER Token wird gedimmt — der Skin-Default bleibt 1.
+          "--fg": { role: "text", alphas: [0.3] },
+          "--dot": { role: "graphic" },
+        },
+      },
+      css,
+    );
+    expect(r.violationCount).toBe(1);
+    expect(r.violations[0]).toMatchObject({ token: "--fg", alpha: 0.3 });
+  });
+});
+
+describe("Vollständigkeit über das GANZE Blatt (Riegel 1)", () => {
+  // Zweiter toter Winkel aus Runde 1: der Scan sah nur `base` + Theme-Blöcke.
+  // Beides wird jetzt einzeln scharf gestellt.
+
+  const DECL = {
+    stylesheet: SHEET,
+    base: ":root",
+    themes: { dark: '.p[data-theme="dark"]' },
+    grounds: [{ token: "--bg" }],
+    tokens: { "--bg": { role: "ground" }, "--fg": { role: "text" } },
+  };
+  const CSS = ':root{--brand:#123456;}.p[data-theme="dark"]{--bg:#000000;--fg:#ffffff;}';
+
+  it("fängt eine unklassifizierte Farbe im BASE-Block", () => {
+    const r = measure(DECL, CSS);
+    expect(r.findings.map((f) => f.problem)).toContain("unclassified");
+    expect(r.findings.find((f) => f.problem === "unclassified")!.detail).toContain("--brand");
+  });
+
+  it("fängt eine unklassifizierte Farbe in einem GAR NICHT erklärten Block", () => {
+    // Genau ionics `.visu-root { --ion-color-primary-contrast: #ffffff }` — der Textton
+    // auf dem gefüllten Akzent-Button, den der frühere Scan nicht sehen konnte.
+    const css = `${CSS}.irgendwo{--versteckt:#ffffff;}`;
+    const r = measure(
+      { ...DECL, tokens: { ...DECL.tokens, "--brand": { role: "ground", reason: "x" } } },
+      css,
+    );
+    expect(r.findings.map((f) => f.problem)).toContain("unclassified");
+    expect(r.findings.find((f) => f.problem === "unclassified")!.detail).toContain("--versteckt");
+  });
+
+  it("löst einen Token auf, der NUR ausserhalb der erklärten Blöcke steht", () => {
+    // Klassifizieren allein reicht nicht: er muss auch messbar sein, sonst wäre
+    // "steht in keinem erklärten Block" die nächste Hintertür.
+    const css = `${CSS}.irgendwo{--ink:#8a8a8a;}`;
+    const r = measure(
+      {
+        ...DECL,
+        tokens: {
+          ...DECL.tokens,
+          "--brand": { role: "exempt", reason: "Markenfarbe, nirgends gezeichnet" },
+          "--ink": { role: "text", on: ["--bg"] },
+        },
+      },
+      css,
+    );
+    // #8a8a8a auf Schwarz = 6.2:1 → bestanden, ABER es wurde wirklich gemessen:
+    // zwei Paarungen (--fg und --ink, je gegen --bg), --brand ist exempt.
+    expect(r.findings).toEqual([]);
+    expect(r.combinations).toBe(2);
+    expect(r.status).toBe("pass");
+  });
+
+  it("hält einen var()-Alias auf eine Nicht-Farbe für keine Farbe", () => {
+    // Ein Wächter mit falschem Alarm wird ignoriert: `--x: var(--schriftstapel)`
+    // sieht aus wie eine Farbe und ist keine.
+    const css = `:root{--stack:ui-sans-serif,system-ui;--font:var(--stack);}.p[data-theme="dark"]{--bg:#000000;--fg:#ffffff;}`;
+    const r = measure(DECL, css);
+    expect(r.findings).toEqual([]);
+    expect(r.status).toBe("pass");
+  });
+});
+
+describe("Die anderen drei Auswege (Riegel 2 · 3 · 4)", () => {
+  it("Riegel 2 — `ground` deklarieren und aus `grounds` weglassen braucht eine Begründung", () => {
+    const css = '.p[data-theme="dark"]{--bg:#000000;--fg:#ffffff;--linie:#111111;}';
+    const decl = {
+      stylesheet: SHEET,
+      themes: { dark: '.p[data-theme="dark"]' },
+      grounds: [{ token: "--bg" }],
+      tokens: {
+        "--bg": { role: "ground" },
+        "--fg": { role: "text", on: ["--bg"] },
+        // Ohne Begründung: der stillste Ausweg — weder Vordergrund noch Grund.
+        "--linie": { role: "ground" },
+      },
+    };
+    const r = measure(decl, css);
+    expect(r.status).toBe("fail");
+    expect(r.findings.map((f) => f.problem)).toContain("ground-without-reason");
+
+    const ok = measure(
+      {
+        ...decl,
+        tokens: {
+          ...decl.tokens,
+          "--linie": { role: "ground", reason: "Trennlinie, kein Vordergrund" },
+        },
+      },
+      css,
+    );
+    expect(ok.status).toBe("pass");
+    // Und die Auslassung steht sichtbar im Artefakt, nicht nur im Manifest.
+    expect(ok.unmeasuredGrounds).toEqual({ "--linie": "Trennlinie, kein Vordergrund" });
+  });
+
+  it("Riegel 3 — ein Theme auszunehmen verlangt dieselbe Begründung wie ein Token", () => {
+    const css =
+      '.p[data-theme="dark"]{--bg:#000000;--fg:#ffffff;}.p[data-theme="light"]{--bg:#ffffff;--fg:#eeeeee;}';
+    const decl = {
+      stylesheet: SHEET,
+      themes: { dark: '.p[data-theme="dark"]', light: '.p[data-theme="light"]' },
+      grounds: [{ token: "--bg" }],
+      tokens: { "--bg": { role: "ground" }, "--fg": { role: "text", on: ["--bg"] } },
+    };
+    // Ohne Ausnahme fällt `light` (Fast-Weiss auf Weiss).
+    expect(measure(decl, css).status).toBe("fail");
+
+    // Leere Begründung: das ganze Theme wäre lautlos verschwunden.
+    const sneaky = measure({ ...decl, exemptThemes: { light: "" } }, css);
+    expect(sneaky.status).toBe("fail");
+    expect(sneaky.findings.map((f) => f.problem)).toContain("exempt-without-reason");
+
+    // Mit Begründung ist es eine Aussage — und sie steht im Report.
+    const stated = measure(
+      { ...decl, exemptThemes: { light: "nur ein Entwurf, nicht ausgeliefert" } },
+      css,
+    );
+    expect(stated.status).toBe("pass");
+    expect(stated.themes).toEqual(["dark"]);
+    expect(stated.exemptThemes).toEqual({ light: "nur ein Entwurf, nicht ausgeliefert" });
+  });
+
+  it("Riegel 4 — ein nicht eingeordneter Tweak nimmt `checkedTweakExtremes` weg", () => {
+    const css = '.p[data-theme="dark"]{--bg:#000000;--fg:#ffffff;}';
+    const decl = {
+      stylesheet: SHEET,
+      themes: { dark: '.p[data-theme="dark"]' },
+      grounds: [{ token: "--bg" }],
+      tokens: { "--bg": { role: "ground" }, "--fg": { role: "text", on: ["--bg"] } },
+    };
+    const tweaks = { stil: { type: "select", options: ["a", "b"], default: "a" } };
+
+    // Nicht eingeordnet: Befund UND die positive Behauptung fällt weg.
+    const silent = measure(decl, css, tweaks);
+    expect(silent.checkedTweakExtremes).toBe(false);
+    expect(silent.findings.map((f) => f.problem)).toContain("undeclared-tweak");
+
+    // Als farbneutral erklärt: die Aussage trägt wieder.
+    const neutral = measure(
+      { ...decl, neutralTweaks: { stil: "schaltet nur die Ecken um" } },
+      css,
+      tweaks,
+    );
+    expect(neutral.checkedTweakExtremes).toBe(true);
+    expect(neutral.status).toBe("pass");
+
+    // Als farbwirksam-aber-nicht-erfassbar erklärt: kein Befund, aber die
+    // Behauptung bleibt unten — genau das ist der Unterschied zu Runde 1.
+    const owned = measure(
+      { ...decl, unmeasuredTweaks: { stil: "attributgeschaltet, keine Variable" } },
+      css,
+      tweaks,
+    );
+    expect(owned.findings).toEqual([]);
+    expect(owned.checkedTweakExtremes).toBe(false);
+    expect(owned.unmeasuredTweaks).toEqual({ stil: "attributgeschaltet, keine Variable" });
+  });
+
+  it("Riegel 4 — eine Einordnung ohne Begründung ist ebenfalls ein Vergessen", () => {
+    const css = '.p[data-theme="dark"]{--bg:#000000;--fg:#ffffff;}';
+    const r = measure(
+      {
+        stylesheet: SHEET,
+        themes: { dark: '.p[data-theme="dark"]' },
+        grounds: [{ token: "--bg" }],
+        tokens: { "--bg": { role: "ground" }, "--fg": { role: "text", on: ["--bg"] } },
+        neutralTweaks: { stil: "" },
+      },
+      css,
+      { stil: { type: "select", options: ["a", "b"], default: "a" } },
+    );
+    expect(r.findings.map((f) => f.problem)).toContain("exempt-without-reason");
   });
 });

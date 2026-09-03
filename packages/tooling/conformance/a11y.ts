@@ -38,9 +38,25 @@
 //
 // ══ Was den Skin daran hindert, sich grün zu deklarieren
 //
-// Die Vollständigkeitsprüfung: JEDE Farb-Deklaration in einem erklärten Block muss
-// in `tokens` stehen. Eine unbequeme Farbe lässt sich also nicht durch Weglassen
-// aus der Messung nehmen — das Weglassen selbst ist der Befund (`unclassified`).
+// Jeder Weg AUS der Messung heraus muss eine begründete Aussage sein, nie ein
+// Weglassen (Goldene Regel 3). Vier Riegel, jeder für einen Ausweg, den ein
+// früherer Entwurf offen liess:
+//
+//  1. **Farbe weglassen.** JEDE Farb-Deklaration in JEDEM Block der deklarierten
+//     Stylesheets muss in `tokens` stehen — nicht nur in `base` und den
+//     Theme-Blöcken. Ein Skin, der seine unbequeme Farbe in einen dritten Block
+//     schreibt (ionic tut das mit den `--ion-*`-Brückenvariablen), fiele sonst
+//     lautlos aus der Prüfung.
+//  2. **Grund weglassen.** Ein Token als `ground` zu deklarieren und dann NICHT in
+//     `grounds` zu führen nahm es spurlos aus der Messung. Das braucht jetzt eine
+//     Begründung und steht als `unmeasuredGrounds` im Report.
+//  3. **Theme weglassen.** `exemptThemes` verlangt eine nicht-leere Begründung,
+//     genau wie `exempt` bei einem Token.
+//  4. **Tweak weglassen.** Jeder Tweak aus `manifest.tweaks` muss eingeordnet sein:
+//     messbare Achse, farbneutral (mit Grund) oder farbwirksam-aber-nicht-erfassbar
+//     (mit Grund, und dann ist `checkedTweakExtremes` FALSE). Ohne diesen Abgleich
+//     behauptete der Report, die Extreme geprüft zu haben, während ein unbenannter
+//     Tweak die Farbe verschiebt — eine ungedeckte positive Aussage.
 
 import {
   schema as contractSchema,
@@ -114,6 +130,23 @@ export function tokensFor(sources: readonly string[], selector: string): Map<str
     for (const rule of parseRules(css)) {
       if (!rule.selectors.includes(selector)) continue;
       for (const [name, value] of declarations(rule.body)) out.set(name, value);
+    }
+  }
+  return out;
+}
+
+/**
+ * JEDE Custom-Property-Deklaration ALLER Blöcke, mit dem Selektor, in dem sie steht.
+ * Grundlage von Riegel 1: die Vollständigkeit wird über das ganze Blatt geprüft, nicht
+ * nur über die erklärten Blöcke — sonst wäre ein dritter Block das Versteck.
+ */
+export function allDeclarations(sources: readonly string[]): [string, string, string][] {
+  const out: [string, string, string][] = [];
+  for (const css of sources) {
+    for (const rule of parseRules(css)) {
+      for (const [name, value] of declarations(rule.body)) {
+        out.push([rule.selectors.join(", "), name, value]);
+      }
     }
   }
   return out;
@@ -343,7 +376,9 @@ const UNDECLARED: SupportA11y = {
   combinations: 0,
   worst: {},
   violationCount: 0,
+  violationBreakdown: { atDefault: 0, atTweakExtreme: 0, whenDimmed: 0 },
   violations: [],
+  findingCount: 1,
   findings: [
     {
       problem: "undeclared",
@@ -379,6 +414,24 @@ export function measureA11y(input: A11yInput): SupportA11y {
   const exemptThemes = decl.exemptThemes ?? {};
   const measuredThemes = Object.entries(decl.themes).filter(([name]) => !(name in exemptThemes));
 
+  // Riegel 3: ein ganzes Theme auszunehmen ist die grösste Auslassung überhaupt —
+  // sie braucht dieselbe Begründungspflicht wie ein einzelner Token. Ohne diese
+  // Prüfung hätte `exemptThemes: { light: "" }` den halben Farbraum stillgelegt.
+  for (const [theme, reason] of Object.entries(exemptThemes)) {
+    if (!reason || reason.trim().length === 0) {
+      findings.push({
+        problem: "exempt-without-reason",
+        detail: `Theme ${theme} ist ausgenommen, ohne Begründung — das ist ein Vergessen, keine Aussage`,
+      });
+    }
+    if (!(theme in decl.themes)) {
+      findings.push({
+        problem: "selector-missing",
+        detail: `exemptThemes nennt ${theme}, das in themes gar nicht steht`,
+      });
+    }
+  }
+
   for (const selector of [
     ...(decl.base ? [decl.base] : []),
     ...measuredThemes.map(([, sel]) => sel),
@@ -404,6 +457,22 @@ export function measureA11y(input: A11yInput): SupportA11y {
   }
 
   const groundNames = new Set(decl.grounds.map((g) => g.token));
+
+  // Riegel 2: `role: "ground"` heisst "wird nicht als Vordergrund gemessen". Steht der
+  // Token dann auch in keinem `grounds`-Eintrag, ist er ÜBERHAUPT nicht gemessen — der
+  // stillste aller Auswege. Er ist erlaubt (eine Trennlinie ist wirklich kein
+  // Vordergrund), aber nur als begründete Aussage, und er steht im Report.
+  const unmeasuredGrounds: Record<string, string> = {};
+  for (const [token, entry] of Object.entries(decl.tokens)) {
+    if (entry.role !== "ground" || groundNames.has(token)) continue;
+    if (!entry.reason || entry.reason.trim().length === 0) {
+      findings.push({
+        problem: "ground-without-reason",
+        detail: `${token} ist ground, steht aber in keinem grounds-Eintrag — damit ist er ungemessen. Das braucht eine Begründung.`,
+      });
+    } else unmeasuredGrounds[token] = entry.reason;
+  }
+
   for (const [token, entry] of Object.entries(decl.tokens)) {
     for (const on of entry.on ?? []) {
       if (!groundNames.has(on)) {
@@ -452,13 +521,69 @@ export function measureA11y(input: A11yInput): SupportA11y {
       });
     }
   }
-  // "Extreme geprüft" heisst: JEDE deklarierte Achse hat mindestens einen Stopp
-  // erzeugt. Ein Skin ohne farbwirksame Tweaks (terminal) hat nichts anzufahren —
-  // dort ist die Aussage trivial wahr, und der Report zeigt `tweakStops: [default]`.
-  const checkedTweakExtremes = axes.length === 0 || stops.length > 1;
+  // Riegel 4: JEDER Tweak des Manifests muss eingeordnet sein. Ohne diesen Abgleich
+  // stand `checkedTweakExtremes: true` im Report, während ein unbenannter Tweak die
+  // Farbe verschob — eine ungedeckte positive Aussage, und damit genau der Fehler,
+  // den diese Fläche sonst überall verbietet.
+  const neutralTweaks = decl.neutralTweaks ?? {};
+  const unmeasuredTweaks = decl.unmeasuredTweaks ?? {};
+  const named = new Set([
+    ...axes.map((a) => a.tweak),
+    ...Object.keys(neutralTweaks),
+    ...Object.keys(unmeasuredTweaks),
+  ]);
+  let unclassifiedTweak = false;
+  for (const name of Object.keys(tweaks)) {
+    if (named.has(name)) continue;
+    unclassifiedTweak = true;
+    findings.push({
+      problem: "undeclared-tweak",
+      detail: `Tweak ${name} ist in a11y weder als Achse noch als neutralTweaks noch als unmeasuredTweaks eingeordnet — die Extreme sind damit NICHT vollständig geprüft`,
+    });
+  }
+  for (const [group, entries] of [
+    ["neutralTweaks", neutralTweaks],
+    ["unmeasuredTweaks", unmeasuredTweaks],
+  ] as const) {
+    for (const [name, reason] of Object.entries(entries)) {
+      if (!(name in tweaks)) {
+        findings.push({
+          problem: "unknown-tweak",
+          detail: `${group} nennt ${name}, den manifest.tweaks nicht kennt`,
+        });
+      }
+      if (!reason || reason.trim().length === 0) {
+        findings.push({
+          problem: "exempt-without-reason",
+          detail: `${group}.${name} ohne Begründung — eine Auslassung muss eine Aussage sein`,
+        });
+      }
+    }
+  }
+
+  // "Extreme geprüft" heisst dreierlei: jede deklarierte Achse hat einen Stopp
+  // erzeugt, KEIN Tweak ist unklassifiziert geblieben, und keiner ist als
+  // farbwirksam-aber-nicht-erfassbar eingeräumt. Ein Skin ohne Tweaks (terminal)
+  // hat nichts anzufahren — dort ist die Aussage trivial wahr, und der Report zeigt
+  // `tweakStops: ["default"]`, die Aussage bleibt also nachlesbar.
+  const checkedTweakExtremes =
+    (axes.length === 0 || stops.length > 1) &&
+    !unclassifiedTweak &&
+    Object.keys(unmeasuredTweaks).length === 0;
 
   const measurements: A11yMeasurement[] = [];
   const violations: A11yMeasurement[] = [];
+  /**
+   * Der Kaskaden-Boden: JEDE Deklaration aller Blätter, in Quelltextreihenfolge.
+   * Er liegt UNTER `base` und dem Theme, die ihn überschreiben. Ohne ihn wäre ein
+   * Token, der ausserhalb der erklärten Blöcke definiert ist, zwar klassifizierbar,
+   * aber nicht auflösbar — und ionics `--ion-color-primary-contrast` (Weiss auf dem
+   * gefüllten Akzent-Button) fiele erneut aus der Messung, diesmal durch die
+   * Hintertür "steht in keinem erklärten Block".
+   */
+  const envAll = new Map<string, string>();
+  for (const [, name, value] of allDeclarations(sources)) envAll.set(name, value);
+
   const base =
     sources.length > 0 && decl.base ? tokensFor(sources, decl.base) : new Map<string, string>();
   const alphas = decl.alphas && decl.alphas.length > 0 ? decl.alphas : [1];
@@ -468,7 +593,7 @@ export function measureA11y(input: A11yInput): SupportA11y {
     const themeTokens = tokensFor(sources, selector);
 
     for (const stop of stops) {
-      const env = new Map<string, string>([...base, ...themeTokens, ...stop.overrides]);
+      const env = new Map<string, string>([...envAll, ...base, ...themeTokens, ...stop.overrides]);
 
       // 1) Gründe auflösen und die Kette zusammenmischen.
       const ground = new Map<string, Rgba>();
@@ -546,27 +671,34 @@ export function measureA11y(input: A11yInput): SupportA11y {
     }
   }
 
-  // 3) Vollständigkeit: jede Farb-Deklaration eines erklärten Blocks MUSS eine
-  //    Rolle tragen. Das ist der Riegel gegen "unbequeme Farbe einfach weglassen".
+  // 3) Riegel 1 — Vollständigkeit über das GANZE Blatt, nicht nur über die
+  //    erklärten Blöcke. Ein Skin, der seine unbequeme Farbe in einen dritten Block
+  //    schreibt, fiele sonst lautlos aus der Prüfung; ionics `--ion-*`-Brücke unter
+  //    `.visu-root` ist genau so ein Block, und er trägt echte Textfarben.
+  //    Ein Token, das hier nur eine ROLLE braucht (keine Messung), kann `exempt`
+  //    mit Begründung sein — die Auslassung bleibt lesbar.
   if (sources.length > 0) {
-    const scanned = [
-      ...(decl.base ? [decl.base] : []),
-      ...measuredThemes.map(([, selector]) => selector),
-    ];
-    for (const selector of scanned) {
-      for (const [name, value] of tokensFor(sources, selector)) {
-        if (name in decl.tokens) continue;
-        if (COLOR_SHAPED.test(value)) {
-          findings.push({
-            problem: "unclassified",
-            detail: `${selector}: ${name} = "${value}" ist eine Farbe ohne Rolle in a11y.tokens`,
-          });
-        } else if (COLOR_BEARING.test(value)) {
-          findings.push({
-            problem: "unclassified",
-            detail: `${selector}: ${name} = "${value}" trägt Farbe, ist aber keine flache Farbe — als exempt mit Begründung führen`,
-          });
-        }
+    // Ein `var()`-Alias ist nur dann eine Farbe, wenn er AUF eine Farbe zeigt.
+    // `--ion-font-family: var(--vz-font)` sieht sonst wie eine aus, und ein
+    // Wächter mit falschem Alarm wird ignoriert — dieselbe Regel wie bei `alphas`.
+    const isColor = (value: string): boolean =>
+      /^var\(/i.test(value) ? resolveColor(value, envAll) !== null : COLOR_SHAPED.test(value);
+
+    const seen = new Set<string>();
+    for (const [selector, name, value] of allDeclarations(sources)) {
+      if (name in decl.tokens || seen.has(name)) continue;
+      if (isColor(value)) {
+        seen.add(name);
+        findings.push({
+          problem: "unclassified",
+          detail: `${selector}: ${name} = "${value}" ist eine Farbe ohne Rolle in a11y.tokens`,
+        });
+      } else if (COLOR_BEARING.test(value)) {
+        seen.add(name);
+        findings.push({
+          problem: "unclassified",
+          detail: `${selector}: ${name} = "${value}" trägt Farbe, ist aber keine flache Farbe — als exempt mit Begründung führen`,
+        });
       }
     }
   }
@@ -586,6 +718,7 @@ export function measureA11y(input: A11yInput): SupportA11y {
   }
   const ok = violations.length === 0 && findings.length === 0 && measurements.length > 0;
 
+  const deduped = dedupe(findings);
   return {
     status: ok ? "pass" : "fail",
     aa: ok,
@@ -597,9 +730,17 @@ export function measureA11y(input: A11yInput): SupportA11y {
     combinations: measurements.length,
     worst,
     violationCount: violations.length,
+    violationBreakdown: {
+      atDefault: violations.filter((v) => v.alpha === 1 && v.tweaks === "default").length,
+      atTweakExtreme: violations.filter((v) => v.alpha === 1 && v.tweaks !== "default").length,
+      whenDimmed: violations.filter((v) => v.alpha < 1).length,
+    },
     violations: violations.sort((a, b) => a.ratio - b.ratio).slice(0, 40),
     ...(Object.keys(exemptTokens).length > 0 ? { exempt: exemptTokens } : {}),
-    findings: dedupe(findings),
+    ...(Object.keys(unmeasuredGrounds).length > 0 ? { unmeasuredGrounds } : {}),
+    ...(Object.keys(unmeasuredTweaks).length > 0 ? { unmeasuredTweaks } : {}),
+    findingCount: deduped.length,
+    findings: deduped.slice(0, 40),
   };
 }
 

@@ -405,6 +405,127 @@
       "--vz-bg-image": {
         "role": "exempt",
         "reason": "Foto-URL. Nur im Theme image aktiv, das als Ganzes ausgenommen ist."
+      },
+      "--ion-background-color": {
+        "role": "exempt",
+        "reason": "Brücken-Variable für Ionic-Komponenten: reicht --vz-bg unverändert durch. Gemessen wird der Quell-Token, nicht die Kopie."
+      },
+      "--ion-text-color": {
+        "role": "exempt",
+        "reason": "Brücken-Variable für Ionic-Komponenten: reicht --vz-fg unverändert durch. Gemessen wird der Quell-Token, nicht die Kopie."
+      },
+      "--ion-color-step-150": {
+        "role": "exempt",
+        "reason": "Brücken-Variable für Ionic-Komponenten: reicht --vz-fg-soft unverändert durch. Gemessen wird der Quell-Token, nicht die Kopie."
+      },
+      "--ion-toolbar-color": {
+        "role": "exempt",
+        "reason": "Brücken-Variable für Ionic-Komponenten: reicht --vz-fg unverändert durch. Gemessen wird der Quell-Token, nicht die Kopie."
+      },
+      "--ion-color-primary": {
+        "role": "exempt",
+        "reason": "Brücken-Variable für Ionic-Komponenten: reicht --vz-accent unverändert durch. Gemessen wird der Quell-Token, nicht die Kopie."
+      },
+      "--ion-color-success": {
+        "role": "exempt",
+        "reason": "Brücken-Variable für Ionic-Komponenten: reicht --vz-on unverändert durch. Gemessen wird der Quell-Token, nicht die Kopie."
+      },
+      "--ion-color-warning": {
+        "role": "exempt",
+        "reason": "Brücken-Variable für Ionic-Komponenten: reicht --vz-warn unverändert durch. Gemessen wird der Quell-Token, nicht die Kopie."
+      },
+      "--ion-color-danger": {
+        "role": "exempt",
+        "reason": "Brücken-Variable für Ionic-Komponenten: reicht --vz-bad unverändert durch. Gemessen wird der Quell-Token, nicht die Kopie."
+      },
+      "--track-background-checked": {
+        "role": "exempt",
+        "reason": "Brücken-Variable für Ionic-Komponenten: reicht --vz-accent unverändert durch. Gemessen wird der Quell-Token, nicht die Kopie."
+      },
+      "--bar-background": {
+        "role": "exempt",
+        "reason": "Brücken-Variable für Ionic-Komponenten: reicht --vz-divider unverändert durch. Gemessen wird der Quell-Token, nicht die Kopie."
+      },
+      "--bar-background-active": {
+        "role": "exempt",
+        "reason": "Brücken-Variable für Ionic-Komponenten: reicht --vz-accent unverändert durch. Gemessen wird der Quell-Token, nicht die Kopie."
+      },
+      "--knob-background": {
+        "role": "exempt",
+        "reason": "Brücken-Variable für Ionic-Komponenten: reicht --vz-accent unverändert durch. Gemessen wird der Quell-Token, nicht die Kopie."
+      },
+      "--background": {
+        "role": "exempt",
+        "reason": "Brücken-Variable für Ionic-Komponenten: reicht --vz-tile-bg-strong unverändert durch. Gemessen wird der Quell-Token, nicht die Kopie."
+      },
+      "--acc": {
+        "role": "exempt",
+        "reason": "Brücken-Variable für Ionic-Komponenten: reicht --vz-accent (vom Host je Gerät gesetzt) unverändert durch. Gemessen wird der Quell-Token, nicht die Kopie."
+      },
+      "--ion-toolbar-background": {
+        "role": "exempt",
+        "reason": "transparent — kein eigenes Pixel; gemessen wird der Grund darunter (--vz-bg)"
+      },
+      "--ion-item-background": {
+        "role": "exempt",
+        "reason": "transparent — kein eigenes Pixel; gemessen wird der Grund darunter"
+      },
+      "--ion-color-primary-shade": {
+        "role": "exempt",
+        "reason": "color-mix() — dieses Rechenwerk löst keine Mischfarben auf. Nur Hover-/Aktiv-Tönung des Akzents, nie Text."
+      },
+      "--ion-color-primary-tint": {
+        "role": "exempt",
+        "reason": "color-mix() — dieses Rechenwerk löst keine Mischfarben auf. Nur Hover-/Aktiv-Tönung des Akzents, nie Text."
+      },
+      "--track-background": {
+        "role": "exempt",
+        "reason": "color-mix() gegen transparent — die unbefüllte Toggle-Spur. Ihre Aussage ist die Grenze zur befüllten Spur, nicht zum Grund; dieselbe Lage wie terminals --t-bar-track, und hier zusätzlich unrechenbar."
+      },
+      "--ion-color-primary-contrast": {
+        "role": "text",
+        "on": [
+          "--vz-acc-orange",
+          "--vz-acc-teal",
+          "--vz-acc-violet",
+          "--vz-acc-green",
+          "--vz-acc-blue",
+          "--vz-acc-rose",
+          "--vz-acc-amber",
+          "--vz-acc-slate",
+          "--vz-accent"
+        ],
+        "reason": "Text AUF dem akzentgefüllten Ionic-Button. Der Skin hat dasselbe Problem für sein EIGENES Markup mit --ink-* gelöst (Kommentar in ionic.css); der Komponentenpfad blieb auf Weiss."
+      },
+      "--handle-background": {
+        "role": "graphic",
+        "on": [
+          "--vz-acc-orange",
+          "--vz-acc-teal",
+          "--vz-acc-violet",
+          "--vz-acc-green",
+          "--vz-acc-blue",
+          "--vz-acc-rose",
+          "--vz-acc-amber",
+          "--vz-acc-slate",
+          "--vz-accent"
+        ],
+        "reason": "Der Toggle-Knopf. Gemessen gegen die befüllte (akzentfarbene) Spur — der Zustand EIN. Gegen die unbefüllte Spur ist er nicht messbar, weil die eine color-mix() ist."
+      },
+      "--handle-background-checked": {
+        "role": "graphic",
+        "on": [
+          "--vz-acc-orange",
+          "--vz-acc-teal",
+          "--vz-acc-violet",
+          "--vz-acc-green",
+          "--vz-acc-blue",
+          "--vz-acc-rose",
+          "--vz-acc-amber",
+          "--vz-acc-slate",
+          "--vz-accent"
+        ],
+        "reason": "wie --handle-background, im Zustand EIN"
       }
     },
     "tweakAxes": [
@@ -412,7 +533,17 @@
         "tweak": "tileAlpha",
         "cssVar": "--vz-tile-alpha"
       }
-    ]
+    ],
+    "neutralTweaks": {
+      "glassBlur": "Weichzeichner der Glas-Fläche (--vz-blur). Verändert die Schärfe des Hintergrunds, nicht den Wert eines Farb-Tokens.",
+      "cellScale": "Kachelgrösse (--vz-cell). Reine Geometrie.",
+      "edge": "Eckenradius (--vz-radius). Reine Geometrie."
+    },
+    "unmeasuredTweaks": {
+      "stil": "Schaltet über data-stil ein ANDERES Regelwerk frei (glass/ios/md), das den Kachelgrund per color-mix() aus dem Akzent aufhellt. Das ist Farbwirkung, aber keine CSS-Variable — diese Fläche modelliert nur Variablen-Achsen, also ist es NICHT geprüft und sagt das hier.",
+      "accentStyle": "bar/glow/ring zeichnet den Akzent anders (Fläche, Schein, Ring). Ebenfalls attributgeschaltet statt variablengetrieben, also ungeprüft.",
+      "glow": "Skaliert die Deckkraft einer dekorativen Schein-Schicht HINTER der Kachel (opacity: calc(var(--vz-glow) * …)). Sie verschiebt den effektiven Grund, geht aber in keine Token-Auflösung ein."
+    }
   },
   "themes": ["light", "dark", "image"]
 }
