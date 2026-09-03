@@ -235,6 +235,58 @@ describe("edomi page links — the host resolves, the skin only draws", () => {
     expect(item?.props?.["data-link"]).toBe("keller");
   });
 
+  it("leaves exactly ONE focus stop per linked item — the covered tile is inert", () => {
+    // The BLOCKER a reviewer found: the overlay covers the tile for the pointer
+    // (z-index), but a WRITABLE ionic tile keeps `role="button" tabindex="0"
+    // aria-pressed`. Without `inert` that is a second focus stop announcing an
+    // operable switch the mouse can never reach (WCAG 4.1.2) — the very double
+    // affordance the host steps back from at the cell level.
+    const host = linkedHost({
+      renderTile: (deviceId: string) =>
+        h("div", { class: "host-tile", "data-id": deviceId, role: "button", tabindex: 0 }),
+    });
+    const item = findAll(page(host), "edomi-item")[0];
+
+    const body = findAll(item, "edomi-item-body")[0];
+    expect(body, "the covered tile must be wrapped").toBeDefined();
+    expect(body?.props?.inert).toBe(true);
+    // The tile is INSIDE that wrapper, so `inert` actually covers it.
+    expect(findAll(body, "host-tile")).toHaveLength(1);
+    // …and the affordance itself is NOT inert.
+    expect(findAll(item, "edomi-link")[0]?.props?.inert).toBeUndefined();
+  });
+
+  it("does not wrap — and so does not inert — an item without a link", () => {
+    const item = findAll(page(stubHost()), "edomi-item")[0];
+    expect(findAll(item, "edomi-item-body")).toHaveLength(0);
+    expect(findAll(item, "host-tile")).toHaveLength(1);
+  });
+
+  it("an unknown target leaves the tile fully operable (no overlay => no inert)", () => {
+    const host = linkedHost({
+      resolveLink: vi.fn(() => ({ kind: "unknown" as const, targetNodeId: "keller" })),
+    });
+    const item = findAll(page(host), "edomi-item")[0];
+    expect(findAll(item, "edomi-item-body")).toHaveLength(0);
+  });
+
+  it("the accessible name carries the GATE state, straight from the host", () => {
+    // A cursor cannot say "this asks for a PIN first" on touch or to a screen
+    // reader. The host owns the state, so the host words it — the skin only
+    // hands back the outcome it already holds.
+    const host = linkedHost({
+      resolveLink: vi.fn(() => ({ kind: "gate" as const, pageId: "technik", accessNodeId: "keller" })),
+      linkLabel: vi.fn((_l, outcome) => (outcome?.kind === "gate" ? "PIN nötig" : "frei")),
+    });
+    const overlay = findAll(page(host), "edomi-link")[0];
+
+    expect(overlay?.props?.["aria-label"]).toBe("PIN nötig");
+    expect(host.linkLabel).toHaveBeenCalledWith(
+      { targetNodeId: "keller", activeIndicator: "dot" },
+      { kind: "gate", pageId: "technik", accessNodeId: "keller" },
+    );
+  });
+
   it("an item without a link is completely untouched (additive)", () => {
     const item = findAll(page(stubHost()), "edomi-item")[0];
     expect(item?.props?.["data-link"]).toBeUndefined();
@@ -243,12 +295,17 @@ describe("edomi page links — the host resolves, the skin only draws", () => {
   });
 
   /**
-   * The structural half of golden rule 4, checked at the source rather than
-   * asserted in prose: the link code path may call host services and nothing
-   * else. If someone later re-adds a tree descent or an access check to the
-   * skin, this goes red.
+   * A TRIPWIRE, not "the proof". It reads one WINDOW of the file (the link code
+   * path) and would NOT catch a tree descent placed above `linkOverlay` and
+   * passed in — a reviewer demonstrated exactly that. It is kept because it
+   * catches the likely regression (someone reaching for the tree right where the
+   * link is drawn) cheaply.
+   *
+   * The load-bearing proof is behavioural and lives above: every link spec drives
+   * a stub host whose `navTree` is EMPTY, so a skin that resolved anything itself
+   * could not produce the right affordance at all.
    */
-  it("the link code path contains no tree- or access-logic of its own", async () => {
+  it("tripwire: the link code path holds no tree- or access-logic of its own", async () => {
     const url = new URL("../src/page.ts", import.meta.url);
     const src = await readFile(url, "utf8");
     const start = src.indexOf("function linkOverlay");

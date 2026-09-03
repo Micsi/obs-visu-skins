@@ -40,15 +40,16 @@ import {
   version as contractVersion,
   type CoreWidgetType,
   type Renderer,
+  type PageRenderer,
   type SkinManifest,
   type SupportReport,
   type SupportWidgetEntry,
 } from "@obs/visu-contract";
-import { ctxStub, tokensStub } from "./stubs.js";
+import { ctxStub, pageHostProbe, tokensStub } from "./stubs.js";
 
 // Die Fixture-Wand nutzt denselben Ctx-/Tokens-Stub wie dieser Lauf — Wand und
 // support.json sollen dieselbe Prüfung zeigen, nicht zwei Nachbildungen.
-export { ctxStub, tokensStub } from "./stubs.js";
+export { ctxStub, tokensStub, pageHostProbe } from "./stubs.js";
 
 /**
  * Die stabilen Kern-Typen — **aus dem Vertragsschema abgeleitet**, nicht getippt:
@@ -80,12 +81,128 @@ export interface SkinInput {
   readonly tiles: RendererMap;
   readonly details?: RendererMap;
   readonly presets?: RendererMap;
+  /** Der optionale Ganzseiten-Renderer (Vertrag 1.10) - gebraucht, um die
+   *  `honors`-Achse zu MESSEN statt zu glauben. */
+  readonly page?: PageRenderer;
+}
+
+/**
+ * Ein Befund auf der `honors`-Achse - der Deklarations-Slot des Layouts.
+ *
+ * `layout.honors` wird verbatim nach support.json durchgereicht und der HOST
+ * richtet sein Verhalten danach (bei `'link'` tritt er mit seiner eigenen
+ * Sprung-Affordanz zurück). Ein Slot, auf den sich Verhalten stützt, muss
+ * geprüft sein, sonst ist er wieder nur eine Behauptung:
+ *
+ *  - `unknown`      - der String steht nicht im Vertrags-Vokabular
+ *                     (`contract.schema.json -> layoutHonors`). Ein Tippfehler
+ *                     wäre sonst eine stumme Nicht-Deklaration.
+ *  - `undelivered`  - der Skin deklariert `'link'`, sein Page-Renderer fragt den
+ *                     Host beim Probelauf aber nach KEINEM Link-Dienst. Dann
+ *                     zeichnet er den Sprung nicht - und weil der Host wegen der
+ *                     Deklaration zurückgetreten ist, gäbe es gar keine
+ *                     Affordanz mehr.
+ *  - `unrenderable` - `'link'` ohne jeden Page-Renderer: nichts kann den Sprung
+ *                     zeichnen, denn nur der Page-Renderer sieht `LayerItem`.
+ */
+export interface HonorsFinding {
+  readonly token: string;
+  readonly problem: "unknown" | "undelivered" | "unrenderable";
+  readonly detail: string;
 }
 
 /** Ergebnis des Generators: der Report plus ein hartes Fehler-Flag (gap ODER broken). */
 export interface ConformanceResult {
   readonly report: SupportReport;
   readonly hasGap: boolean;
+  /** Befunde der `honors`-Achse; nicht leer => harter Fehler wie `gap`. */
+  readonly honors: readonly HonorsFinding[];
+}
+
+/** Das anerkannte `honors`-Vokabular - AUS dem Vertrag, nie aus einer Kopie hier. */
+export const LAYOUT_HONORS: readonly string[] = Object.freeze([
+  ...(((contractSchema as { layoutHonors?: readonly string[] }).layoutHonors ?? []) as string[]),
+]);
+
+/**
+ * Misst die `honors`-Achse. Kein I/O; der Page-Renderer wird einmal über einen
+ * neutralen, protokollierenden {@link pageHostProbe} gefahren. Wirft er, ist das
+ * derselbe Befund wie "fragt nichts an" - er liefert keine Affordanz.
+ */
+export function checkHonors(skin: SkinInput): HonorsFinding[] {
+  const declared = skin.manifest.layout.honors ?? [];
+  const findings: HonorsFinding[] = [];
+
+  for (const token of declared) {
+    if (LAYOUT_HONORS.length > 0 && !LAYOUT_HONORS.includes(token)) {
+      findings.push({
+        token,
+        problem: "unknown",
+        detail: `nicht im Vertrags-Vokabular (${LAYOUT_HONORS.join(" · ")})`,
+      });
+    }
+  }
+
+  if (declared.includes("link")) {
+    if (!skin.page) {
+      findings.push({
+        token: "link",
+        problem: "unrenderable",
+        detail: "kein Page-Renderer - nur er sieht LayerItem.link",
+      });
+    } else {
+      const probe = pageHostProbe();
+      let tree: unknown = null;
+      try {
+        tree = skin.page(probe.host);
+      } catch {
+        /* wie "zeichnet nichts": es entsteht keine Affordanz */
+      }
+      // NICHT "hat den Host gefragt" — das wäre zu schwach: ein Skin, der
+      // `isLinkActive` fürs Markup aufruft und den Sprung dann NICHT zeichnet,
+      // käme damit durch (in einer Gegenprobe genau so passiert). Gemessen wird
+      // die Affordanz selbst: es muss etwas Aktivierbares geben, das den Link
+      // wirklich FOLGT. Also jeden Klick-Handler des gerenderten Baums auslösen
+      // und `followLink` verlangen.
+      for (const fire of clickHandlers(tree)) {
+        try {
+          fire();
+        } catch {
+          /* ein werfender Handler liefert keine Affordanz - zählt als nichts */
+        }
+      }
+      if (!probe.linkCalls.includes("followLink")) {
+        findings.push({
+          token: "link",
+          problem: "undelivered",
+          detail:
+            "der Page-Renderer zeichnet keine aktivierbare Sprung-Affordanz (kein Klick-Handler ruft host.followLink)",
+        });
+      }
+    }
+  }
+
+  return findings;
+}
+
+/**
+ * Alle Klick-Handler eines gerenderten Baums (Vue-VNode-artig: `props` +
+ * `children`). Tiefenbegrenzt und zyklensicher genug für einen headless Probelauf.
+ */
+function clickHandlers(node: unknown, out: (() => void)[] = [], depth = 0): (() => void)[] {
+  if (depth > 64 || node === null || node === undefined || typeof node !== "object") return out;
+  if (Array.isArray(node)) {
+    for (const child of node) clickHandlers(child, out, depth + 1);
+    return out;
+  }
+  const vnode = node as { props?: Record<string, unknown> | null; children?: unknown };
+  for (const [key, value] of Object.entries(vnode.props ?? {})) {
+    if (/^on(Click|click)$/.test(key) && typeof value === "function") {
+      out.push(value as () => void);
+    }
+  }
+  clickHandlers(vnode.children, out, depth + 1);
+  return out;
 }
 
 type Summary = {
@@ -383,5 +500,6 @@ export function generateSupport(
     },
   };
 
-  return { report, hasGap: summary.gap > 0 || summary.broken > 0 };
+  const honors = checkHonors(skin);
+  return { report, hasGap: summary.gap > 0 || summary.broken > 0 || honors.length > 0, honors };
 }

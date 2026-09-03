@@ -59,21 +59,21 @@ function navEntry(node: NavNode, host: PageHost): VNode {
  *     LOCATION target, the `protected` PIN gate and an unknown node are already
  *     decided when this returns; the skin only reads `kind`.
  *   - `host.isLinkActive(link)` — target is the current page or an ancestor.
- *   - `host.linkLabel(link)`   — the accessible name (host locale + node name).
+ *   - `host.linkLabel(link, outcome)` — the accessible name. The outcome is
+ *     handed back so the NAME carries the state: a PIN-gated target announces
+ *     itself as gated, which a cursor or a colour cannot do on touch or to a
+ *     screen reader.
  *   - `host.followLink(link)`  — perform the canonical action.
  *
- * The skin therefore never touches `host.navTree`, never reads `NavNode.access`
- * and never walks a parent chain — it decides only WHERE the affordance sits and
- * WHAT it looks like (golden rule 4).
+ * FOR LINKS the skin therefore touches neither `host.navTree` nor
+ * `NavNode.access` nor any parent chain — it decides only WHERE the affordance
+ * sits and WHAT it looks like (golden rule 4). (The nav rail above legitimately
+ * reads both: that is the separate `honors: 'nav'` capability, not link logic.)
  *
  * A `<button role="link">` rather than an `<a>`: it is natively focusable and
  * natively fires its click on Enter AND Space, so the skin maps no keyboard
  * gesture of its own. It is stretched over the placed element, which is exactly
- * #1194's case — an element with no click function of its own. DECLARED
- * consequence (golden rule 3): on a LINKED item the jump owns the whole box, so
- * a tile control inside it is display-only there; the item carries
- * `data-link-covers="tile"` so that is inspectable in the DOM rather than a
- * surprise. An item without a link is untouched.
+ * #1194's case — an element with no click function of its own.
  */
 function linkOverlay(
   link: NonNullable<LayerItem["link"]>,
@@ -89,7 +89,7 @@ function linkOverlay(
     type: "button",
     // Announced as a link (it navigates), operated as a button (native keys).
     role: "link",
-    "aria-label": host.linkLabel(link),
+    "aria-label": host.linkLabel(link, outcome),
     "aria-current": active ? "page" : undefined,
     "data-link": link.targetNodeId,
     "data-link-outcome": outcome.kind,
@@ -125,7 +125,21 @@ function layerCanvas(layer: PageLayer, host: PageHost): VNode {
               }
             : {}),
         },
-        [host.renderTile(item.id) as VNode, ...(overlay ? [overlay] : [])],
+        overlay
+          ? [
+              // The overlay covers the tile for the POINTER (z-index). `inert`
+              // makes that true for keyboard and assistive tech too: without it
+              // a writable tile keeps its own `role="button" tabindex="0"
+              // aria-pressed` and becomes a second focus stop that announces a
+              // switch nobody can reach (WCAG 4.1.2) — the same double
+              // affordance the host steps back from at the cell level. `inert`
+              // is the mechanism this file already uses for nav + popups.
+              h("div", { class: "edomi-item-body", inert: true }, [
+                host.renderTile(item.id) as VNode,
+              ]),
+              overlay,
+            ]
+          : [host.renderTile(item.id) as VNode],
       );
     }),
   );

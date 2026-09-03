@@ -12,7 +12,7 @@ import { writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
-import type { SkinManifest } from "@obs/visu-contract";
+import type { PageRenderer, SkinManifest } from "@obs/visu-contract";
 import { generateSupport, type RendererMap, type SkinInput } from "./index.js";
 
 interface SkinModule {
@@ -20,6 +20,8 @@ interface SkinModule {
   /** Optionale Detail-/Preset-Flächen — die Aktions-Achse misst über alle. */
   readonly details?: RendererMap;
   readonly presets?: RendererMap;
+  /** Optionaler Ganzseiten-Renderer — die `honors`-Achse misst über ihn. */
+  readonly page?: PageRenderer;
 }
 
 async function loadSkin(pkg: string): Promise<{ skin: SkinInput; manifestPath: string }> {
@@ -28,7 +30,13 @@ async function loadSkin(pkg: string): Promise<{ skin: SkinInput; manifestPath: s
   const manifestPath = require.resolve(`${pkg}/manifest.json`);
   const manifest = require(manifestPath) as SkinManifest;
   return {
-    skin: { manifest, tiles: mod.tiles, details: mod.details, presets: mod.presets },
+    skin: {
+      manifest,
+      tiles: mod.tiles,
+      details: mod.details,
+      presets: mod.presets,
+      page: mod.page,
+    },
     manifestPath,
   };
 }
@@ -44,7 +52,7 @@ async function main(argv: readonly string[]): Promise<number> {
   }
 
   const { skin, manifestPath } = await loadSkin(pkg);
-  const { report, hasGap } = generateSupport(skin);
+  const { report, hasGap, honors } = generateSupport(skin);
   const json = JSON.stringify(report, null, 2);
 
   if (toStdout) {
@@ -56,10 +64,13 @@ async function main(argv: readonly string[]): Promise<number> {
   }
 
   if (hasGap) {
-    // gap UND broken sind Fehlerstufen (ARCHITECTURE.md §2) — beide werden benannt.
+    // gap UND broken sind Fehlerstufen (ARCHITECTURE.md §2) — beide werden benannt,
+    // und seit Vertrag 1.12 auch die `honors`-Achse (der Deklarations-Slot, auf den
+    // sich das Host-Verhalten stützt).
     const failures = Object.entries(report.widgets)
       .filter(([, e]) => e.level === "gap" || e.level === "broken")
       .map(([t, e]) => `  ${t} [${e.level}]: ${e.reason ?? e.level}`)
+      .concat(honors.map((f) => `  honors:${f.token} [${f.problem}]: ${f.detail}`))
       .join("\n");
     process.stderr.write(`conformance failure in ${report.skin}:\n${failures}\n`);
     return 1;

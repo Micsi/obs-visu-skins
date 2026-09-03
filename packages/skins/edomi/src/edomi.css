@@ -102,8 +102,15 @@
   pointer-events: auto;
 }
 /* Fill the authored box with the reused ionic content tile (the host wraps the
-   tile in .skin-host-cell; ionic normally stretches it via flex). */
-.edomi-item > .skin-host-cell {
+   tile in .skin-host-cell; ionic normally stretches it via flex). On a LINKED
+   item the cell sits one level deeper, inside the `inert` body wrapper. */
+.edomi-item > .skin-host-cell,
+.edomi-item > .edomi-item-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+}
+.edomi-item-body > .skin-host-cell {
   flex: 1;
   min-width: 0;
   display: flex;
@@ -159,9 +166,12 @@
   pointer-events: none;
   z-index: 4;
 }
+/* Bottom-LEFT. Not top-right: the reused ionic tile puts its readonly lock badge
+   there and the two markers overlapped. Not top-left either: the room label
+   starts there. The bottom-left corner is free in every reused tile. */
 .edomi-item[data-link-active][data-link-indicator="dot"]::after {
-  top: 6px;
-  right: 6px;
+  bottom: 6px;
+  left: 6px;
   width: 8px;
   height: 8px;
   border-radius: 50%;

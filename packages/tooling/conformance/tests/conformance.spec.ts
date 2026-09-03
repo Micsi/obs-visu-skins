@@ -12,7 +12,14 @@ import type { Renderer, SkinManifest } from "@obs/visu-contract";
 import { tiles } from "@obs-visu-skins/ionic";
 import ionicManifest from "@obs-visu-skins/ionic/manifest.json" with { type: "json" };
 import { version as contractVersion } from "@obs/visu-contract";
-import { CORE_WIDGET_TYPES, collectActions, generateSupport, type RendererMap } from "../index.js";
+import {
+  CORE_WIDGET_TYPES,
+  LAYOUT_HONORS,
+  checkHonors,
+  collectActions,
+  generateSupport,
+  type RendererMap,
+} from "../index.js";
 
 const ionic = ionicManifest as unknown as SkinManifest;
 
@@ -323,5 +330,94 @@ describe("generateSupport — gap-hart", () => {
     expect(report.widgets.light?.level).toBe("broken");
     expect(report.widgets.light?.reason).toContain("boom");
     expect(report.summary.broken).toBe(1);
+  });
+});
+
+/* ------------------------------------------- honors-Achse (Vertrag 1.12, #146) */
+
+const honorsSkin = (honors: string[], page?: (host: never) => unknown) => ({
+  manifest: {
+    name: "honors-stub",
+    targetsContract: contractVersion,
+    unsupported: [],
+    widgets: {},
+    layout: { model: "grid", honors },
+  } as unknown as SkinManifest,
+  tiles: {} as RendererMap,
+  ...(page ? { page: page as never } : {}),
+});
+
+describe("honors-Achse — der Deklarations-Slot wird gemessen, nicht geglaubt", () => {
+  it("kennt das Vokabular AUS dem Vertrag, nicht aus einer Kopie", () => {
+    // Kommt die Liste aus dem Schema, wächst sie mit jedem Vertrags-Bump mit.
+    expect(LAYOUT_HONORS).toContain("link");
+    expect(LAYOUT_HONORS).toContain("order");
+  });
+
+  it("lehnt einen unbekannten honors-String ab (ein Tippfehler wäre sonst stumm)", () => {
+    const findings = checkHonors(honorsSkin(["order", "positon"]));
+    expect(findings.map((f) => [f.token, f.problem])).toEqual([["positon", "unknown"]]);
+  });
+
+  it("akzeptiert das gesamte Vertrags-Vokabular", () => {
+    // `link` braucht zusätzlich einen liefernden Page-Renderer, daher separat.
+    const vocabulary = LAYOUT_HONORS.filter((t) => t !== "link");
+    expect(checkHonors(honorsSkin([...vocabulary]))).toEqual([]);
+  });
+
+  it("`link` ohne Page-Renderer: nichts kann den Sprung zeichnen", () => {
+    const findings = checkHonors(honorsSkin(["link"]));
+    expect(findings.map((f) => f.problem)).toEqual(["unrenderable"]);
+  });
+
+  it("`link` deklariert, aber der Page-Renderer zeichnet nichts => undelivered", () => {
+    // Genau die Kehrseite, die #146 beklagt: der Host tritt wegen der Deklaration
+    // mit SEINER Affordanz zurück — zeichnet der Skin dann nichts, gibt es gar keine.
+    const findings = checkHonors(honorsSkin(["link"], () => "<div/>"));
+    expect(findings.map((f) => f.problem)).toEqual(["undelivered"]);
+  });
+
+  it("den Host nur zu FRAGEN reicht nicht — es muss eine Affordanz entstehen", () => {
+    // Die Gegenprobe, die diesen Prüfer überhaupt erst geschärft hat: ein Skin,
+    // der `isLinkActive` fürs Markup aufruft und den Sprung dann weglässt, kam
+    // durch die frühere "hat gefragt"-Fassung glatt durch.
+    const asksOnly = (host: never) => {
+      const h = host as unknown as {
+        layersFor: (id: string) => { items: { link?: unknown }[] }[];
+        currentPageId: string;
+        isLinkActive: (l: unknown) => boolean;
+      };
+      for (const layer of h.layersFor(h.currentPageId)) {
+        for (const item of layer.items) if (item.link) h.isLinkActive(item.link);
+      }
+      return "<div/>";
+    };
+    expect(checkHonors(honorsSkin(["link"], asksOnly)).map((f) => f.problem)).toEqual([
+      "undelivered",
+    ]);
+  });
+
+  it("`link` + eine aktivierbare Affordanz, die followLink ruft => sauber", () => {
+    const page = (host: never) => {
+      const h = host as unknown as {
+        layersFor: (id: string) => { items: { link?: unknown }[] }[];
+        currentPageId: string;
+        followLink: (l: unknown) => unknown;
+      };
+      const children: unknown[] = [];
+      for (const layer of h.layersFor(h.currentPageId)) {
+        for (const item of layer.items) {
+          if (item.link) children.push({ props: { onClick: () => h.followLink(item.link) } });
+        }
+      }
+      return { props: {}, children };
+    };
+    expect(checkHonors(honorsSkin(["link"], page))).toEqual([]);
+  });
+
+  it("ein honors-Befund ist ein harter Fehler wie eine gap", () => {
+    const { hasGap, honors } = generateSupport(honorsSkin(["nope"]));
+    expect(honors).toHaveLength(1);
+    expect(hasGap).toBe(true);
   });
 });

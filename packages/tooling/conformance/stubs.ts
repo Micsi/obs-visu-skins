@@ -7,7 +7,7 @@
 //
 // Bewusst KEIN State (Goldene Regel 4) — reine Funktionen über die Fixture-Daten.
 
-import type { Ctx, Device, Tokens } from "@obs/visu-contract";
+import type { Ctx, Device, PageHost, PageLink, Tokens } from "@obs/visu-contract";
 
 /** Neutrale Tokens: der headless Lauf prüft Struktur, nicht Farbe. */
 export const tokensStub: Tokens = {
@@ -90,4 +90,73 @@ export function ctxStub(overrides: Partial<Ctx> = {}): Ctx {
       d.type === "sensor" && typeof d.status === "string" && /erhöht|hoch|warn/i.test(d.status),
     ...overrides,
   };
+}
+
+/* ------------------------------------------------- PageHost-Stub (Vertrag 1.12) */
+
+/** Was ein Page-Renderer beim Probelauf am Host TATSÄCHLICH angefragt hat. */
+export interface PageHostProbe {
+  readonly host: PageHost;
+  /** Namen der aufgerufenen Link-Dienste, in Aufrufreihenfolge. */
+  readonly linkCalls: string[];
+}
+
+/**
+ * Ein minimaler {@link PageHost} für den Konformitätslauf: er beantwortet jede
+ * Frage neutral und PROTOKOLLIERT, welche Link-Dienste der Skin benutzt hat.
+ *
+ * Damit wird `honors: ['link']` messbar statt behauptet. Der Host tritt bei
+ * diesem String mit seiner eigenen Sprung-Affordanz zurück - ein Skin, der ihn
+ * deklariert und dann nichts zeichnet, hätte also GAR KEINE Affordanz mehr.
+ * Genau die Kehrseite dessen, was der Slot verhindern soll (Goldene Regel 3).
+ *
+ * Kein State (Goldene Regel 4): eine Seite, ein Layer, ein verlinktes Element.
+ */
+export function pageHostProbe(): PageHostProbe {
+  const linkCalls: string[] = [];
+  const note = <T>(name: string, value: T): T => {
+    linkCalls.push(name);
+    return value;
+  };
+  const host: PageHost = {
+    navTree: [
+      {
+        id: "probe-page",
+        name: "Probe",
+        type: "PAGE",
+        access: "public",
+        children: [],
+      },
+    ],
+    currentPageId: "probe-page",
+    navigate: () => {},
+    layersFor: (id: string) =>
+      id === "probe-page"
+        ? [
+            {
+              id: "probe-page",
+              origin: "own" as const,
+              order: 0,
+              items: [
+                {
+                  id: "probe-item",
+                  position: { x: 0, y: 0, w: 10, h: 10 },
+                  link: { targetNodeId: "probe-target", activeIndicator: "dot" as const },
+                },
+              ],
+            },
+          ]
+        : [],
+    renderTile: (deviceId: string) => `<tile:${deviceId}>`,
+    openPopups: [],
+    openPopup: () => {},
+    closePopup: () => {},
+    resolveLink: (link: PageLink) =>
+      note("resolveLink", { kind: "navigate" as const, pageId: link.targetNodeId }),
+    followLink: (link: PageLink) =>
+      note("followLink", { kind: "navigate" as const, pageId: link.targetNodeId }),
+    isLinkActive: () => note("isLinkActive", false),
+    linkLabel: (link: PageLink) => note("linkLabel", `zur Seite ${link.targetNodeId}`),
+  };
+  return { host, linkCalls };
 }
