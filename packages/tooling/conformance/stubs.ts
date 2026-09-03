@@ -99,6 +99,15 @@ export interface PageHostProbe {
   readonly host: PageHost;
   /** Namen der aufgerufenen Link-Dienste, in Aufrufreihenfolge. */
   readonly linkCalls: string[];
+  /**
+   * Leert das Protokoll. Der Probelauf trennt damit zwei Phasen, die sonst in
+   * einen Topf fielen: was der Renderer WÄHREND des Zeichnens am Host fragt, und
+   * was ein KLICK auslöst. Nur das Zweite ist eine Affordanz — ein Renderer, der
+   * `followLink` schon beim Rendern ruft und einen leeren Baum zurückgibt, hat
+   * keine gezeichnet (und navigiert im Browser beim blossen Anzeigen der Seite,
+   * was für sich genommen ein Fehler wäre).
+   */
+  reset(): void;
 }
 
 /**
@@ -158,7 +167,13 @@ export function pageHostProbe(): PageHostProbe {
     isLinkActive: () => note("isLinkActive", false),
     linkLabel: (link: PageLink) => note("linkLabel", `zur Seite ${link.targetNodeId}`),
   };
-  return { host, linkCalls };
+  return {
+    host,
+    linkCalls,
+    reset: () => {
+      linkCalls.length = 0;
+    },
+  };
 }
 
 /* --------------------------------------------- Klick-Ereignis (Vertrag 1.12) */

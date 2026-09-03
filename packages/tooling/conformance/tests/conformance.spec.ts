@@ -8,6 +8,7 @@
 // → "gap"; ein werfender Renderer → "broken". Beides Exit != 0.
 
 import { describe, expect, it } from "vitest";
+import { h, mergeProps, type VNode } from "vue";
 import type { Renderer, SkinManifest } from "@obs/visu-contract";
 import { tiles } from "@obs-visu-skins/ionic";
 import ionicManifest from "@obs-visu-skins/ionic/manifest.json" with { type: "json" };
@@ -558,6 +559,182 @@ describe("honors-Achse — der Deklarations-Slot wird gemessen, nicht geglaubt",
     expect((await checkHonors(honorsSkin(["link"], page))).map((f) => f.problem)).toEqual([
       "undelivered",
     ]);
+  });
+
+  /* ------------------------- Listener-Formen, mit ECHTEM Vue gebaut (Runde 3) */
+
+  /**
+   * Warum eine Tabelle statt Einzelfällen: G1/G2/G3 waren drei Varianten
+   * DERSELBEN Frage — sieht die Probe, was der Browser sieht? Einzelspecs
+   * beantworten sie je einmal; eine Tabelle über die Formen, die Vue wirklich
+   * erzeugt, deckt das Feld ab und wächst mit, wenn eine Form dazukommt.
+   *
+   * Die Bäume baut deshalb ECHTES Vue (`h`, `mergeProps`, eine Options-API-
+   * Komponente), nicht meine Vorstellung davon, wie ein VNode aussieht — sonst
+   * prüfte die Spec nur, dass zwei Nachbildungen zueinander passen.
+   *
+   * Was die Probe NICHT tut (und bewusst nicht): den Baum mit Vue mounten und
+   * einen echten Klick schicken. Das wäre die höchste Treue, verlangte aber ein
+   * DOM und machte Vue zur Pflicht-Abhängigkeit des Konformitätslaufs — und der
+   * Vertrag erlaubt ausdrücklich Skins OHNE Vue (`Renderer` darf rohes Markup
+   * liefern, `collectActions` liest genau das). Der Wächter bleibt deshalb
+   * framework-neutral; nur seine GEGENPROBEN fahren echtes Vue.
+   */
+
+  /** Ein Page-Renderer, der den Sprung mit genau diesen Props zeichnet. */
+  function pageDrawing(propsFor: (follow: () => void) => Record<string, unknown>) {
+    return (host: never) => {
+      const svc = host as unknown as {
+        layersFor: (id: string) => { items: { link?: unknown }[] }[];
+        currentPageId: string;
+        followLink: (l: unknown) => unknown;
+      };
+      const children: VNode[] = [];
+      for (const layer of svc.layersFor(svc.currentPageId)) {
+        for (const item of layer.items) {
+          if (!item.link) continue;
+          children.push(h("button", propsFor(() => void svc.followLink(item.link))));
+        }
+      }
+      return h("div", null, children);
+    };
+  }
+
+  // Die Namen sind exakt die, die Vues Compiler aus den Ereignis-Modifikatoren
+  // erzeugt: `.once` → onClickOnce, `.capture` → onClickCapture, `.passive` →
+  // onClickPassive, kombinierbar. Der Browser ruft sie alle als Klick-Handler.
+  const CLICK_FORMS: [string, (f: () => void) => Record<string, unknown>][] = [
+    ["onClick", (f) => ({ onClick: f })],
+    ["onclick (roher DOM-Name)", (f) => ({ onclick: f })],
+    ["onClickOnce (.once)", (f) => ({ onClickOnce: f })],
+    ["onClickCapture (.capture)", (f) => ({ onClickCapture: f })],
+    ["onClickOnceCapture (.once.capture)", (f) => ({ onClickOnceCapture: f })],
+    ["onClickPassive (.passive)", (f) => ({ onClickPassive: f })],
+    // mergeProps ist Vues eigene Funktion — sie macht aus zwei Listenern ein
+    // ARRAY unter einem Namen. `typeof value === "function"` sah davon nichts.
+    ["Array nach mergeProps", (f) => mergeProps({ onClick: () => {} }, { onClick: f })],
+  ];
+
+  for (const [name, propsFor] of CLICK_FORMS) {
+    it(`zählt die Listener-Form ${name}`, async () => {
+      expect(await checkHonors(honorsSkin(["link"], pageDrawing(propsFor)))).toEqual([]);
+    });
+  }
+
+  // Die Kehrseite: was KEIN Klick-Listener ist, darf auch nicht mitzählen —
+  // sonst wäre der geweitete Wächter nur noch nachgiebig.
+  const NOT_CLICK: [string, (f: () => void) => Record<string, unknown>][] = [
+    ["onClickOutside (ein Komponenten-Emit, kein Klick)", (f) => ({ onClickOutside: f })],
+    ["onKeydown", (f) => ({ onKeydown: f })],
+    ["onDblclick", (f) => ({ onDblclick: f })],
+  ];
+
+  for (const [name, propsFor] of NOT_CLICK) {
+    it(`zählt ${name} NICHT`, async () => {
+      const findings = await checkHonors(honorsSkin(["link"], pageDrawing(propsFor)));
+      expect(findings.map((f) => f.problem)).toEqual(["undelivered"]);
+    });
+  }
+
+  it("löst eine Options-API-Komponente auf, deren render() über `this` geht", async () => {
+    // Vue ruft `render()` mit dem Komponenten-Proxy. Als nackte Funktion gerufen
+    // warf `this.host` an der ersten Zeile, die Ausnahme galt als leerer
+    // Teilbaum — und ein Skin, der im Browser funktioniert, fiel durch.
+    const OptionsComponent = {
+      props: { host: { type: Object, required: true } },
+      render(this: {
+        host: {
+          layersFor: (id: string) => { items: { link?: unknown }[] }[];
+          currentPageId: string;
+          followLink: (l: unknown) => unknown;
+        };
+      }) {
+        const svc = this.host;
+        const children: VNode[] = [];
+        for (const layer of svc.layersFor(svc.currentPageId)) {
+          for (const item of layer.items) {
+            if (item.link) children.push(h("button", { onClick: () => void svc.followLink(item.link) }));
+          }
+        }
+        return h("div", null, children);
+      },
+    };
+    const page = (host: never) => h(OptionsComponent as never, { host });
+    expect(await checkHonors(honorsSkin(["link"], page))).toEqual([]);
+  });
+
+  it("…auch, wenn sie über `this.$props` statt über `this.host` geht", async () => {
+    const OptionsComponent = {
+      props: { host: { type: Object, required: true } },
+      render(this: {
+        $props: {
+          host: {
+            layersFor: (id: string) => { items: { link?: unknown }[] }[];
+            currentPageId: string;
+            followLink: (l: unknown) => unknown;
+          };
+        };
+      }) {
+        const svc = this.$props.host;
+        const children: VNode[] = [];
+        for (const layer of svc.layersFor(svc.currentPageId)) {
+          for (const item of layer.items) {
+            if (item.link) children.push(h("button", { onClick: () => void svc.followLink(item.link) }));
+          }
+        }
+        return h("div", null, children);
+      },
+    };
+    const page = (host: never) => h(OptionsComponent as never, { host });
+    expect(await checkHonors(honorsSkin(["link"], page))).toEqual([]);
+  });
+
+  it("verwirft, was der Renderer WÄHREND des Zeichnens ruft — leerer Baum bleibt undelivered", async () => {
+    // Das Loch, das die Ereignis-/Komponenten-Weitung aufgerissen hatte:
+    // `probe.linkCalls` wurde beim Rendern gefüllt und vor dem Handler-Lauf nicht
+    // geleert. Ein Renderer, der `followLink` beim RENDERN ruft und einen leeren
+    // Baum liefert, bestand die Prüfung — genau der Fall, den `undelivered`
+    // fangen soll. (Im Browser wäre er ohnehin kaputt: er navigiert beim blossen
+    // Anzeigen der Seite.)
+    const page = (host: never) => {
+      const svc = host as unknown as {
+        layersFor: (id: string) => { items: { link?: unknown }[] }[];
+        currentPageId: string;
+        followLink: (l: unknown) => unknown;
+      };
+      for (const layer of svc.layersFor(svc.currentPageId)) {
+        for (const item of layer.items) if (item.link) svc.followLink(item.link);
+      }
+      return h("div", null, []);
+    };
+    expect((await checkHonors(honorsSkin(["link"], page))).map((f) => f.problem)).toEqual([
+      "undelivered",
+    ]);
+  });
+
+  it("…und ein Renderer, der beim Zeichnen fragt UND einen Handler setzt, bleibt sauber", async () => {
+    // Der Nachbarfall zum Schnitt oben: das Verwerfen darf den Normalfall nicht
+    // mitnehmen. edomi ruft beim Rendern `resolveLink`/`isLinkActive`/`linkLabel`.
+    const page = (host: never) => {
+      const svc = host as unknown as {
+        layersFor: (id: string) => { items: { link?: unknown }[] }[];
+        currentPageId: string;
+        resolveLink: (l: unknown) => unknown;
+        isLinkActive: (l: unknown) => boolean;
+        followLink: (l: unknown) => unknown;
+      };
+      const children: VNode[] = [];
+      for (const layer of svc.layersFor(svc.currentPageId)) {
+        for (const item of layer.items) {
+          if (!item.link) continue;
+          svc.resolveLink(item.link);
+          svc.isLinkActive(item.link);
+          children.push(h("button", { onClick: () => void svc.followLink(item.link) }));
+        }
+      }
+      return h("div", null, children);
+    };
+    expect(await checkHonors(honorsSkin(["link"], page))).toEqual([]);
   });
 
   it("ein honors-Befund ist ein harter Fehler wie eine gap", async () => {
