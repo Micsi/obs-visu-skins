@@ -160,3 +160,83 @@ export function pageHostProbe(): PageHostProbe {
   };
   return { host, linkCalls };
 }
+
+/* --------------------------------------------- Klick-Ereignis (Vertrag 1.12) */
+
+/**
+ * Ein Stellvertreter-Klickereignis für den `honors`-Probelauf.
+ *
+ * Der Probelauf ruft die gefundenen `onClick`-Handler selbst auf. Tat er das mit
+ * GAR KEINEM Argument, warf jeder völlig normale Vue-Handler
+ * (`(event) => { event.preventDefault(); host.followLink(link) }`) an der ersten
+ * Zeile — noch VOR `followLink` — und der Skin fiel als `undelivered` durch,
+ * obwohl er im Browser genau das Richtige tut. Ein Wächter, der einen konformen
+ * Skin ablehnt, weil dieser sein Ereignis anfasst, misst nicht, er rät.
+ *
+ * Bewusst ein konkretes Objekt und KEIN Proxy: der Stellvertreter beantwortet die
+ * Fläche, die ein Klick-Handler real benutzt, und sonst nichts. Ein Proxy, der auf
+ * jeden Namen eine Funktion zurückgibt, machte `if (event.defaultPrevented)` und
+ * ähnliche Abfragen still wahr und verschöbe das Verhalten des Handlers.
+ */
+export function clickEventStub(): Record<string, unknown> {
+  const target: Record<string, unknown> = {
+    nodeType: 1,
+    tagName: "BUTTON",
+    dataset: {},
+    classList: { contains: () => false, add: () => {}, remove: () => {}, toggle: () => false },
+    getAttribute: () => null,
+    setAttribute: () => {},
+    hasAttribute: () => false,
+    closest: () => null,
+    matches: () => false,
+    focus: () => {},
+    blur: () => {},
+    getBoundingClientRect: () => ({
+      x: 0,
+      y: 0,
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      width: 0,
+      height: 0,
+    }),
+  };
+  const event: Record<string, unknown> = {
+    type: "click",
+    isTrusted: false,
+    bubbles: true,
+    cancelable: true,
+    defaultPrevented: false,
+    eventPhase: 2,
+    timeStamp: 0,
+    detail: 1,
+    button: 0,
+    buttons: 1,
+    clientX: 0,
+    clientY: 0,
+    screenX: 0,
+    screenY: 0,
+    pageX: 0,
+    pageY: 0,
+    offsetX: 0,
+    offsetY: 0,
+    altKey: false,
+    ctrlKey: false,
+    metaKey: false,
+    shiftKey: false,
+    pointerType: "mouse",
+    target,
+    currentTarget: target,
+    srcElement: target,
+    relatedTarget: null,
+    view: null,
+    preventDefault: () => {
+      event.defaultPrevented = true;
+    },
+    stopPropagation: () => {},
+    stopImmediatePropagation: () => {},
+    composedPath: () => [target],
+  };
+  return event;
+}

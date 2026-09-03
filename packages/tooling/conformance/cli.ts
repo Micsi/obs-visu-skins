@@ -83,7 +83,7 @@ async function main(argv: readonly string[]): Promise<number> {
   }
 
   const { skin, manifestPath } = await loadSkin(pkg);
-  const { report, hasGap, honors } = generateSupport(skin);
+  const { report, hasGap, honors } = await generateSupport(skin);
   const json = JSON.stringify(report, null, 2);
 
   if (toStdout) {

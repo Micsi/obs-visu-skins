@@ -44,8 +44,8 @@ const AA_DECL = {
 };
 
 describe("generateSupport — ionic (vollständig)", () => {
-  it("meldet keine gap/broken und deckt alle neun Kern-Typen ab", () => {
-    const { report } = generateSupport({ manifest: ionic, tiles });
+  it("meldet keine gap/broken und deckt alle neun Kern-Typen ab", async () => {
+    const { report } = await generateSupport({ manifest: ionic, tiles });
 
     // Bewusst NICHT `hasGap`: das Flag deckt seit Vertrag 1.13 auch die Farb-Achse
     // ab, und ionics Palette ist dort gemessen rot (theme-unabhängige Akzente auf
@@ -74,13 +74,13 @@ describe("generateSupport — ionic (vollständig)", () => {
     expect(report.summary.unsupported).toBe(0);
   });
 
-  it("spiegelt nicht die eigene Zielversion, sondern den echten Vertragsstand", () => {
-    const { report } = generateSupport({ manifest: ionic, tiles });
+  it("spiegelt nicht die eigene Zielversion, sondern den echten Vertragsstand", async () => {
+    const { report } = await generateSupport({ manifest: ionic, tiles });
     expect(report.contractLatest).toBe(contractVersion);
   });
 
-  it("nennt je Typ die Aktions-Abdeckung, die Fixtures und die Renderer-Herkunft", () => {
-    const { report } = generateSupport({ manifest: ionic, tiles });
+  it("nennt je Typ die Aktions-Abdeckung, die Fixtures und die Renderer-Herkunft", async () => {
+    const { report } = await generateSupport({ manifest: ionic, tiles });
     // camera kennt genau eine kanonische Aktion (refresh) und zwei Fixtures.
     expect(report.widgets.camera?.actions).toBe("1/1");
     expect(report.widgets.camera?.fixtures).toEqual(["online", "offline"]);
@@ -89,7 +89,7 @@ describe("generateSupport — ionic (vollständig)", () => {
     expect(report.widgets.camera?.render).toMatch(/^tile:\S+/);
   });
 
-  it("übernimmt das Layout-Modell aus dem geprüften Manifest", () => {
+  it("übernimmt das Layout-Modell aus dem geprüften Manifest", async () => {
     // Bewusst gegen ein EIGENES Fixture-Manifest, nicht gegen ionic: sonst würde
     // diese Spec im geteilten Tooling rot, sobald ein fremder Skin sein `honors` ändert.
     const manifest: SkinManifest = {
@@ -97,13 +97,13 @@ describe("generateSupport — ionic (vollständig)", () => {
       name: "layout-fixture",
       layout: { model: "grid", honors: ["order", "grouping", "role"] },
     };
-    const { report } = generateSupport({ manifest, tiles });
+    const { report } = await generateSupport({ manifest, tiles });
     expect(report.layout).toEqual({ model: "grid", honors: ["order", "grouping", "role"] });
   });
 
-  it("schreibt einen deterministischen Zeitstempel über die injizierte now-Quelle", () => {
+  it("schreibt einen deterministischen Zeitstempel über die injizierte now-Quelle", async () => {
     const fixed = new Date("2026-06-11T00:00:00.000Z");
-    const { report } = generateSupport({ manifest: ionic, tiles }, () => fixed);
+    const { report } = await generateSupport({ manifest: ionic, tiles }, () => fixed);
     expect(report.generatedAt).toBe("2026-06-11T00:00:00.000Z");
   });
 });
@@ -125,7 +125,7 @@ describe("generateSupport — gap-hart", () => {
       children: actions.map((a) => ({ type: "button", props: { "data-action": a }, children: a })),
     });
 
-  it('meldet "gap" für ein deklariertes widget ohne passenden tiles-Renderer', () => {
+  it('meldet "gap" für ein deklariertes widget ohne passenden tiles-Renderer', async () => {
     const brokenManifest: SkinManifest = {
       name: "broken",
       targetsContract: "1.1",
@@ -149,7 +149,7 @@ describe("generateSupport — gap-hart", () => {
       scene: stubRenderer,
     };
 
-    const { report, hasGap } = generateSupport({
+    const { report, hasGap } = await generateSupport({
       manifest: brokenManifest,
       tiles: partialTiles,
     });
@@ -159,7 +159,7 @@ describe("generateSupport — gap-hart", () => {
     expect(report.summary.gap).toBe(1);
   });
 
-  it('meldet "gap" für einen Renderer ohne widgets-Deklaration', () => {
+  it('meldet "gap" für einen Renderer ohne widgets-Deklaration', async () => {
     const manifest: SkinManifest = {
       name: "undeclared",
       targetsContract: "1.1",
@@ -183,13 +183,13 @@ describe("generateSupport — gap-hart", () => {
       scene: stubRenderer,
     };
 
-    const { report, hasGap } = generateSupport({ manifest, tiles: tilesWithUndeclared });
+    const { report, hasGap } = await generateSupport({ manifest, tiles: tilesWithUndeclared });
 
     expect(hasGap).toBe(true);
     expect(report.widgets.scene?.level).toBe("gap");
   });
 
-  it('markiert in unsupported deklarierte Kern-Typen als "unsupported" (kein gap)', () => {
+  it('markiert in unsupported deklarierte Kern-Typen als "unsupported" (kein gap)', async () => {
     const manifest: SkinManifest = {
       name: "minimal",
       targetsContract: "1.1",
@@ -211,7 +211,7 @@ describe("generateSupport — gap-hart", () => {
       jalousie: marking("setPosition"),
     };
 
-    const { report, hasGap } = generateSupport({
+    const { report, hasGap } = await generateSupport({
       manifest,
       tiles: partialTiles,
       styles: AA_STYLES,
@@ -232,7 +232,7 @@ describe("generateSupport — gap-hart", () => {
     expect(report.summary.partial).toBe(3);
   });
 
-  it("misst die Aktions-Achse am gerenderten Baum, nicht am Manifest", () => {
+  it("misst die Aktions-Achse am gerenderten Baum, nicht am Manifest", async () => {
     // Der Renderer markiert NICHTS — das Manifest behauptet trotzdem beide Aktionen.
     // Genau diese Lücke soll sichtbar werden: die Stufe folgt dem Baum.
     const silent: Renderer = () => ({ type: "div", props: {}, children: [] });
@@ -248,7 +248,7 @@ describe("generateSupport — gap-hart", () => {
       a11y: AA_DECL,
     };
 
-    const { report, hasGap } = generateSupport({
+    const { report, hasGap } = await generateSupport({
       manifest,
       tiles: { light: silent, switch: silent },
       styles: AA_STYLES,
@@ -262,7 +262,7 @@ describe("generateSupport — gap-hart", () => {
     expect(report.widgets.light?.reason).toContain("declared but never marked: setDim, toggle");
   });
 
-  it("zählt eine Aktion, die nur die Detailfläche markiert, als angeboten", () => {
+  it("zählt eine Aktion, die nur die Detailfläche markiert, als angeboten", async () => {
     const silent: Renderer = () => ({ type: "div", props: {}, children: [] });
     const toggleInDetail: Renderer = () => ({
       type: "div",
@@ -277,7 +277,7 @@ describe("generateSupport — gap-hart", () => {
       layout: { model: "grid", honors: ["order"] },
     };
 
-    const { report } = generateSupport({
+    const { report } = await generateSupport({
       manifest,
       tiles: { light: silent },
       details: { light: toggleInDetail },
@@ -288,7 +288,7 @@ describe("generateSupport — gap-hart", () => {
     expect(report.widgets.light?.render).toContain("detail:");
   });
 
-  it('meldet "broken", wenn ein Renderer eine nicht deklarierte Aktion markiert', () => {
+  it('meldet "broken", wenn ein Renderer eine nicht deklarierte Aktion markiert', async () => {
     // Goldene Regel 3: nicht verdrahtet darf nie vorgetäuscht werden.
     const liar: Renderer = () => ({
       type: "div",
@@ -303,14 +303,14 @@ describe("generateSupport — gap-hart", () => {
       layout: { model: "grid", honors: ["order"] },
     };
 
-    const { report, hasGap } = generateSupport({ manifest, tiles: { light: liar } });
+    const { report, hasGap } = await generateSupport({ manifest, tiles: { light: liar } });
 
     expect(hasGap).toBe(true);
     expect(report.widgets.light?.level).toBe("broken");
     expect(report.widgets.light?.reason).toContain("marks undeclared action(s): setDim");
   });
 
-  it("duldet universelle Host-Aktionen ohne Deklaration (§6)", () => {
+  it("duldet universelle Host-Aktionen ohne Deklaration (§6)", async () => {
     const hostMarks: Renderer = () => ({
       type: "div",
       props: { "data-action": "openDetail" },
@@ -327,7 +327,7 @@ describe("generateSupport — gap-hart", () => {
       a11y: AA_DECL,
     };
 
-    const { report, hasGap } = generateSupport({
+    const { report, hasGap } = await generateSupport({
       manifest,
       tiles: { blind: hostMarks },
       styles: AA_STYLES,
@@ -337,13 +337,13 @@ describe("generateSupport — gap-hart", () => {
     expect(report.widgets.blind?.level).not.toBe("broken");
   });
 
-  it("liest data-action auch aus rohem Markup (Renderer ohne Framework)", () => {
+  it("liest data-action auch aus rohem Markup (Renderer ohne Framework)", async () => {
     expect(
       [...collectActions('<div data-action="toggle"><b data-action="lock"/></div>')].sort(),
     ).toEqual(["lock", "toggle"]);
   });
 
-  it('meldet "broken" für einen Renderer, der an einer Vertrags-Fixture wirft', () => {
+  it('meldet "broken" für einen Renderer, der an einer Vertrags-Fixture wirft', async () => {
     const throwing: Renderer = () => {
       throw new Error("boom");
     };
@@ -358,7 +358,7 @@ describe("generateSupport — gap-hart", () => {
       layout: { model: "list", honors: ["order"] },
     };
 
-    const { report, hasGap } = generateSupport({
+    const { report, hasGap } = await generateSupport({
       manifest,
       tiles: { light: throwing, switch: stubRenderer },
     });
@@ -393,36 +393,36 @@ const honorsSkin = (honors: string[], page?: (host: never) => unknown) => ({
  * es nicht leisten.
  */
 describe("honors-Achse — der Deklarations-Slot wird gemessen, nicht geglaubt", () => {
-  it("kennt das Vokabular AUS dem Vertrag, nicht aus einer Kopie", () => {
+  it("kennt das Vokabular AUS dem Vertrag, nicht aus einer Kopie", async () => {
     // Kommt die Liste aus dem Schema, wächst sie mit jedem Vertrags-Bump mit.
     expect(LAYOUT_HONORS).toContain("link");
     expect(LAYOUT_HONORS).toContain("order");
   });
 
-  it("lehnt einen unbekannten honors-String ab (ein Tippfehler wäre sonst stumm)", () => {
-    const findings = checkHonors(honorsSkin(["order", "positon"]));
+  it("lehnt einen unbekannten honors-String ab (ein Tippfehler wäre sonst stumm)", async () => {
+    const findings = await checkHonors(honorsSkin(["order", "positon"]));
     expect(findings.map((f) => [f.token, f.problem])).toEqual([["positon", "unknown"]]);
   });
 
-  it("akzeptiert das gesamte Vertrags-Vokabular", () => {
+  it("akzeptiert das gesamte Vertrags-Vokabular", async () => {
     // `link` braucht zusätzlich einen liefernden Page-Renderer, daher separat.
     const vocabulary = LAYOUT_HONORS.filter((t) => t !== "link");
-    expect(checkHonors(honorsSkin([...vocabulary]))).toEqual([]);
+    expect(await checkHonors(honorsSkin([...vocabulary]))).toEqual([]);
   });
 
-  it("`link` ohne Page-Renderer: nichts kann den Sprung zeichnen", () => {
-    const findings = checkHonors(honorsSkin(["link"]));
+  it("`link` ohne Page-Renderer: nichts kann den Sprung zeichnen", async () => {
+    const findings = await checkHonors(honorsSkin(["link"]));
     expect(findings.map((f) => f.problem)).toEqual(["unrenderable"]);
   });
 
-  it("`link` deklariert, aber der Page-Renderer zeichnet nichts => undelivered", () => {
+  it("`link` deklariert, aber der Page-Renderer zeichnet nichts => undelivered", async () => {
     // Genau die Kehrseite, die #146 beklagt: der Host tritt wegen der Deklaration
     // mit SEINER Affordanz zurück — zeichnet der Skin dann nichts, gibt es gar keine.
-    const findings = checkHonors(honorsSkin(["link"], () => "<div/>"));
+    const findings = await checkHonors(honorsSkin(["link"], () => "<div/>"));
     expect(findings.map((f) => f.problem)).toEqual(["undelivered"]);
   });
 
-  it("den Host nur zu FRAGEN reicht nicht — followLink muss gerufen werden", () => {
+  it("den Host nur zu FRAGEN reicht nicht — followLink muss gerufen werden", async () => {
     // Die Gegenprobe, die diesen Prüfer überhaupt erst geschärft hat: ein Skin,
     // der `isLinkActive` fürs Markup aufruft und den Sprung dann weglässt, kam
     // durch die frühere "hat gefragt"-Fassung glatt durch.
@@ -437,12 +437,12 @@ describe("honors-Achse — der Deklarations-Slot wird gemessen, nicht geglaubt",
       }
       return "<div/>";
     };
-    expect(checkHonors(honorsSkin(["link"], asksOnly)).map((f) => f.problem)).toEqual([
+    expect((await checkHonors(honorsSkin(["link"], asksOnly))).map((f) => f.problem)).toEqual([
       "undelivered",
     ]);
   });
 
-  it("`link` + ein Klick-Handler, der followLink ruft => sauber", () => {
+  it("`link` + ein Klick-Handler, der followLink ruft => sauber", async () => {
     const page = (host: never) => {
       const h = host as unknown as {
         layersFor: (id: string) => { items: { link?: unknown }[] }[];
@@ -457,12 +457,132 @@ describe("honors-Achse — der Deklarations-Slot wird gemessen, nicht geglaubt",
       }
       return { props: {}, children };
     };
-    expect(checkHonors(honorsSkin(["link"], page))).toEqual([]);
+    expect(await checkHonors(honorsSkin(["link"], page))).toEqual([]);
   });
 
-  it("ein honors-Befund ist ein harter Fehler wie eine gap", () => {
-    const { hasGap, honors } = generateSupport(honorsSkin(["nope"]));
+  /* ---------------------------------------- Gegenproben zum Probelauf selbst */
+
+  // Die drei folgenden Specs sind Gegenproben GEGEN DEN WÄCHTER, nicht gegen einen
+  // Skin: sie beschreiben je einen Renderer, der im Browser nachweislich springt
+  // und den der Probelauf trotzdem ablehnte. Ohne sie bleibt "der Wächter ist
+  // grün" eine Aussage über den Wächter, nicht über die Skins.
+
+  it("ein Handler, der sein Ereignis anfasst, gilt als geliefert (nicht als undelivered)", async () => {
+    // Der Normalfall in Vue: `(event) => { event.preventDefault(); … }`. Ohne
+    // Ereignis-Argument warf die erste Zeile, `followLink` kam nie dran, und ein
+    // konformer Skin fiel in der CI durch.
+    const page = (host: never) => {
+      const h = host as unknown as {
+        layersFor: (id: string) => { items: { link?: unknown }[] }[];
+        currentPageId: string;
+        followLink: (l: unknown) => unknown;
+      };
+      const children: unknown[] = [];
+      for (const layer of h.layersFor(h.currentPageId)) {
+        for (const item of layer.items) {
+          if (!item.link) continue;
+          children.push({
+            props: {
+              onClick: (event: {
+                preventDefault: () => void;
+                stopPropagation: () => void;
+                currentTarget: { tagName: string };
+              }) => {
+                event.preventDefault();
+                event.stopPropagation();
+                if (event.currentTarget.tagName === "NOPE") return;
+                h.followLink(item.link);
+              },
+            },
+          });
+        }
+      }
+      return { props: {}, children };
+    };
+    expect(await checkHonors(honorsSkin(["link"], page))).toEqual([]);
+  });
+
+  it("ein Handler, der erst nach einem await springt, gilt als geliefert", async () => {
+    const page = (host: never) => {
+      const h = host as unknown as {
+        layersFor: (id: string) => { items: { link?: unknown }[] }[];
+        currentPageId: string;
+        followLink: (l: unknown) => unknown;
+      };
+      const children: unknown[] = [];
+      for (const layer of h.layersFor(h.currentPageId)) {
+        for (const item of layer.items) {
+          if (!item.link) continue;
+          children.push({
+            props: {
+              onClick: async () => {
+                await Promise.resolve();
+                h.followLink(item.link);
+              },
+            },
+          });
+        }
+      }
+      return { props: {}, children };
+    };
+    expect(await checkHonors(honorsSkin(["link"], page))).toEqual([]);
+  });
+
+  it("löst Komponenten-VNodes auf — ein komponentisierter Page-Renderer liefert", async () => {
+    // `h(PageComponent, { host })`: der äussere VNode trägt weder props noch
+    // children mit dem Handler. Die Aktions-Achse löste das längst auf, der
+    // Probelauf nicht — und wies jeden komponentisierten Skin als undelivered ab.
+    const Inner = (props: { host: unknown }) => {
+      const h = props.host as {
+        layersFor: (id: string) => { items: { link?: unknown }[] }[];
+        currentPageId: string;
+        followLink: (l: unknown) => unknown;
+      };
+      const children: unknown[] = [];
+      for (const layer of h.layersFor(h.currentPageId)) {
+        for (const item of layer.items) {
+          if (item.link) children.push({ props: { onClick: () => h.followLink(item.link) } });
+        }
+      }
+      return { props: {}, children };
+    };
+    const page = (host: never) => ({ type: Inner, props: { host }, children: null });
+    expect(await checkHonors(honorsSkin(["link"], page))).toEqual([]);
+  });
+
+  it("und der Wächter fällt weiterhin: ein leerer Komponenten-Baum ist undelivered", async () => {
+    // Die Kehrprobe zur Komponenten-Auflösung. Ohne sie belegte die Spec oben nur,
+    // dass etwas grün wird — nicht, dass die Auflösung noch etwas ablehnen kann.
+    const Empty = () => ({ props: {}, children: [] });
+    const page = (host: never) => ({ type: Empty, props: { host }, children: null });
+    expect((await checkHonors(honorsSkin(["link"], page))).map((f) => f.problem)).toEqual([
+      "undelivered",
+    ]);
+  });
+
+  it("ein honors-Befund ist ein harter Fehler wie eine gap", async () => {
+    const { hasGap, honors } = await generateSupport(honorsSkin(["nope"]));
     expect(honors).toHaveLength(1);
     expect(hasGap).toBe(true);
+  });
+
+  it("und er steht IM Artefakt, nicht nur im Exit-Code des Laufs", async () => {
+    // F3: bei `unknown`/`unrenderable`/`undelivered` wurde support.json trotzdem
+    // mit der BEHAUPTETEN honors-Liste und ohne einen einzigen Befund serialisiert.
+    // stderr und Exit-Code sind nach dem Lauf weg — das Artefakt blieb liegen.
+    const { report } = await generateSupport(honorsSkin(["link"]));
+    expect(report.layout?.honors).toEqual(["link"]);
+    expect(report.layout?.honorsFindings).toEqual([
+      {
+        token: "link",
+        problem: "unrenderable",
+        detail: "kein Page-Renderer - nur er sieht LayerItem.link",
+      },
+    ]);
+  });
+
+  it("ein sauberer Skin trägt KEIN honorsFindings im Artefakt", async () => {
+    const { report } = await generateSupport(honorsSkin(["order"]));
+    expect(report.layout).toEqual({ model: "grid", honors: ["order"] });
   });
 });

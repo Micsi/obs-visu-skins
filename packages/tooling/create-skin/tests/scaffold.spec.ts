@@ -105,7 +105,7 @@ describe("scaffoldSkin (end-to-end against a temporary target)", () => {
         styles[sheet] = readFileSync(join(dir, sheet), "utf8");
       }
 
-      const { hasGap, report } = generateSupport({ manifest, tiles: mod.tiles, styles });
+      const { hasGap, report } = await generateSupport({ manifest, tiles: mod.tiles, styles });
       expect(hasGap).toBe(false);
       expect(report.summary.gap).toBe(0);
       expect(report.summary.broken).toBe(0);

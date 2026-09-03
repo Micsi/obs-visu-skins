@@ -236,11 +236,21 @@
  * Bewusst NUR in der breiten Form. In der gestapelten (schmalen) Form sind Label
  * und Zustand volle Zeilen; ein max-content-Boden wuerde dort genau den
  * Horizontalscroll erzwingen, den die Stapelung vermeidet.
- * 701px = komplementaer zur Stapel-Schwelle (max-width: 700px) unten. */
+ * 701px = komplementaer zur Stapel-Schwelle (max-width: 700px) unten.
+ *
+ * Der Boden ist GEDECKELT (`min(max-content, 100%)`), und das ist der Kern:
+ * ein nackter `max-content`-Boden ueberschreibt das `min-width: 0` der Spalte,
+ * und weil beide Felder `white-space: nowrap` tragen, konnte ein ueberlanges
+ * Label oder ein langer Zustandstext dann weder schrumpfen noch umbrechen noch
+ * ellipsieren — ein nutzergelieferter Wert erzwang genau den horizontalen
+ * Ueberlauf, den diese Regel verhindern sollte. Mit dem Deckel gilt der Boden
+ * nur, solange der Inhalt in die Zeile passt; darueber faellt die Spalte auf
+ * die Zeilenbreite zurueck und kuerzt wieder mit Ellipse. Die Reihenfolge
+ * (erst umbricht die Befehlsspalte) bleibt fuer jeden normalen Inhalt erhalten. */
 @container (min-width: 701px) {
   .t-root .t-label,
   .t-root .t-state {
-    min-width: max-content;
+    min-width: min(max-content, 100%);
   }
 }
 

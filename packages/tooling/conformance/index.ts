@@ -50,12 +50,12 @@ import {
   type SupportReport,
   type SupportWidgetEntry,
 } from "@obs/visu-contract";
-import { ctxStub, pageHostProbe, tokensStub } from "./stubs.js";
+import { clickEventStub, ctxStub, pageHostProbe, tokensStub } from "./stubs.js";
 import { measureA11y } from "./a11y.js";
 
 // Die Fixture-Wand nutzt denselben Ctx-/Tokens-Stub wie dieser Lauf — Wand und
 // support.json sollen dieselbe Prüfung zeigen, nicht zwei Nachbildungen.
-export { ctxStub, tokensStub, pageHostProbe } from "./stubs.js";
+export { ctxStub, tokensStub, pageHostProbe, clickEventStub } from "./stubs.js";
 // Die Farb-Achse liegt in a11y.ts, wird aber von hier mit-exportiert: wer den
 // Generator benutzt, soll nicht wissen muessen, dass sie in einer zweiten Datei steht.
 export {
@@ -157,8 +157,14 @@ export const LAYOUT_HONORS: readonly string[] = Object.freeze([
  * Misst die `honors`-Achse. Kein I/O; der Page-Renderer wird einmal über einen
  * neutralen, protokollierenden {@link pageHostProbe} gefahren. Wirft er, zeichnet
  * er nichts - derselbe Befund.
+ *
+ * `async`, und das ist keine Kosmetik: ein Klick-Handler darf `followLink` hinter
+ * einem `await` rufen (erst fragen, dann springen). Ein synchroner Probelauf sah
+ * davon nichts und meldete `undelivered` - er hätte einen konformen Skin
+ * abgelehnt. Der Lauf wartet deshalb auf das, was ein Handler zurückgibt, bevor
+ * er urteilt.
  */
-export function checkHonors(skin: SkinInput): HonorsFinding[] {
+export async function checkHonors(skin: SkinInput): Promise<HonorsFinding[]> {
   const declared = skin.manifest.layout.honors ?? [];
   const findings: HonorsFinding[] = [];
 
@@ -200,9 +206,16 @@ export function checkHonors(skin: SkinInput): HonorsFinding[] {
       // `isLinkActive` fürs Markup ruft und den Sprung weglässt. Der Rest
       // (bedienbar, fokussierbar) ist Sache der Specs des Skins; hier wird
       // NICHT behauptet, er sei geprüft.
+      //
+      // Der Handler bekommt ein Stellvertreter-Ereignis ({@link clickEventStub}).
+      // Ohne Argument warf jeder normale Vue-Handler an `event.preventDefault()`
+      // — noch VOR `followLink` — und ein konformer Skin fiel durch, nur weil er
+      // sein Klick-Ereignis anfasst.
       for (const fire of clickHandlers(tree)) {
         try {
-          fire();
+          // Ein Handler, der erst nach einem `await` springt, wird MITGEZÄHLT:
+          // der Rückgabewert wird abgewartet, bevor das Protokoll gelesen wird.
+          await fire(clickEventStub());
         } catch {
           /* ein werfender Handler liefert keine Affordanz - zählt als nichts */
         }
@@ -221,22 +234,67 @@ export function checkHonors(skin: SkinInput): HonorsFinding[] {
   return findings;
 }
 
+/** Ein Klick-Handler, so wie Vue ihn ruft: mit dem Ereignis, ggf. asynchron. */
+type ClickHandler = (event: unknown) => unknown;
+
+/**
+ * Rendert einen Komponenten-VNode aus, falls es einer ist.
+ *
+ * Ein Renderer darf seine Elemente durch eine Komponente ziehen
+ * (`h(PageComponent, { host })`); erst deren Render-Funktion erzeugt das Markup.
+ * Wer nur `props`/`children` des äusseren VNode liest, sieht davon nichts. Diese
+ * eine Auflösung bedient BEIDE Traversierungen — die Aktions-Achse
+ * ({@link collectActions}) und den `honors`-Probelauf ({@link clickHandlers}).
+ * Getrennte Fassungen waren genau der Grund, warum die Aktions-Achse Komponenten
+ * auflöste und der Probelauf nicht: ein komponentisierter Skin galt dort als
+ * `undelivered`, obwohl sein DOM `followLink` ruft.
+ *
+ * Wirft die Komponente ohne echte Laufzeit, bleibt sie schlicht ungemessen —
+ * `broken` ist dem Renderer selbst vorbehalten, nicht unserer Unfähigkeit, ihn
+ * zu instanziieren.
+ */
+function expandComponent(vnode: { type?: unknown; props?: unknown; children?: unknown }): unknown {
+  const type = vnode.type;
+  const render =
+    typeof type === "function"
+      ? (type as (props?: unknown, ctx?: unknown) => unknown)
+      : type &&
+          typeof type === "object" &&
+          typeof (type as { render?: unknown }).render === "function"
+        ? (type as { render: (props?: unknown, ctx?: unknown) => unknown }).render
+        : undefined;
+  if (!render) return undefined;
+  try {
+    const slots = vnode.children;
+    return render(vnode.props ?? {}, { slots, attrs: vnode.props ?? {} });
+  } catch {
+    return undefined;
+  }
+}
+
 /**
  * Alle Klick-Handler eines gerenderten Baums (Vue-VNode-artig: `props` +
- * `children`). Tiefenbegrenzt und zyklensicher genug für einen headless Probelauf.
+ * `children`), Komponenten eingeschlossen. Tiefenbegrenzt und zyklensicher genug
+ * für einen headless Probelauf.
  */
-function clickHandlers(node: unknown, out: (() => void)[] = [], depth = 0): (() => void)[] {
+function clickHandlers(node: unknown, out: ClickHandler[] = [], depth = 0): ClickHandler[] {
   if (depth > 64 || node === null || node === undefined || typeof node !== "object") return out;
   if (Array.isArray(node)) {
     for (const child of node) clickHandlers(child, out, depth + 1);
     return out;
   }
-  const vnode = node as { props?: Record<string, unknown> | null; children?: unknown };
+  const vnode = node as {
+    type?: unknown;
+    props?: Record<string, unknown> | null;
+    children?: unknown;
+  };
   for (const [key, value] of Object.entries(vnode.props ?? {})) {
     if (/^on(Click|click)$/.test(key) && typeof value === "function") {
-      out.push(value as () => void);
+      out.push(value as ClickHandler);
     }
   }
+  const expanded = expandComponent(vnode);
+  if (expanded !== undefined) clickHandlers(expanded, out, depth + 1);
   clickHandlers(vnode.children, out, depth + 1);
   return out;
 }
@@ -327,23 +385,9 @@ export function collectActions(
   // Komponente ziehen (`h(ActionButton)`), deren Render-Funktion erst das Element mit
   // `data-action` erzeugt. Wer nur props/children des aeusseren VNode liest, sieht die
   // Aktion nie und stuft einen voll bedienbaren Skin auf display/partial herunter.
-  const type = vnode.type;
-  const render =
-    typeof type === "function"
-      ? (type as (props?: unknown, ctx?: unknown) => unknown)
-      : type && typeof type === "object" && typeof (type as { render?: unknown }).render === "function"
-        ? ((type as { render: (props?: unknown, ctx?: unknown) => unknown }).render)
-        : undefined;
-  if (render) {
-    try {
-      const slots = vnode.children;
-      collectActions(render(vnode.props ?? {}, { slots, attrs: vnode.props ?? {} }), out, depth + 1);
-    } catch {
-      // Eine Komponente, die ohne echte Laufzeit nicht rendert, darf den Lauf nicht
-      // kippen — sie bleibt schlicht ungemessen. `broken` ist dem Renderer selbst
-      // vorbehalten, nicht unserer Unfaehigkeit, ihn zu instanziieren.
-    }
-  }
+  // Dieselbe Aufloesung benutzt der `honors`-Probelauf ({@link expandComponent}).
+  const expanded = expandComponent(vnode);
+  if (expanded !== undefined) collectActions(expanded, out, depth + 1);
 
   if (vnode.children !== undefined) collectActions(vnode.children, out, depth + 1);
   return out;
@@ -496,13 +540,16 @@ function classify(
  * Erzeugt den Konformitäts-Report für einen Skin. Kein I/O, kein State — die
  * Renderer werden rein funktional über die Vertrags-Fixtures aufgerufen.
  *
+ * `async`, weil die `honors`-Achse einen Klick-Handler auch dann noch zählt, wenn
+ * er `followLink` erst nach einem `await` ruft ({@link checkHonors}).
+ *
  * @param skin manifest.json + tiles-Renderer-Map des Skins
  * @param now  Zeitstempel-Quelle (injizierbar für deterministische Tests)
  */
-export function generateSupport(
+export async function generateSupport(
   skin: SkinInput,
   now: () => Date = () => new Date(),
-): ConformanceResult {
+): Promise<ConformanceResult> {
   const { manifest } = skin;
 
   const widgets: Record<string, SupportWidgetEntry> = {};
@@ -521,6 +568,8 @@ export function generateSupport(
     summary[entry.level] += 1;
   }
 
+  const honors = await checkHonors(skin);
+
   const report: SupportReport = {
     skin: manifest.name,
     targetsContract: manifest.targetsContract,
@@ -532,7 +581,15 @@ export function generateSupport(
     widgets,
     layout: {
       model: manifest.layout.model,
+      // Die DEKLARATION, verbatim — sie bleibt, was sie ist.
       honors: manifest.layout.honors ?? [],
+      // …und daneben das MESSERGEBNIS. Ohne diesen Eintrag trug support.json bei
+      // `unknown`/`unrenderable`/`undelivered` weiterhin die behauptete
+      // `honors`-Liste und KEINEN einzigen Befund: Exit-Code und stderr sind nach
+      // dem Lauf weg, das Artefakt bleibt liegen, und ein späterer Konsument hielt
+      // es für gültig. Ein Befund gehört deshalb IN das Artefakt, nicht nur in den
+      // Lauf, der es geschrieben hat.
+      ...(honors.length > 0 ? { honorsFindings: honors } : {}),
     },
     // Die Farb-Achse (Vertrag 1.13). Sie steht IMMER im Report — auch wenn der
     // Skin nichts deklariert: dann als `undeclared`, ausdruecklich unterscheidbar
@@ -541,7 +598,6 @@ export function generateSupport(
     a11y: measureA11y({ manifest, styles: skin.styles }),
   };
 
-  const honors = checkHonors(skin);
   const a11yFailed = report.a11y?.status !== "pass";
   return {
     report,
