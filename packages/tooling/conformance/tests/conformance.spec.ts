@@ -1444,3 +1444,61 @@ describe("honors-Achse — die beiden Richtungen messen verschieden streng", () 
     ]);
   }, 30_000);
 });
+
+describe("Aktions-Achse — die Komponente sieht ihre Props so, wie Vue sie liefert", () => {
+  const actionSkin = (tiles: RendererMap) => ({
+    manifest: {
+      name: "props-stub",
+      targetsContract: contractVersion,
+      unsupported: [],
+      widgets: { switch: { actions: ["toggle"] } },
+      layout: { model: "grid", honors: [] },
+    } as unknown as SkinManifest,
+    tiles,
+  });
+
+  it("wendet den deklarierten `default` an, bevor sie den Baum abläuft", async () => {
+    // Vue setzt beim Instanziieren die Defaults der Prop-Deklaration. Der rohe
+    // Prop-Beutel des VNode kennt sie nicht: eine Aktions-Komponente, deren
+    // weggelassenes `enabled` per Deklaration `true` wäre, bekam `undefined`,
+    // zeichnete ihr `data-action` nicht — und eine tatsächlich angebotene Aktion
+    // rutschte von `full` auf `display`.
+    const Action = {
+      props: { enabled: { type: Boolean, default: true } },
+      setup(props: { enabled: boolean }) {
+        return () => (props.enabled ? vh("button", { "data-action": "toggle" }) : vh("span"));
+      },
+    };
+    const tile: Renderer = () => vh(Action as never, {}) as never;
+    const { report } = await generateSupport(actionSkin({ switch: tile }));
+    expect(report.widgets.switch?.actions).toBe("1/1");
+    expect(report.widgets.switch?.level).toBe("full");
+  });
+
+  it("macht aus einem deklarierten Boolean ohne Wert `false`, nicht `undefined`", async () => {
+    // Der Nachbarfall: die Normalisierung darf nicht alles wahr machen. Ohne Wert
+    // ist ein deklariertes Boolean `false` — die Aktion wird dann zu Recht NICHT
+    // gezeichnet.
+    const Action = {
+      props: { enabled: { type: Boolean } },
+      setup(props: { enabled: boolean }) {
+        return () => (props.enabled ? vh("button", { "data-action": "toggle" }) : vh("span"));
+      },
+    };
+    const tile: Renderer = () => vh(Action as never, {}) as never;
+    const { report } = await generateSupport(actionSkin({ switch: tile }));
+    expect(report.widgets.switch?.actions).toBe("0/1");
+  });
+
+  it("liest `<C enabled>` — den leeren String — als `true`", async () => {
+    const Action = {
+      props: { enabled: { type: Boolean } },
+      setup(props: { enabled: boolean }) {
+        return () => (props.enabled ? vh("button", { "data-action": "toggle" }) : vh("span"));
+      },
+    };
+    const tile: Renderer = () => vh(Action as never, { enabled: "" }) as never;
+    const { report } = await generateSupport(actionSkin({ switch: tile }));
+    expect(report.widgets.switch?.actions).toBe("1/1");
+  });
+});

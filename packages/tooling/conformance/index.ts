@@ -584,6 +584,52 @@ async function domRuntime(): Promise<{ createApp: typeof import("vue").createApp
 }
 
 /**
+ * Die Props, wie die Komponente sie SIEHT — nicht der rohe Prop-Beutel des VNode.
+ *
+ * Beim Instanziieren wendet Vue die Deklaration an: fehlende Props bekommen ihren
+ * `default`, ein deklariertes `Boolean` ohne Wert wird zu `false` und mit leerem
+ * String zu `true`. Nichts davon geschah hier, und der Unterschied ist messbar: eine
+ * Aktions-Komponente, deren weggelassenes `enabled` per Deklaration `true` wäre,
+ * bekam `undefined`, zeichnete ihr `data-action` nicht — und eine tatsächlich
+ * angebotene Aktion rutschte von `full` auf `partial` oder `display`.
+ *
+ * Bewusst nur die Deklaration, kein Mount: die Aktions-Achse jagt Hunderte Fixtures
+ * durch die Renderer, ein Mount je Fixture wäre zu teuer (siehe den Doc-Block oben).
+ * Was Vue darüber hinaus tut — `attrs`-Trennung, Validatoren — verschiebt das
+ * gezeichnete Markup nicht und bleibt deshalb aussen vor.
+ */
+function normalizeProps(
+  raw: Record<string, unknown>,
+  declared: unknown,
+): Record<string, unknown> {
+  if (!declared || typeof declared !== "object") return raw;
+  const out: Record<string, unknown> = { ...raw };
+  // Array-Form (`props: ['a','b']`) trägt keine Defaults — nichts zu tun.
+  if (Array.isArray(declared)) return out;
+  for (const [name, spec] of Object.entries(declared as Record<string, unknown>)) {
+    const given = out[name];
+    const type = spec && typeof spec === "object" ? (spec as { type?: unknown }).type : spec;
+    const isBoolean = type === Boolean || (Array.isArray(type) && type.includes(Boolean));
+    if (given === undefined) {
+      const def =
+        spec && typeof spec === "object" ? (spec as { default?: unknown }).default : undefined;
+      if (def !== undefined) {
+        // Objekt-/Array-Defaults liefert Vue über eine Fabrik, damit Instanzen sie
+        // nicht teilen.
+        out[name] = typeof def === "function" && type !== Function ? (def as () => unknown)() : def;
+      } else if (isBoolean) {
+        // Ein deklariertes Boolean ohne Wert ist `false`, nicht `undefined`.
+        out[name] = false;
+      }
+    } else if (isBoolean && given === "") {
+      // `<C enabled>` kommt als leerer String an und bedeutet `true`.
+      out[name] = true;
+    }
+  }
+  return out;
+}
+
+/**
  * Rendert einen Komponenten-VNode aus, falls es einer ist.
  *
  * Ein Renderer darf seine Elemente durch eine Komponente ziehen
@@ -603,10 +649,11 @@ async function domRuntime(): Promise<{ createApp: typeof import("vue").createApp
  */
 function expandComponent(vnode: { type?: unknown; props?: unknown; children?: unknown }): unknown {
   const type = vnode.type;
-  const props = (vnode.props ?? {}) as Record<string, unknown>;
+  const raw = (vnode.props ?? {}) as Record<string, unknown>;
   const slots = vnode.children;
-  const ctx = { slots, attrs: props, emit: () => {}, expose: () => {} };
   const options = type && typeof type === "object" ? (type as Record<string, unknown>) : undefined;
+  const props = normalizeProps(raw, options?.props);
+  const ctx = { slots, attrs: raw, emit: () => {}, expose: () => {} };
 
   // Die HÄUFIGSTE Komponentenform der Composition API — `defineComponent({ setup()
   // { return () => h(…) } })` — hat WEDER einen aufrufbaren `type` NOCH ein
