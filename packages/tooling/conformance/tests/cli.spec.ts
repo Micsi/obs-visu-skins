@@ -1,3 +1,10 @@
+// @vitest-environment node
+//
+// BEWUSST unter `node`, nicht unter der jsdom-Umgebung der uebrigen Specs: `cli.ts`
+// traegt eine Shebang, ueber die der Transform-Pfad der Browser-Umgebung stolpert.
+// Das ist hier kein Ausweichen, sondern der schaerfere Test — so laeuft das CLI
+// genau so, wie ein direkter Aufruf es faehrt, und belegt, dass `ensureDom()` die
+// DOM-Laufzeit selbst hochzieht, bevor der Skin (und mit ihm Vue) geladen wird.
 // CLI-Spec: belegt die aufrufbare Schnittstelle, die R4 (#3) später als CI-Gate verdrahtet.
 // Läuft unter dem TS-Runner (vitest), der Skin-Pakete als `.ts` auflöst — derselbe Weg,
 // auf dem die Skins selbst konsumiert werden.

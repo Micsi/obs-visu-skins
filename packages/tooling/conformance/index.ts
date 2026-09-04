@@ -50,12 +50,12 @@ import {
   type SupportReport,
   type SupportWidgetEntry,
 } from "@obs/visu-contract";
-import { clickEventProbe, ctxStub, pageHostProbe, tokensStub } from "./stubs.js";
+import { ctxStub, pageHostProbe, tokensStub } from "./stubs.js";
 import { measureA11y } from "./a11y.js";
 
 // Die Fixture-Wand nutzt denselben Ctx-/Tokens-Stub wie dieser Lauf — Wand und
 // support.json sollen dieselbe Prüfung zeigen, nicht zwei Nachbildungen.
-export { ctxStub, tokensStub, pageHostProbe, clickEventStub, clickEventProbe } from "./stubs.js";
+export { ctxStub, tokensStub, pageHostProbe } from "./stubs.js";
 // Die Farb-Achse liegt in a11y.ts, wird aber von hier mit-exportiert: wer den
 // Generator benutzt, soll nicht wissen muessen, dass sie in einer zweiten Datei steht.
 export {
@@ -190,64 +190,13 @@ export async function checkHonors(skin: SkinInput): Promise<HonorsFinding[]> {
       });
     } else {
       const probe = pageHostProbe();
-      let tree: unknown = null;
-      try {
-        tree = skin.page(probe.host);
-      } catch {
-        /* wie "zeichnet nichts": es entsteht keine Affordanz */
-      }
-      // Gemessen wird genau EINES: IRGENDEIN Klick-Handler im gerenderten Baum
-      // ruft `host.followLink`. Nicht mehr — nicht, dass die Affordanz sichtbar,
-      // fokussierbar, aktivierbar oder überhaupt an DIESEM Item hängt. Ein
-      // Reviewer hat drei Renderer gebaut, die das hier grün passieren und
-      // trotzdem unbedienbar sind (`disabled`+`display:none`; ein nacktes,
-      // nicht fokussierbares `<div>`; ein Handler ohne Bezug zum Item).
-      //
-      // Diese schmale Messung ist trotzdem die richtige: sie trennt sicher
-      // "zeichnet den Sprung" von "hat den Host nur gefragt" — und genau daran
-      // scheiterte die erste Fassung, durch die ein Skin schlüpfte, der
-      // `isLinkActive` fürs Markup ruft und den Sprung weglässt. Der Rest
-      // (bedienbar, fokussierbar) ist Sache der Specs des Skins; hier wird
-      // NICHT behauptet, er sei geprüft.
-      //
-      // Der Handler bekommt ein Stellvertreter-Ereignis ({@link clickEventProbe}).
-      // Ohne Argument warf jeder normale Vue-Handler an `event.preventDefault()`
-      // — noch VOR `followLink` — und ein konformer Skin fiel durch, nur weil er
-      // sein Klick-Ereignis anfasst.
-      //
-      // ZWEI PHASEN, und die Trennung ist der ganze Punkt: was der Renderer
-      // WÄHREND des Zeichnens am Host fragt, wird verworfen; gezählt wird nur,
-      // was ein KLICK auslöst. Ohne diesen Schnitt bestand ein Renderer, der
-      // `host.followLink` beim Rendern ruft und einen LEEREN Baum zurückgibt —
-      // also genau der Fall, den `undelivered` fangen soll. (Im Browser wäre so
-      // ein Renderer ohnehin kaputt: er navigiert beim blossen Anzeigen.)
-      //
-      // Die REIHENFOLGE trägt das: erst SAMMELN, dann leeren, dann feuern. Das
-      // Sammeln rendert Komponenten-VNodes aus (`expandComponent`), gehört also
-      // noch zur Zeichenphase — stand `reset()` davor, floss genau der
-      // Render-Zeit-Aufruf einer Komponente wieder ins Protokoll, den der Schnitt
-      // entfernen soll.
-      const dispatches = clickDispatches(tree);
-      probe.reset();
-      for (const fire of dispatches) {
-        try {
-          // Ein Handler, der erst nach einem `await` springt, wird MITGEZÄHLT:
-          // der Rückgabewert wird abgewartet, bevor das Protokoll gelesen wird.
-          // GEDECKELT, weil der Handler fremder Code ist: ein Versprechen, das nie
-          // eintrifft (`new Promise(() => {})`, ein Warten auf einen Dienst, den es
-          // hier nicht gibt), hätte sonst den ganzen Lauf und mit ihm das CI-Gate
-          // angehalten, statt einen Befund zu erzeugen.
-          await withTimeout(fire());
-        } catch {
-          /* ein werfender Handler liefert keine Affordanz - zählt als nichts */
-        }
-      }
-      if (!probe.linkCalls.includes("followLink")) {
+      const delivered = await probeLinkDelivery(skin.page, probe);
+      if (!delivered) {
         findings.push({
           token: "link",
           problem: "undelivered",
           detail:
-            "der Page-Renderer zeichnet keine aktivierbare Sprung-Affordanz (kein Klick-Handler ruft host.followLink)",
+            "der Page-Renderer zeichnet keine aktivierbare Sprung-Affordanz (kein Klick im gerenderten DOM ruft host.followLink)",
         });
       }
     }
@@ -256,86 +205,162 @@ export async function checkHonors(skin: SkinInput): Promise<HonorsFinding[]> {
   return findings;
 }
 
-/** Ein Klick-Handler, so wie Vue ihn ruft: mit dem Ereignis, ggf. asynchron. */
-type ClickHandler = (event: unknown) => unknown;
-
 /**
- * Die Prop-Namen, unter denen Vue einen Klick-Listener ablegt.
+ * Der `honors: link`-Probelauf: die Seite wird ECHT gerendert und ECHT geklickt.
  *
- * Vue hängt die Ereignis-Modifikatoren an den Namen an (`.once` → `onClickOnce`,
- * `.capture` → `onClickCapture`, `.passive` → `onClickPassive`, kombinierbar und
- * in beliebiger Reihenfolge). Der Browser ruft sie alle als Klick-Handler; die
- * Prüfung auf den EXAKTEN Namen `onClick` sah sie nicht, und eine gültige
- * Sprung-Affordanz, deren `followLink` in einem `onClickOnce` steckt, fiel als
- * `undelivered` durch.
+ * Die Vorgängerfassung baute Vues Verhalten nach — sie lief den VNode-Baum ab,
+ * sammelte `onClick`-Props und rief sie selbst auf. Das war eine Nachbildung, und
+ * jede Review-Runde fand die nächste Stelle, an der sie vom Original abwich:
+ * Ereignis-Modifikatoren im Prop-Namen, Listener-Arrays aus `mergeProps` und ihre
+ * `stopImmediatePropagation`-Semantik, `setup()`-Komponenten ohne `render`,
+ * Komponenten-Emits gegenüber Attribut-Fallthrough, `inheritAttrs: false`,
+ * Slot-Kinder, die der Renderer gar nicht einsetzt, das Ereignis-Ziel mit seinem
+ * `dataset`. Jede dieser Regeln ist Vue-Wissen, und die Liste hat kein Ende.
  *
- * Bewusst am Ende verankert: `onClickOutside` (ein Komponenten-Emit) ist KEIN
- * Klick-Listener und darf nicht mitzählen.
- */
-const CLICK_PROP = /^on-?click(?:once|capture|passive)*$/i;
-
-/**
- * Ein Klick, so wie der Browser ihn austrägt: EIN Ereignis durch die Listener
- * EINES Prop-Namens, in ihrer Reihenfolge.
- */
-type ClickDispatch = () => Promise<void>;
-
-/** Obergrenze für einen einzelnen Handler-Lauf. */
-const HANDLER_TIMEOUT_MS = 2000;
-
-/**
- * Wartet auf den Handler, aber nicht ewig.
+ * Deshalb übernimmt Vue sie wieder selbst: `createApp(...).mount()` in ein echtes
+ * Dokument, dann ein echtes `MouseEvent` auf jedes Element. Damit stimmen alle
+ * genannten Punkte per Konstruktion — und ein paar Fälle, die die Nachbildung
+ * gar nicht sehen konnte, kommen gratis dazu: ein `disabled` Button verschluckt
+ * seinen Klick genau wie im Browser, und Bubbling erreicht die Handler der
+ * Vorfahren in der richtigen Reihenfolge.
  *
- * Der Probelauf ruft FREMDEN Code. Ein Handler, dessen Versprechen nie eintrifft,
- * hielt den ganzen Lauf an — das Gate lief in den CI-Timeout, statt den Skin als
- * `undelivered` zu melden. Ein abgelaufener Handler zählt wie einer, der nichts
- * getan hat: was er nach Ablauf noch ins Protokoll schreibt, ist keine Affordanz,
- * die ein Nutzer erlebt.
+ * Gemessen wird weiterhin genau EINES: irgendein Klick im gerenderten DOM führt
+ * zu `host.followLink`. NICHT geprüft (und nicht behauptet) ist, ob die Affordanz
+ * sichtbar, fokussierbar oder an genau diesem Item verankert ist — das bleibt
+ * Sache der Specs des Skins.
  */
-async function withTimeout(work: Promise<void>): Promise<void> {
-  let timer: ReturnType<typeof setTimeout> | undefined;
+async function probeLinkDelivery(
+  page: NonNullable<SkinInput["page"]>,
+  probe: ReturnType<typeof pageHostProbe>,
+): Promise<boolean> {
+  const vue = await domRuntime();
+  // Ohne DOM-Laufzeit wird NICHT gemessen — und damit auch nichts behauptet. Ein
+  // Befund hier wäre unsere Unfähigkeit zu messen, nicht ein Mangel des Skins.
+  if (!vue) return true;
+
+  const container = document.createElement("div");
+  document.body.appendChild(container);
+  const app = vue.createApp({ render: () => page(probe.host) });
   try {
-    await Promise.race([
-      work,
-      new Promise<void>((resolve) => {
-        timer = setTimeout(resolve, HANDLER_TIMEOUT_MS);
-      }),
-    ]);
-  } finally {
-    if (timer !== undefined) clearTimeout(timer);
+    app.mount(container);
+  } catch {
+    // Wirft der Renderer, zeichnet er nichts — derselbe Befund wie ein leerer Baum.
+    container.remove();
+    return false;
   }
-}
 
-/**
- * Die Listener unter EINEM Prop-Namen. Nach `mergeProps` (Vue mischt die
- * Listener zweier Prop-Objekte) steht dort ein ARRAY von Funktionen, kein
- * einzelner Handler — `typeof value === "function"` sah davon nichts.
- */
-function listenersOf(value: unknown, out: ClickHandler[] = [], depth = 0): ClickHandler[] {
-  if (depth > 8) return out;
-  if (typeof value === "function") out.push(value as ClickHandler);
-  else if (Array.isArray(value)) for (const v of value) listenersOf(v, out, depth + 1);
-  return out;
-}
+  // ZWEI PHASEN: was der Renderer beim ZEICHNEN am Host fragt, wird verworfen;
+  // gezählt wird nur, was ein KLICK auslöst. Ohne diesen Schnitt bestünde ein
+  // Renderer, der `followLink` schon beim Rendern ruft und nichts zeichnet — im
+  // Browser wäre er kaputt: er navigierte beim blossen Anzeigen der Seite.
+  probe.reset();
 
-/**
- * Macht aus den Listenern EINES Prop-Namens EINEN Klick.
- *
- * Vue ruft die Glieder eines Listener-Arrays nacheinander mit DEMSELBEN Ereignis
- * und bricht ab, sobald eines `stopImmediatePropagation()` ruft. Der Probelauf
- * feuerte sie einzeln mit je frischem Ereignis — ein Array, dessen späterer
- * Listener `followLink` ruft, bestand damit, obwohl ein echter Klick dort nie
- * ankommt. Ein Dispatch trägt jetzt ein Ereignis durch die ganze Kette und hält
- * an, wo der Browser anhielte.
- */
-function dispatchOf(listeners: readonly ClickHandler[]): ClickDispatch {
-  return async () => {
-    const { event, immediateStopped } = clickEventProbe();
-    for (const listener of listeners) {
-      if (immediateStopped()) return;
-      await listener(event);
+  const deadline = Date.now() + PROBE_BUDGET_MS;
+  const w = globalThis as unknown as { MouseEvent: typeof MouseEvent };
+  for (const el of Array.from(container.querySelectorAll("*"))) {
+    if (probe.linkCalls.includes("followLink") || Date.now() > deadline) break;
+    try {
+      el.dispatchEvent(new w.MouseEvent("click", { bubbles: true, cancelable: true }));
+    } catch {
+      /* ein werfender Handler liefert keine Affordanz - zählt als nichts */
     }
-  };
+  }
+
+  // Ein Handler darf `followLink` hinter einem `await` rufen (erst fragen, dann
+  // springen). Dem Rest der Warteschlange wird deshalb noch Zeit gegeben — kurz
+  // (siehe {@link SETTLE_MS}) und zusätzlich vom Gesamtbudget gedeckelt, damit ein
+  // Versprechen, das nie eintrifft, den Lauf nicht anhält.
+  const settleUntil = Math.min(Date.now() + SETTLE_MS, deadline);
+  while (!probe.linkCalls.includes("followLink") && Date.now() < settleUntil) {
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+
+  const delivered = probe.linkCalls.includes("followLink");
+  try {
+    app.unmount();
+  } catch {
+    /* der Abbau gehört nicht zur Messung */
+  }
+  container.remove();
+  return delivered;
+}
+
+
+/**
+ * Zeitbudget für die GANZE Klick-Phase eines Skins — nicht pro Handler.
+ *
+ * Der Probelauf ruft fremden Code. Ein Deckel je Handler skaliert nicht: hundert
+ * Handler, deren Versprechen nie eintreffen, summierten sich auf Minuten und
+ * liefen genau in den CI-Timeout, den der Deckel verhindern soll.
+ */
+const PROBE_BUDGET_MS = 3000;
+
+/**
+ * Nachlauf, nachdem alle Klicks gefeuert sind.
+ *
+ * Ein Handler darf `followLink` hinter einem `await` rufen — dafür muss die
+ * Warteschlange noch abfliessen. Bewusst KURZ und getrennt vom Gesamtbudget: der
+ * Host-Stub antwortet sofort, es gibt hier nichts, worauf ein konformer Renderer
+ * lange warten müsste. Das ganze Budget hier abzuwarten hiesse, jeden Skin OHNE
+ * Link volle drei Sekunden zu bestrafen — bei drei Skins im Gate reine Wartezeit.
+ */
+const SETTLE_MS = 250;
+
+/**
+ * Stellt eine DOM-Umgebung bereit und liefert Vues `createApp` dazu.
+ *
+ * Unter vitest (`environment: "jsdom"`) steht das DOM schon; im CLI wird es hier
+ * aufgezogen. Die Reihenfolge ist nicht verhandelbar: `@vue/runtime-dom` greift
+ * `document` beim MODUL-LADEN ab, deshalb wird Vue erst NACH den Globals
+ * importiert (dynamisch), nie oben im Datei-Kopf.
+ */
+export async function ensureDom(): Promise<boolean> {
+  const g = globalThis as Record<string, unknown>;
+  if (typeof g.document === "undefined") {
+    let JSDOM: typeof import("jsdom").JSDOM;
+    try {
+      ({ JSDOM } = await import("jsdom"));
+    } catch {
+      return false;
+    }
+    const dom = new JSDOM("<!doctype html><html><body></body></html>", {
+      pretendToBeVisual: true,
+    });
+    const w = dom.window as unknown as Record<string, unknown>;
+    g.window = w;
+    g.document = w.document;
+    for (const name of [
+      "Node",
+      "Element",
+      "HTMLElement",
+      "SVGElement",
+      "Text",
+      "Comment",
+      "DocumentFragment",
+      "Event",
+      "MouseEvent",
+      "CustomEvent",
+      "navigator",
+      "requestAnimationFrame",
+      "cancelAnimationFrame",
+    ]) {
+      if (g[name] === undefined && w[name] !== undefined) g[name] = w[name];
+    }
+  }
+  return true;
+}
+
+/**
+ * Die DOM-Umgebung plus Vues `createApp`.
+ *
+ * Vue wird DYNAMISCH geladen, und erst hier: `@vue/runtime-dom` greift `document`
+ * beim Modul-Laden ab. Wer Vue vorher importiert (ein Skin etwa, den das CLI
+ * nachlädt), bekommt eine Laufzeit ohne Dokument — deshalb ruft `cli.ts`
+ * {@link ensureDom} auf, BEVOR es den Skin importiert.
+ */
+async function domRuntime(): Promise<{ createApp: typeof import("vue").createApp } | null> {
+  if (!(await ensureDom())) return null;
+  return await import("vue");
 }
 
 /**
@@ -343,12 +368,14 @@ function dispatchOf(listeners: readonly ClickHandler[]): ClickDispatch {
  *
  * Ein Renderer darf seine Elemente durch eine Komponente ziehen
  * (`h(PageComponent, { host })`); erst deren Render-Funktion erzeugt das Markup.
- * Wer nur `props`/`children` des äusseren VNode liest, sieht davon nichts. Diese
- * eine Auflösung bedient BEIDE Traversierungen — die Aktions-Achse
- * ({@link collectActions}) und den `honors`-Probelauf ({@link clickDispatches}).
- * Getrennte Fassungen waren genau der Grund, warum die Aktions-Achse Komponenten
- * auflöste und der Probelauf nicht: ein komponentisierter Skin galt dort als
- * `undelivered`, obwohl sein DOM `followLink` ruft.
+ * Wer nur `props`/`children` des äusseren VNode liest, sieht davon nichts.
+ *
+ * Nur noch für die AKTIONS-Achse ({@link collectActions}): die sucht `data-action`
+ * im zurückgegebenen Baum und arbeitet bewusst ohne DOM, weil sie jede Fixture
+ * jedes Typs durch jede Renderer-Fläche jagt — Hunderte Läufe, für die ein Mount
+ * je Fixture zu teuer wäre. Der `honors`-Probelauf ist genau diesen Weg gegangen
+ * und wieder abgebogen: dort wurde aus dem Auflösen ein Nachbau von Vues
+ * Semantik, den {@link probeLinkDelivery} jetzt Vue selbst überlässt.
  *
  * Wirft die Komponente ohne echte Laufzeit, bleibt sie schlicht ungemessen —
  * `broken` ist dem Renderer selbst vorbehalten, nicht unserer Unfähigkeit, ihn
@@ -417,62 +444,6 @@ function expandComponent(vnode: { type?: unknown; props?: unknown; children?: un
   } catch {
     return undefined;
   }
-}
-
-/**
- * Ob ein `onClick` an DIESEM VNode wirklich ein DOM-Klick-Listener ist.
- *
- * An einem Element-VNode (`type` ist ein String) immer. An einem KOMPONENTEN-VNode
- * kommt es darauf an, was die Komponente deklariert: steht `click` in ihren
- * `emits`, ist der Prop ein Komponenten-Ereignis und läuft NUR, wenn die
- * Komponente selbst `emit('click')` ruft — ein Klick des Nutzers erreicht ihn
- * nie. Der Probelauf rief ihn trotzdem direkt auf und nahm eine Seite ohne jede
- * funktionierende Sprung-Affordanz ab.
- *
- * Deklariert sie `click` NICHT, fällt der Listener nach Vues Regeln als Attribut
- * auf das Wurzelelement durch und ist damit sehr wohl ein echter Klick-Handler —
- * deshalb wird er dann weiter gezählt.
- */
-function isDomClickTarget(type: unknown): boolean {
-  const component = type !== null && (typeof type === "object" || typeof type === "function");
-  const emits = component ? (type as { emits?: unknown }).emits : undefined;
-  if (Array.isArray(emits)) return !emits.includes("click");
-  if (emits !== null && typeof emits === "object") return !("click" in (emits as object));
-  // Der Ausschluss greift NUR bei einem nachweislich deklarierten `click`-Emit.
-  // Alles andere — Elemente, aber auch die VNode-ARTIGEN Bäume, mit denen die
-  // Gegenproben arbeiten — zählt weiter. Ein Wächter, der im Zweifel wegwirft,
-  // lehnte konforme Skins ab; das ist genau die Fehlalarm-Klasse, gegen die die
-  // übrigen Weitungen hier gebaut sind.
-  return true;
-}
-
-/**
- * Alle Klicks eines gerenderten Baums (Vue-VNode-artig: `props` + `children`),
- * Komponenten eingeschlossen — je Prop-Name EIN Dispatch, nicht je Listener.
- * Tiefenbegrenzt und zyklensicher genug für einen headless Probelauf.
- */
-function clickDispatches(node: unknown, out: ClickDispatch[] = [], depth = 0): ClickDispatch[] {
-  if (depth > 64 || node === null || node === undefined || typeof node !== "object") return out;
-  if (Array.isArray(node)) {
-    for (const child of node) clickDispatches(child, out, depth + 1);
-    return out;
-  }
-  const vnode = node as {
-    type?: unknown;
-    props?: Record<string, unknown> | null;
-    children?: unknown;
-  };
-  if (isDomClickTarget(vnode.type)) {
-    for (const [key, value] of Object.entries(vnode.props ?? {})) {
-      if (!CLICK_PROP.test(key)) continue;
-      const listeners = listenersOf(value);
-      if (listeners.length > 0) out.push(dispatchOf(listeners));
-    }
-  }
-  const expanded = expandComponent(vnode);
-  if (expanded !== undefined) clickDispatches(expanded, out, depth + 1);
-  clickDispatches(vnode.children, out, depth + 1);
-  return out;
 }
 
 type Summary = {

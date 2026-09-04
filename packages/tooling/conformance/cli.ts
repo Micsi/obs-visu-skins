@@ -13,7 +13,7 @@ import { dirname, isAbsolute, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
 import type { PageRenderer, SkinManifest } from "@obs/visu-contract";
-import { generateSupport, type RendererMap, type SkinInput } from "./index.js";
+import { ensureDom, generateSupport, type RendererMap, type SkinInput } from "./index.js";
 
 interface SkinModule {
   readonly tiles: RendererMap;
@@ -60,6 +60,12 @@ function loadStyles(
 }
 
 async function loadSkin(pkg: string): Promise<{ skin: SkinInput; manifestPath: string }> {
+  // VOR dem Skin-Import: der zieht Vue nach, und `@vue/runtime-dom` greift
+  // `document` beim Modul-Laden ab. Steht das DOM erst danach, mountet der
+  // honors-Probelauf in eine Laufzeit ohne Dokument. Unter vitest ist die
+  // Umgebung schon `jsdom`; dieser Aufruf trägt den Fall, dass jemand das CLI
+  // direkt fährt.
+  await ensureDom();
   const require = createRequire(import.meta.url);
   const mod = (await import(pkg)) as SkinModule;
   const manifestPath = require.resolve(`${pkg}/manifest.json`);

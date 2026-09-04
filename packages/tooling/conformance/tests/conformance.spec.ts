@@ -8,7 +8,9 @@
 // → "gap"; ein werfender Renderer → "broken". Beides Exit != 0.
 
 import { describe, expect, it } from "vitest";
-import { h, mergeProps, type VNode } from "vue";
+// `vh` ist derselbe `h` — die Link-Specs binden `h` lokal an den Host-Stub und
+// brauchen daneben noch Vues Hyperscript.
+import { h, h as vh, mergeProps, type VNode } from "vue";
 import type { Renderer, SkinManifest } from "@obs/visu-contract";
 import { tiles } from "@obs-visu-skins/ionic";
 import ionicManifest from "@obs-visu-skins/ionic/manifest.json" with { type: "json" };
@@ -450,13 +452,13 @@ describe("honors-Achse — der Deklarations-Slot wird gemessen, nicht geglaubt",
         currentPageId: string;
         followLink: (l: unknown) => unknown;
       };
-      const children: unknown[] = [];
+      const children: VNode[] = [];
       for (const layer of h.layersFor(h.currentPageId)) {
         for (const item of layer.items) {
-          if (item.link) children.push({ props: { onClick: () => h.followLink(item.link) } });
+          if (item.link) children.push(vh("button", { onClick: () => h.followLink(item.link) }));
         }
       }
-      return { props: {}, children };
+      return vh("div", {}, children);
     };
     expect(await checkHonors(honorsSkin(["link"], page))).toEqual([]);
   });
@@ -478,27 +480,23 @@ describe("honors-Achse — der Deklarations-Slot wird gemessen, nicht geglaubt",
         currentPageId: string;
         followLink: (l: unknown) => unknown;
       };
-      const children: unknown[] = [];
+      const children: VNode[] = [];
       for (const layer of h.layersFor(h.currentPageId)) {
         for (const item of layer.items) {
           if (!item.link) continue;
-          children.push({
-            props: {
-              onClick: (event: {
-                preventDefault: () => void;
-                stopPropagation: () => void;
-                currentTarget: { tagName: string };
-              }) => {
+          children.push(
+            vh("button", {
+              onClick: (event: MouseEvent) => {
                 event.preventDefault();
                 event.stopPropagation();
-                if (event.currentTarget.tagName === "NOPE") return;
+                if ((event.currentTarget as HTMLElement).tagName === "NOPE") return;
                 h.followLink(item.link);
               },
-            },
-          });
+            }),
+          );
         }
       }
-      return { props: {}, children };
+      return vh("div", {}, children);
     };
     expect(await checkHonors(honorsSkin(["link"], page))).toEqual([]);
   });
@@ -510,21 +508,21 @@ describe("honors-Achse — der Deklarations-Slot wird gemessen, nicht geglaubt",
         currentPageId: string;
         followLink: (l: unknown) => unknown;
       };
-      const children: unknown[] = [];
+      const children: VNode[] = [];
       for (const layer of h.layersFor(h.currentPageId)) {
         for (const item of layer.items) {
           if (!item.link) continue;
-          children.push({
-            props: {
+          children.push(
+            vh("button", {
               onClick: async () => {
                 await Promise.resolve();
                 h.followLink(item.link);
               },
-            },
-          });
+            }),
+          );
         }
       }
-      return { props: {}, children };
+      return vh("div", {}, children);
     };
     expect(await checkHonors(honorsSkin(["link"], page))).toEqual([]);
   });
@@ -539,23 +537,23 @@ describe("honors-Achse — der Deklarations-Slot wird gemessen, nicht geglaubt",
         currentPageId: string;
         followLink: (l: unknown) => unknown;
       };
-      const children: unknown[] = [];
+      const children: VNode[] = [];
       for (const layer of h.layersFor(h.currentPageId)) {
         for (const item of layer.items) {
-          if (item.link) children.push({ props: { onClick: () => h.followLink(item.link) } });
+          if (item.link) children.push(vh("button", { onClick: () => h.followLink(item.link) }));
         }
       }
-      return { props: {}, children };
+      return vh("div", {}, children);
     };
-    const page = (host: never) => ({ type: Inner, props: { host }, children: null });
+    const page = (host: never) => vh(Inner as never, { host });
     expect(await checkHonors(honorsSkin(["link"], page))).toEqual([]);
   });
 
   it("und der Wächter fällt weiterhin: ein leerer Komponenten-Baum ist undelivered", async () => {
     // Die Kehrprobe zur Komponenten-Auflösung. Ohne sie belegte die Spec oben nur,
     // dass etwas grün wird — nicht, dass die Auflösung noch etwas ablehnen kann.
-    const Empty = () => ({ props: {}, children: [] });
-    const page = (host: never) => ({ type: Empty, props: { host }, children: null });
+    const Empty = () => vh("div", {}, []);
+    const page = (host: never) => vh(Empty as never, { host });
     expect((await checkHonors(honorsSkin(["link"], page))).map((f) => f.problem)).toEqual([
       "undelivered",
     ]);
@@ -935,5 +933,148 @@ describe("honors-Achse — der Deklarations-Slot wird gemessen, nicht geglaubt",
   it("ein sauberer Skin trägt KEIN honorsFindings im Artefakt", async () => {
     const { report } = await generateSupport(honorsSkin(["order"]));
     expect(report.layout).toEqual({ model: "grid", honors: ["order"] });
+  });
+});
+
+/**
+ * Die sieben Faelle, an denen die NACHBILDUNG von Vues Verhalten zuletzt scheiterte.
+ *
+ * Sie stehen hier nicht, weil je einer von ihnen einzeln behoben worden waere —
+ * sondern weil der Probelauf die Seite jetzt WIRKLICH mountet und WIRKLICH klickt.
+ * Vue bringt seine Semantik selbst mit; diese Specs halten fest, dass sie damit
+ * stimmt, und wuerden rot, wenn jemand wieder anfinge, sie nachzubauen.
+ */
+describe("honors-Probelauf — Vue liefert die Semantik, nicht unsere Nachbildung", () => {
+  const svcOf = (host: never) =>
+    host as unknown as {
+      layersFor: (id: string) => { items: { link?: unknown }[] }[];
+      currentPageId: string;
+      followLink: (l: unknown) => unknown;
+    };
+  const firstLink = (svc: ReturnType<typeof svcOf>): unknown =>
+    svc.layersFor(svc.currentPageId)[0]?.items.find((i: { link?: unknown }) => i.link)?.link;
+
+  it("routet ein Komponenten-Ereignis an den Listener des Eltern-VNode", async () => {
+    // `emits: ["click"]` + `emit("click")` im Kind: Vue ruft damit den `onClick`
+    // des Komponenten-VNode. Die Nachbildung ersetzte `emit` durch ein No-op und
+    // schloss den aeusseren Listener zugleich aus — ein voellig normaler
+    // komponenten-vermittelter Sprung galt als `undelivered`.
+    const page = (host: never) => {
+      const svc = svcOf(host);
+      const link = firstLink(svc);
+      const Button = {
+        emits: ["click"],
+        setup(_p: unknown, { emit }: { emit: (e: string) => void }) {
+          return () => vh("button", { onClick: () => emit("click") });
+        },
+      };
+      return vh(Button as never, { onClick: () => void svc.followLink(link) });
+    };
+    expect(await checkHonors(honorsSkin(["link"], page))).toEqual([]);
+  });
+
+  it("zaehlt einen Listener NICHT, den `inheritAttrs: false` nirgends anhaengt", async () => {
+    // Ohne Fallthrough landet der `onClick` an keinem Element. Die Nachbildung rief
+    // ihn trotzdem direkt auf und nahm eine Seite ab, die im Browser nichts tut.
+    const page = (host: never) => {
+      const svc = svcOf(host);
+      const link = firstLink(svc);
+      const Isolated = { inheritAttrs: false, render: () => vh("div", {}, []) };
+      return vh(Isolated as never, { onClick: () => void svc.followLink(link) });
+    };
+    expect((await checkHonors(honorsSkin(["link"], page))).map((f) => f.problem)).toEqual([
+      "undelivered",
+    ]);
+  });
+
+  it("teilt EIN Ereignis ueber mehrere Klick-Props desselben Elements", async () => {
+    // `onClick` und `onClickOnce` sind fuer Vue derselbe native `click`. Haelt der
+    // erste mit `stopImmediatePropagation()` an, kommt der zweite nicht mehr dran.
+    // Getrennte Dispatches mit je frischem Ereignis liessen ihn durch.
+    const page = (host: never) => {
+      const svc = svcOf(host);
+      const link = firstLink(svc);
+      return vh("button", {
+        onClick: (e: MouseEvent) => e.stopImmediatePropagation(),
+        onClickOnce: () => void svc.followLink(link),
+      });
+    };
+    expect((await checkHonors(honorsSkin(["link"], page))).map((f) => f.problem)).toEqual([
+      "undelivered",
+    ]);
+  });
+
+  it("bleibt unter der Zeitgrenze, auch bei vielen nie eintreffenden Handlern", async () => {
+    // Ein Deckel JE HANDLER skalierte nicht: hundert haengende Handler summierten
+    // sich auf Minuten und liefen genau in den CI-Timeout, den er verhindern soll.
+    // Das Budget gilt fuer die ganze Phase.
+    const page = () =>
+      vh(
+        "div",
+        {},
+        Array.from({ length: 100 }, () => vh("button", { onClick: () => new Promise(() => {}) })),
+      );
+    const started = Date.now();
+    const findings = await checkHonors(honorsSkin(["link"], page as never));
+    expect(findings.map((f) => f.problem)).toEqual(["undelivered"]);
+    expect(Date.now() - started, "die ganze Phase, nicht je Handler").toBeLessThan(10_000);
+  }, 30_000);
+
+  it("gibt dem Handler ein Ereignis mit dem ECHTEN geklickten Element", async () => {
+    // Ein Handler darf `event.currentTarget.dataset` lesen, bevor er springt. Der
+    // Stellvertreter war immer ein generischer Button mit leerem `dataset` — ein
+    // konformer Skin fiel durch, weil seine Bedingung nie zutraf.
+    const page = (host: never) => {
+      const svc = svcOf(host);
+      const link = firstLink(svc);
+      return vh("button", {
+        "data-link": "keller",
+        onClick: (e: MouseEvent) => {
+          const el = e.currentTarget as HTMLElement;
+          if (el.dataset.link !== "keller") return;
+          if (el.getAttribute("data-link") !== "keller") return;
+          void svc.followLink(link);
+        },
+      });
+    };
+    expect(await checkHonors(honorsSkin(["link"], page))).toEqual([]);
+  });
+
+  it("klickt keine Slot-Kinder, die der Renderer gar nicht einsetzt", async () => {
+    // Eine Komponente, die ihren Default-Slot NICHT rendert: Vue mountet diese
+    // Kinder nie. Die Nachbildung lief `vnode.children` trotzdem ab und liess
+    // einen verworfenen Button den Skin durchbringen.
+    const page = (host: never) => {
+      const svc = svcOf(host);
+      const link = firstLink(svc);
+      const Discards = { render: () => vh("div", {}, ["nichts vom Slot"]) };
+      return vh(Discards as never, {}, {
+        default: () => [vh("button", { onClick: () => void svc.followLink(link) })],
+      } as never);
+    };
+    expect((await checkHonors(honorsSkin(["link"], page))).map((f) => f.problem)).toEqual([
+      "undelivered",
+    ]);
+  });
+
+  it("kennt Vues rohe `on:click`-Schreibweise und faellt nicht auf `on-click` herein", async () => {
+    // Vue registriert `on:click` als `click`; `on-click` dagegen als Ereignis
+    // `-click`, das ein Klick nie ausloest. Der alte Namensvergleich hatte beides
+    // genau falsch herum.
+    const withColon = (host: never) => {
+      const svc = svcOf(host);
+      const link = firstLink(svc);
+      return vh("button", { "on:click": () => void svc.followLink(link) });
+    };
+    expect(await checkHonors(honorsSkin(["link"], withColon))).toEqual([]);
+
+    const withHyphen = (host: never) => {
+      const svc = svcOf(host);
+      const link = firstLink(svc);
+      return vh("button", { "on-click": () => void svc.followLink(link) });
+    };
+    expect((await checkHonors(honorsSkin(["link"], withHyphen))).map((f) => f.problem)).toEqual([
+      "undelivered",
+    ]);
   });
 });
