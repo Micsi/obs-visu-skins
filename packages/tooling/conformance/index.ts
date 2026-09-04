@@ -104,10 +104,17 @@ export interface SkinInput {
  *                     Affordanz mehr.
  *  - `unrenderable` - `'link'` ohne jeden Page-Renderer: nichts kann den Sprung
  *                     zeichnen, denn nur der Page-Renderer sieht `LayerItem`.
+ *  - `undeclared`   - die GEGENRICHTUNG: der Page-Renderer zeichnet den Sprung,
+ *                     das Manifest deklariert ihn aber nicht. Der Host tritt nur
+ *                     bei deklariertem Token zurueck, also liegen dann ZWEI
+ *                     Affordanzen uebereinander - zwei Klickflaechen, zwei
+ *                     Fokusstopps, und die eine sagt womoeglich etwas anderes als
+ *                     die andere. Ein vergessenes Token ist damit kein
+ *                     Schoenheitsfehler, sondern doppelte Bedienung.
  */
 export interface HonorsFinding {
   readonly token: string;
-  readonly problem: "unknown" | "undelivered" | "unrenderable";
+  readonly problem: "unknown" | "undelivered" | "unrenderable" | "undeclared";
   readonly detail: string;
 }
 
@@ -158,8 +165,7 @@ export async function checkHonors(skin: SkinInput): Promise<HonorsFinding[]> {
       });
     } else {
       const probe = pageHostProbe();
-      const delivered = await probeLinkDelivery(skin.page, probe);
-      if (!delivered) {
+      if ((await probeLinkDelivery(skin.page, probe)) === "absent") {
         findings.push({
           token: "link",
           problem: "undelivered",
@@ -167,6 +173,21 @@ export async function checkHonors(skin: SkinInput): Promise<HonorsFinding[]> {
             "der Page-Renderer zeichnet keine aktivierbare Sprung-Affordanz (kein Klick im gerenderten DOM ruft host.followLink)",
         });
       }
+    }
+  } else if (skin.page) {
+    // Die GEGENRICHTUNG, und sie ist genauso teuer wie die andere: der Host tritt
+    // mit seiner eigenen Sprung-Affordanz nur zurueck, wenn das Token deklariert
+    // ist. Zeichnet der Skin den Sprung trotzdem, liegen zwei Klickflaechen und
+    // zwei Fokusstopps uebereinander. Ein vergessenes Token faellt sonst nirgends
+    // auf - der Lauf blieb sauber, gerade WEIL nicht gemessen wurde.
+    const probe = pageHostProbe();
+    if ((await probeLinkDelivery(skin.page, probe)) === "delivered") {
+      findings.push({
+        token: "link",
+        problem: "undeclared",
+        detail:
+          "der Page-Renderer zeichnet einen Sprung (ein Klick ruft host.followLink), aber layout.honors nennt 'link' nicht - der Host tritt nicht zurueck und beide Affordanzen liegen uebereinander",
+      });
     }
   }
 
@@ -200,11 +221,14 @@ export async function checkHonors(skin: SkinInput): Promise<HonorsFinding[]> {
 async function probeLinkDelivery(
   page: NonNullable<SkinInput["page"]>,
   probe: ReturnType<typeof pageHostProbe>,
-): Promise<boolean> {
+): Promise<"delivered" | "absent" | "unmeasured"> {
   const vue = await domRuntime();
-  // Ohne DOM-Laufzeit wird NICHT gemessen — und damit auch nichts behauptet. Ein
-  // Befund hier wäre unsere Unfähigkeit zu messen, nicht ein Mangel des Skins.
-  if (!vue) return true;
+  // Ohne DOM-Laufzeit wird NICHT gemessen — und damit auch nichts behauptet.
+  // Bewusst ein EIGENER Zustand statt eines gutmütigen `true`: seit auch die
+  // Gegenrichtung geprüft wird, wäre jede der beiden Antworten in einer Richtung
+  // ein Fehlurteil — "geliefert" erfände ein `undeclared`, "nicht geliefert" ein
+  // `undelivered`. Nicht messen heisst: nichts behaupten.
+  if (!vue) return "unmeasured";
 
   const container = document.createElement("div");
   document.body.appendChild(container);
@@ -214,7 +238,7 @@ async function probeLinkDelivery(
   } catch {
     // Wirft der Renderer, zeichnet er nichts — derselbe Befund wie ein leerer Baum.
     container.remove();
-    return false;
+    return "absent";
   }
 
   // ZWEI PHASEN: was der Renderer beim ZEICHNEN am Host fragt, wird verworfen;
@@ -250,7 +274,7 @@ async function probeLinkDelivery(
     /* der Abbau gehört nicht zur Messung */
   }
   container.remove();
-  return delivered;
+  return delivered ? "delivered" : "absent";
 }
 
 
