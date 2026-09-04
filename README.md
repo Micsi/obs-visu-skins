@@ -92,9 +92,16 @@ obs-Repo unter `CONTRIBUTING-visu.md → „Contract-Bump: der rote Zwischenschr
 Freigabepflicht beschrieben. **Niemals die Reihenfolge drehen**, sonst blockieren sich
 beide Seiten gegenseitig.
 
-**Wenn deine CI rot ist, prüfe zuerst:** Steht die Vertragsversion, gegen die du baust,
-schon in `feat/visu-mobile-skins`? Wenn nein, ist Warten die richtige Handlung, nicht
-Reparieren.
+**Es trifft auch `main` — und damit JEDEN offenen PR.** Sobald der Vertrag drüben weiter
+ist als die Manifeste hier, wird `packages/skins/*/tests/scaffold.spec.ts` rot
+(`expected '<alt>' to be '<neu>'`, die Zeile misst `targetsContract` bewusst gegen den
+Vertrag statt gegen ein Literal). Bis der Manifest-Bump gemergt ist, erbt jeder neu
+geöffnete PR diese rote CI — auch ein reiner Doku-PR, der keine Zeile Code anfasst.
+
+**Wenn deine CI rot ist, prüfe zuerst:** Ist der Fehler `expected '<alt>' to be '<neu>'`
+in einer `scaffold.spec.ts`, oder fehlt ein Vertrags-Export? Dann ist es dieser
+Zwischenschritt, und Warten (bzw. der Manifest-Bump) ist die richtige Handlung — nicht
+Reparieren. Jeder ANDERE Fehler ist deiner.
 
 ### U2 — Paketname zentral als eine Konstante
 
