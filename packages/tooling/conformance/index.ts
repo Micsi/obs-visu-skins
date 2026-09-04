@@ -181,7 +181,7 @@ export async function checkHonors(skin: SkinInput): Promise<HonorsFinding[]> {
     // zwei Fokusstopps uebereinander. Ein vergessenes Token faellt sonst nirgends
     // auf - der Lauf blieb sauber, gerade WEIL nicht gemessen wurde.
     const probe = pageHostProbe();
-    if ((await probeLinkDelivery(skin.page, probe)) === "delivered") {
+    if ((await probeLinkDelivery(skin.page, probe, "any")) === "delivered") {
       findings.push({
         token: "link",
         problem: "undeclared",
@@ -231,6 +231,17 @@ export async function checkHonors(skin: SkinInput): Promise<HonorsFinding[]> {
 async function probeLinkDelivery(
   page: NonNullable<SkinInput["page"]>,
   probe: ReturnType<typeof pageHostProbe>,
+  /**
+   * Wie viel gezeichnet sein muss, damit der Lauf `delivered` meldet.
+   *
+   * `"all"` fuer die DEKLARIERTE Richtung: wer `honors: link` sagt, laesst den Host
+   * bei JEDEM verlinkten Element zurueckreten, also muss auch jedes eine Affordanz
+   * bekommen. `"any"` fuer die GEGENRICHTUNG: dort ist schon EIN gezeichneter
+   * Sprung der Befund — er ueberlagert die Affordanz, die der Host mangels
+   * Deklaration weiterhin selbst zeichnet. Mit demselben strengen Praedikat blieb
+   * genau dieser Fall stumm.
+   */
+  need: "all" | "any" = "all",
 ): Promise<"delivered" | "absent" | "unmeasured"> {
   const vue = await domRuntime();
   // Ohne DOM-Laufzeit wird NICHT gemessen — und damit auch nichts behauptet.
@@ -284,7 +295,7 @@ async function probeLinkDelivery(
   // fortsetzt. Lag `reset()` davor, landete genau dieser Aufruf im Protokoll und
   // wurde später als Klick-Beleg gelesen — der Renderer bestand also mit exakt
   // dem Verhalten, das der Schnitt ausschliessen soll.
-  await drain();
+  await drain(probe);
   probe.reset();
 
   const deadline = Date.now() + PROBE_BUDGET_MS;
@@ -301,7 +312,9 @@ async function probeLinkDelivery(
   //    PIN-geschützten Link. Ein Renderer, der nur für markierte oder nur für
   //    frei erreichbare Ziele zeichnet, liess die übrigen ohne Affordanz — und der
   //    Host ist bei allen zurückgetreten.
-  const hit = () => probe.probeTargets.every((t) => probe.followedTargets.includes(t));
+  const reached = (t: string) => probe.followedTargets.includes(t);
+  const hit = () =>
+    need === "all" ? probe.probeTargets.every(reached) : probe.probeTargets.some(reached);
 
   // Geklickt wird, was ein NUTZER anfassen kann. `dispatchEvent` umgeht die
   // Unterdrückung des Browsers und ruft auch Handler auf einem `disabled`
@@ -348,15 +361,40 @@ async function probeLinkDelivery(
 }
 
 
+/** Wie lange die Mount-Arbeit ruhig sein muss, bevor der Phasenschnitt faellt. */
+const MOUNT_QUIET_MS = 120;
+/** Obergrenze fuer das Abfliessen der Mount-Arbeit. */
+const MOUNT_DRAIN_MS = 600;
+
 /**
- * Laesst die aufgeschobene Arbeit abfliessen — Mikrotasks UND kurze Timer.
+ * Laesst die aufgeschobene Mount-Arbeit abfliessen — bis RUHE, nicht fuer eine
+ * feste Zahl von Runden.
  *
- * Vue schiebt `onMounted` und seine Aktualisierungen in die Warteschlange, und ein
- * `async`-Rumpf setzt erst danach fort. Wer direkt nach `mount()` misst, misst zu
- * frueh.
+ * Drei Null-Timer reichten nur fuer Mikrotasks. Ein `onMounted(async () => { await
+ * delay(50); host.followLink(l) })` kam erst danach — der Phasenschnitt lag also
+ * davor, der Aufruf landete waehrend der Klick-Phase im Protokoll und galt als
+ * Beleg. Der Renderer bestand mit genau dem Verhalten, das der Schnitt
+ * ausschliessen soll: navigieren beim blossen Anzeigen.
+ *
+ * Gewartet wird deshalb, bis das Protokoll {@link MOUNT_QUIET_MS} lang unveraendert
+ * bleibt, hoechstens aber {@link MOUNT_DRAIN_MS}. Das ist eine Verbesserung, keine
+ * Garantie: ein Renderer, der noch spaeter von selbst navigiert, ist von einem
+ * Klick-Effekt zeitlich nicht mehr zu trennen. Diese Grenze ist bewusst benannt
+ * statt stillschweigend in Kauf genommen.
  */
-async function drain(): Promise<void> {
-  for (let i = 0; i < 3; i += 1) await new Promise((resolve) => setTimeout(resolve, 0));
+async function drain(probe: { readonly linkCalls: readonly string[] }): Promise<void> {
+  const until = Date.now() + MOUNT_DRAIN_MS;
+  let seen = probe.linkCalls.length;
+  let quietSince = Date.now();
+  while (Date.now() < until) {
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    if (probe.linkCalls.length !== seen) {
+      seen = probe.linkCalls.length;
+      quietSince = Date.now();
+    } else if (Date.now() - quietSince >= MOUNT_QUIET_MS) {
+      return;
+    }
+  }
 }
 
 /**

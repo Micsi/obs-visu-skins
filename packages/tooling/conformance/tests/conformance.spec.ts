@@ -1356,3 +1356,53 @@ describe("honors-Probelauf — jeder Lauf misst nur sich selbst", () => {
     );
   });
 });
+
+describe("honors-Achse — die beiden Richtungen messen verschieden streng", () => {
+  it("meldet `undeclared` auch, wenn nur EINE Link-Form gezeichnet wird", async () => {
+    // Die verschaerfte Messung ("jede Form braucht eine Affordanz") gehoert zur
+    // DEKLARIERTEN Richtung. In der Gegenrichtung ist schon EIN gezeichneter
+    // Sprung der Befund: er ueberlagert die Affordanz, die der Host mangels
+    // Deklaration weiterhin selbst zeichnet. Mit demselben strengen Praedikat
+    // blieb genau dieser Fall stumm.
+    const page = (host: never) => {
+      const svc = svcOf(host);
+      const one = allLinks(svc)[0];
+      return vh("button", { onClick: () => void svc.followLink(one) });
+    };
+    const findings = await checkHonors(honorsSkin(["order"], page));
+    expect(findings.map((f) => f.problem)).toEqual(["undeclared"]);
+  });
+
+  it("…waehrend die deklarierte Richtung weiterhin ALLE Formen verlangt", async () => {
+    const page = (host: never) => {
+      const svc = svcOf(host);
+      const one = allLinks(svc)[0];
+      return vh("button", { onClick: () => void svc.followLink(one) });
+    };
+    expect((await checkHonors(honorsSkin(["link"], page))).map((f) => f.problem)).toEqual([
+      "undelivered",
+    ]);
+  });
+
+  it("verwirft einen Sprung aus SPAETER Mount-Arbeit, nicht nur aus sofortiger", async () => {
+    // Drei Null-Timer reichten nur fuer Mikrotasks. Ein `onMounted`, das 50 ms
+    // wartet, kam danach — der Aufruf landete waehrend der Klick-Phase im
+    // Protokoll und galt als Beleg, obwohl die Seite nichts Klickbares zeichnet.
+    const page = (host: never) => {
+      const svc = svcOf(host);
+      const Nav = defineComponent({
+        setup() {
+          onMounted(async () => {
+            await new Promise((r) => setTimeout(r, 50));
+            followAll(svc)();
+          });
+          return () => vh("div", {}, "nichts zum Klicken");
+        },
+      });
+      return vh(Nav as never, {});
+    };
+    expect((await checkHonors(honorsSkin(["link"], page))).map((f) => f.problem)).toEqual([
+      "undelivered",
+    ]);
+  }, 30_000);
+});
