@@ -76,6 +76,26 @@ Registry. Zwei unterstützte Wege:
   `packages/contract`-Unterverzeichnis des obs-Repos (z. B.
   `git+ssh://git@github.com/<org>/openbridgeserver.git#<ref>` mit `path:packages/contract`).
 
+### Contract-Bump: eine rote CI ist hier normal (MUST lesen, bevor du sie debuggst)
+
+Zieht der Vertrag einen Minor weiter, ist die CI dieses Repos **rot, bis der zugehörige
+Contract-PR drüben gemergt ist** — mit Typfehlern der Form „hat keinen exportierten
+Member X" oder „Property Y existiert nicht auf Z". Das ist **kein Fehler in deinem Code**.
+
+Grund: Der Workflow-Schritt „Recreate dev-link path" (`.github/workflows/ci.yml`) checkt
+`Micsi/openbridgeserver@feat/visu-mobile-skins` aus und baut den Vertrag von dort. Solange
+die neuen Typen in diesem Branch nicht liegen, kann hier nichts kompilieren.
+
+**Reihenfolge:** erst der Contract-PR im obs-Repo, dann der Manifest-Bump hier. Dessen
+`visu`-Check drüben ist im Zwischenschritt seinerseits rot — auch das ist eingebaut und im
+obs-Repo unter `CONTRIBUTING-visu.md → „Contract-Bump: der rote Zwischenschritt"` samt
+Freigabepflicht beschrieben. **Niemals die Reihenfolge drehen**, sonst blockieren sich
+beide Seiten gegenseitig.
+
+**Wenn deine CI rot ist, prüfe zuerst:** Steht die Vertragsversion, gegen die du baust,
+schon in `feat/visu-mobile-skins`? Wenn nein, ist Warten die richtige Handlung, nicht
+Reparieren.
+
 ### U2 — Paketname zentral als eine Konstante
 
 Der endgültige npm-Scope/Paketname des Vertrags ist noch offen (`@obs/visu-contract` ist
@@ -86,7 +106,10 @@ referenziert dieses Repo den Namen **nur über eine einzige Konstante**:
 import { CONTRACT_PACKAGE } from "@obs-visu-skins/contract-ref";
 // CONTRACT_PACKAGE === "@obs/visu-contract"
 // Die Vertrags-ZIELversion steht nicht hier, sondern je Skin in seinem
-// `manifest.targetsContract` — die Skins ziehen nicht im Gleichschritt um.
+// `manifest.targetsContract`. ACHTUNG, phasenabhängig: nach dem Release darf ein
+// Skin hinter dem Vertrag herhinken — in der Dev-Link-Phase NICHT. Dort verlangt
+// der App-Test (`apps/visu/tests/*-skin-link.test.ts`) exakten Gleichstand, und
+// genau daraus entsteht der rote Zwischenschritt beim Contract-Bump (siehe oben).
 ```
 
 Wird der Vertrag umbenannt, ändert sich genau diese Konstante
