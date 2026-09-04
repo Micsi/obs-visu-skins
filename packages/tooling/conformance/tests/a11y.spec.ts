@@ -13,8 +13,10 @@
 import { describe, expect, it } from "vitest";
 import type { SkinManifest } from "@obs/visu-contract";
 import {
+  COLOR_BEARING,
   composite,
   contrast,
+  declarations,
   measureA11y,
   resolveColor,
   resolveNumber,
@@ -715,5 +717,53 @@ describe("Zugestandene und unauflösbare Extreme dürfen kein `pass` sein (F14 �
     const r = measure(decl, PASSING_CSS, { ton: { type: "select", options: ["#595959"] } });
     expect(r.findings).toEqual([]);
     expect(r.status).toBe("pass");
+  });
+});
+
+describe("CSS-Parsen — der Waechter darf nicht an der Schreibweise scheitern", () => {
+  it("streift `!important` ab, bevor er die Farbe aufloest", () => {
+    // Der Marker entscheidet im Browser nur, WELCHE Deklaration gewinnt; der
+    // berechnete Wert ist derselbe. Am Wert kleben liess er `resolveColor`
+    // scheitern und einen sonst konformen Skin mit `unresolvable` durchfallen.
+    const decls = declarations("--fg: #000 !important; --bg: #fff");
+    expect(Object.fromEntries(decls)).toEqual({ "--fg": "#000", "--bg": "#fff" });
+    expect(resolveColor("#000", new Map(decls))).toEqual({ r: 0, g: 0, b: 0, a: 1 });
+  });
+
+  it("haelt eine Custom-Property-Folge INNERHALB einer Zeichenkette fuer Text", () => {
+    // `content: "--brand: #fff"` ist keine Deklaration. Der Regex auf den Rohtext
+    // sah dort einen Token, und der Vollstaendigkeits-Scan meldete das Phantom als
+    // `unclassified` — ein Befund ueber Text, den niemand als Farbe benutzt.
+    const decls = declarations('content: "--brand: #fff"; --fg: #111');
+    expect(decls.map(([n]) => n)).toEqual(["--fg"]);
+  });
+
+  it("erkennt Namen mit Nicht-ASCII-Zeichen", () => {
+    // `\w` kennt nur ASCII. `--zustand-grün` fiel damit aus Umgebung UND Scan,
+    // waehrend gewoehnliches CSS ihn ueber `var()` sehr wohl verbraucht.
+    const decls = declarations("--zustand-grün: #0f0");
+    expect(Object.fromEntries(decls)).toEqual({ "--zustand-grün": "#0f0" });
+    const env = new Map(decls);
+    expect(resolveColor("var(--zustand-grün)", env)).toEqual({ r: 0, g: 255, b: 0, a: 1 });
+  });
+
+  it("erkennt auch die Farbsyntaxen jenseits von Hex und rgb()", () => {
+    // Fehlt eine Syntax im Praedikat, faellt die Deklaration stillschweigend aus
+    // der Messung — `color: red` ist genauso an der Palette vorbei wie ein Hexwert.
+    for (const v of ["red", "oklch(70% 0.1 200)", "lab(50% 20 -30)", "hwb(90 10% 10%)"]) {
+      expect(COLOR_BEARING.test(v), v).toBe(true);
+    }
+    // Gegenprobe: kein Fehlalarm auf Woertern, die eine Farbe nur ENTHALTEN.
+    for (const v of ["1px solid", "border-box", "inherit"]) {
+      expect(COLOR_BEARING.test(v), v).toBe(false);
+    }
+  });
+
+  it("nimmt den `var()`-Rueckfall auch bei garantiert ungueltigem Wert", () => {
+    // `--optional: initial; --fg: var(--optional, #fff)` ist gueltiges CSS und
+    // berechnet `#fff`. Hier galt es als `unresolvable`, weil der Token ja
+    // "existiert" — der Rueckfall wurde nie versucht.
+    const env = new Map(declarations("--optional: initial"));
+    expect(resolveColor("var(--optional, #fff)", env)).toEqual({ r: 255, g: 255, b: 255, a: 1 });
   });
 });

@@ -114,9 +114,32 @@ export function parseRules(css: string): Rule[] {
   return out;
 }
 
-/** Alle `--name: wert`-Paare eines Rumpfes, in Quelltextreihenfolge. */
+/**
+ * Alle `--name: wert`-Paare eines Rumpfes, in Quelltextreihenfolge.
+ *
+ * Über {@link splitTop} statt über einen Regex auf den Rohtext, und das behebt
+ * drei Fehlurteile auf einmal:
+ *
+ *  - **Zeichenketten** zählten mit. `content: "--brand: #fff"` — oder dieselbe
+ *    Folge in einem Data-URI — galt als echte Deklaration, und der
+ *    Vollständigkeits-Scan meldete den Phantom-Token als `unclassified`.
+ *  - **`!important`** blieb am Wert kleben und liess `resolveColor` scheitern.
+ *  - **Nicht-ASCII-Namen** fielen weg: `\w` kennt nur ASCII, `--zustand-grün`
+ *    wurde also weder in die Umgebung aufgenommen noch klassifiziert — während
+ *    gewöhnliches CSS ihn über `var()` sehr wohl verbraucht.
+ */
 export function declarations(body: string): [string, string][] {
-  return [...body.matchAll(/(--[\w-]+)\s*:\s*([^;}]+)/g)].map(([, n, v]) => [n!, v!.trim()]);
+  const out: [string, string][] = [];
+  for (const part of splitTop(body, ";")) {
+    const cut = part.indexOf(":");
+    if (cut <= 0) continue;
+    const name = part.slice(0, cut).trim();
+    if (!name.startsWith("--") || name.length < 3) continue;
+    const value = withoutImportance(part.slice(cut + 1));
+    if (value.length === 0) continue;
+    out.push([name, value]);
+  }
+  return out;
 }
 
 /**
@@ -209,7 +232,7 @@ export function plainDeclarations(body: string): [string, string][] {
     const cut = part.indexOf(":");
     if (cut <= 0) continue;
     const name = part.slice(0, cut).trim();
-    const value = part.slice(cut + 1).trim();
+    const value = withoutImportance(part.slice(cut + 1));
     if (name.length === 0 || value.length === 0) continue;
     if (name.startsWith("--")) continue; // die haben ihren eigenen Scan
     if (!/^[a-z-]+$/i.test(name)) continue; // kein Eigenschaftsname
@@ -260,7 +283,17 @@ export const COLOR_SHAPED =
  * Schatten. Sie sind nicht wie ein Pixel messbar und müssen deshalb ausdrücklich
  * `exempt` sein — Goldene Regel 3, statt lautlos aus der Messung zu fallen.
  */
-export const COLOR_BEARING = /(#[0-9a-f]{3,8}\b|rgba?\(|hsla?\(|color-mix\()/i;
+/**
+ * Trägt dieser Wert eine Farbe DIREKT, also an den Token vorbei?
+ *
+ * Bewusst breit: der Scan entscheidet, ob eine gewöhnliche Deklaration überhaupt
+ * betrachtet wird. Fehlt hier eine Syntax, fällt sie stillschweigend aus der
+ * Messung — `color: red` und `background: oklch(…)` sind genauso an der Palette
+ * vorbei wie ein Hexwert. Die benannten Farben stehen als Wortgrenze, damit
+ * `border` (enthält „red") nicht anschlägt.
+ */
+export const COLOR_BEARING =
+  /(#[0-9a-f]{3,8}\b|\b(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch|color|color-mix|light-dark)\(|\b(?:red|blue|green|black|white|gray|grey|yellow|orange|purple|pink|brown|cyan|magenta|silver|gold|navy|teal|olive|maroon|lime|aqua|fuchsia|indigo|violet|beige|ivory|khaki|coral|salmon|crimson|turquoise|lavender|plum|tan|azure|orchid|tomato|wheat|linen|snow|seashell|honeydew|currentcolor)\b)/i;
 
 function clamp255(n: number): number {
   return Math.max(0, Math.min(255, Math.round(n)));
@@ -305,8 +338,30 @@ export function resolveNumber(value: string, env: Map<string, string>, depth = 0
 function splitTop(input: string, sep: string): string[] {
   const out: string[] = [];
   let depth = 0;
+  let quote = "";
   let current = "";
-  for (const ch of input) {
+  for (let i = 0; i < input.length; i += 1) {
+    const ch = input[i]!;
+    // Zeichenketten sind für die Struktur BLIND: was zwischen Anführungszeichen
+    // steht, ist Inhalt. Ohne diesen Zweig zählte `content: "a;b(c"` Trenner und
+    // Klammern mit und zerlegte die Deklaration an der falschen Stelle.
+    if (quote) {
+      current += ch;
+      if (ch === "\\") {
+        // Maskiertes Zeichen komplett übernehmen, damit `"\""` die Kette nicht schliesst.
+        const next = input[i + 1];
+        if (next !== undefined) {
+          current += next;
+          i += 1;
+        }
+      } else if (ch === quote) quote = "";
+      continue;
+    }
+    if (ch === '"' || ch === "'") {
+      quote = ch;
+      current += ch;
+      continue;
+    }
     if (ch === "(") depth += 1;
     if (ch === ")") depth -= 1;
     if (ch === sep && depth === 0) {
@@ -316,6 +371,18 @@ function splitTop(input: string, sep: string): string[] {
   }
   out.push(current);
   return out.map((s) => s.trim()).filter((s) => s.length > 0);
+}
+
+/**
+ * Ein CSS-Wert ohne seinen Wichtigkeits-Marker.
+ *
+ * `!important` entscheidet im Browser nur, WELCHE Deklaration gewinnt — der
+ * berechnete Wert ist derselbe. `--fg: #000 !important` erreichte
+ * {@link resolveColor} aber samt Marker, wurde dort abgelehnt, und ein sonst
+ * konformer Skin fiel mit `unresolvable` durch.
+ */
+function withoutImportance(value: string): string {
+  return value.replace(/!\s*important\s*$/i, "").trim();
 }
 
 /**
@@ -353,11 +420,23 @@ export function resolveColor(value: string, env: Map<string, string>, depth = 0)
     return null;
   }
 
-  const variable = /^var\(\s*(--[\w-]+)\s*(?:,([\s\S]*))?\)$/.exec(v);
+  // `--name` bewusst ohne `\w`: Custom-Property-Namen folgen der vollen
+  // `<dashed-ident>`-Grammatik und dürfen Nicht-ASCII enthalten.
+  const variable = /^var\(\s*(--[^\s,)]+)\s*(?:,([\s\S]*))?\)$/.exec(v);
   if (variable) {
     const bound = env.get(variable[1]!);
-    if (bound !== undefined) return resolveColor(bound, env, depth + 1);
-    return variable[2] !== undefined ? resolveColor(variable[2], env, depth + 1) : null;
+    const fallback = variable[2];
+    if (bound !== undefined) {
+      const resolved = resolveColor(bound, env, depth + 1);
+      if (resolved !== null) return resolved;
+      // Der Rückfall greift NICHT nur bei fehlendem Token: auch ein
+      // garantiert-ungültiger Wert (`initial`) oder eine zyklische Bindung lässt
+      // den Browser auf den Rückfall gehen. `--optional: initial; --fg:
+      // var(--optional, #fff)` ist gültiges CSS und berechnet `#fff` — hier galt
+      // es als `unresolvable`, weil der Token ja "existiert".
+      return fallback !== undefined ? resolveColor(fallback, env, depth + 1) : null;
+    }
+    return fallback !== undefined ? resolveColor(fallback, env, depth + 1) : null;
   }
 
   const fn = /^rgba?\(([\s\S]*)\)$/i.exec(v);
