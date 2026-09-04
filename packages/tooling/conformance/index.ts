@@ -213,10 +213,20 @@ export async function checkHonors(skin: SkinInput): Promise<HonorsFinding[]> {
  * seinen Klick genau wie im Browser, und Bubbling erreicht die Handler der
  * Vorfahren in der richtigen Reihenfolge.
  *
- * Gemessen wird weiterhin genau EINES: irgendein Klick im gerenderten DOM führt
- * zu `host.followLink`. NICHT geprüft (und nicht behauptet) ist, ob die Affordanz
- * sichtbar, fokussierbar oder an genau diesem Item verankert ist — das bleibt
- * Sache der Specs des Skins.
+ * Gemessen wird: ein Klick auf ein für einen NUTZER erreichbares Element führt zu
+ * `host.followLink` MIT dem Ziel des gestellten Items. Beide Verschärfungen sind
+ * nachgetragen — der blosse Aufruf nahm auch einen festverdrahteten Fremdlink ab,
+ * und `dispatchEvent` umging die Unterdrückung des Browsers und aktivierte auch
+ * ein `disabled` Steuerelement.
+ *
+ * NICHT geprüft (und nicht behauptet) ist, ob die Affordanz sichtbar oder
+ * fokussierbar ist — das bleibt Sache der Specs des Skins.
+ *
+ * PROGRAMMATISCHE NUTZUNG: wer `generateSupport` direkt aufruft, muss
+ * {@link ensureDom} ausführen, BEVOR ein Vue-Skin importiert wird — `cli.ts` tut
+ * genau das. Sonst hat `@vue/runtime-dom` sich bereits `document: null` gemerkt.
+ * Der Fall wird erkannt (siehe den Kanarienvogel in `domRuntime`) und als
+ * `unmeasured` gemeldet, nicht als Mangel des Skins.
  */
 async function probeLinkDelivery(
   page: NonNullable<SkinInput["page"]>,
@@ -248,26 +258,55 @@ async function probeLinkDelivery(
   probe.reset();
 
   const deadline = Date.now() + PROBE_BUDGET_MS;
-  const w = globalThis as unknown as { MouseEvent: typeof MouseEvent };
-  for (const el of Array.from(container.querySelectorAll("*"))) {
-    if (probe.linkCalls.includes("followLink") || Date.now() > deadline) break;
-    try {
-      el.dispatchEvent(new w.MouseEvent("click", { bubbles: true, cancelable: true }));
-    } catch {
-      /* ein werfender Handler liefert keine Affordanz - zählt als nichts */
+
+  // Was der Probelauf als GELIEFERT anerkennt: `followLink` MIT dem Ziel des
+  // gestellten Items. Der blosse Aufruf genügt nicht — ein Renderer, der das
+  // verlinkte `LayerItem` ignoriert und irgendeine eigene Fläche mit einem
+  // festverdrahteten Ziel zeichnet, ruft `followLink` ebenfalls; der Host zöge
+  // daraufhin seine Affordanz zurück, während das Ziel des Items nirgends
+  // erreichbar wäre.
+  const hit = () => probe.followedTargets.includes(probe.probeTarget);
+
+  // Geklickt wird, was ein NUTZER anfassen kann. `dispatchEvent` umgeht die
+  // Unterdrückung des Browsers und ruft auch Handler auf einem `disabled`
+  // Steuerelement oder in einem `inert`-Teilbaum — der Probelauf nähme dann eine
+  // Affordanz ab, die niemand aktivieren kann. `click()` geht den regulären Weg,
+  // und was ohnehin unbedienbar ist, wird vorher aussortiert.
+  const activate = (el: Element): void => {
+    if (isUnreachable(el)) return;
+    (el as HTMLElement).click();
+  };
+
+  // Ein Schnappschuss reicht nicht: `defineAsyncComponent`, `Suspense` oder eine
+  // Komponente, die sich nach dem Mount aktualisiert, bringt ihre Affordanz erst
+  // danach ins DOM. Es wird deshalb wiederholt eingesammelt und geklickt, bis das
+  // Ziel getroffen ist, nichts Neues mehr auftaucht oder das Budget endet.
+  const clicked = new Set<Element>();
+  while (!hit() && Date.now() < deadline) {
+    const fresh = roots(container, app).filter((el) => !clicked.has(el));
+    for (const el of fresh) {
+      clicked.add(el);
+      if (hit() || Date.now() > deadline) break;
+      try {
+        activate(el);
+      } catch {
+        /* ein werfender Handler liefert keine Affordanz - zählt als nichts */
+      }
     }
+    if (hit()) break;
+    // Nichts Neues UND nichts mehr in der Warteschlange: ein weiterer Durchlauf
+    // fände dasselbe. Ein Handler darf `followLink` hinter einem `await` rufen,
+    // deshalb wird vorher noch kurz abgewartet (siehe {@link SETTLE_MS}).
+    const settleUntil = Math.min(Date.now() + SETTLE_MS, deadline);
+    let grew = false;
+    while (!hit() && Date.now() < settleUntil && !grew) {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      grew = roots(container, app).some((el) => !clicked.has(el));
+    }
+    if (!grew && !hit()) break;
   }
 
-  // Ein Handler darf `followLink` hinter einem `await` rufen (erst fragen, dann
-  // springen). Dem Rest der Warteschlange wird deshalb noch Zeit gegeben — kurz
-  // (siehe {@link SETTLE_MS}) und zusätzlich vom Gesamtbudget gedeckelt, damit ein
-  // Versprechen, das nie eintrifft, den Lauf nicht anhält.
-  const settleUntil = Math.min(Date.now() + SETTLE_MS, deadline);
-  while (!probe.linkCalls.includes("followLink") && Date.now() < settleUntil) {
-    await new Promise((resolve) => setTimeout(resolve, 10));
-  }
-
-  const delivered = probe.linkCalls.includes("followLink");
+  const delivered = hit();
   try {
     app.unmount();
   } catch {
@@ -277,6 +316,50 @@ async function probeLinkDelivery(
   return delivered ? "delivered" : "absent";
 }
 
+
+/**
+ * Ob ein Element für einen Nutzer unerreichbar ist.
+ *
+ * `disabled` verschluckt den Klick im Browser, und ein `inert`-Teilbaum ist weder
+ * klickbar noch fokussierbar. Beides wird hier ausdrücklich geprüft statt sich auf
+ * die Laufzeit zu verlassen: jsdom bildet `inert` nicht ab, und ein Probelauf, der
+ * eine unbedienbare Fläche als Affordanz abnimmt, misst das Gegenteil dessen, was
+ * die Deklaration verspricht.
+ */
+function isUnreachable(el: Element): boolean {
+  for (let n: Element | null = el; n; n = n.parentElement) {
+    if (n.hasAttribute("inert")) return true;
+    if (n.hasAttribute("disabled")) return true;
+    if (n.getAttribute("aria-disabled") === "true") return true;
+  }
+  return false;
+}
+
+/**
+ * Alle Elemente, die der Probelauf anfassen darf: der Container UND das, was die
+ * Anwendung ausserhalb davon gemountet hat.
+ *
+ * `Teleport` ist der Regelfall dafür — eine Overlay-Fläche wandert nach
+ * `document.body`. Wer nur `container` absucht, findet die Affordanz eines
+ * völlig gültigen Renderers nicht und meldet ihn als `undelivered`. Gesucht wird
+ * deshalb auch im Wurzelelement der Anwendung, aber NICHT im übrigen Dokument:
+ * fremde Steuerelemente anderer Läufe gehen den Probelauf nichts an.
+ */
+function roots(container: Element, app: { _container?: unknown }): Element[] {
+  const out = new Set<Element>(Array.from(container.querySelectorAll("*")));
+  for (const el of Array.from(document.body.children)) {
+    // Teleport-Ziele hängen als Geschwister des Containers am Body. Der Container
+    // selbst ist schon erfasst; alles andere, was NACH dem Mount dazukam, gehört
+    // zu dieser Anwendung.
+    if (el === container || el.contains(container)) continue;
+    if (!el.hasAttribute("data-conformance-foreign")) {
+      out.add(el);
+      for (const inner of Array.from(el.querySelectorAll("*"))) out.add(inner);
+    }
+  }
+  void app;
+  return Array.from(out);
+}
 
 /**
  * Zeitbudget für die GANZE Klick-Phase eines Skins — nicht pro Handler.
@@ -352,7 +435,25 @@ export async function ensureDom(): Promise<boolean> {
  */
 async function domRuntime(): Promise<{ createApp: typeof import("vue").createApp } | null> {
   if (!(await ensureDom())) return null;
-  return await import("vue");
+  const vue = await import("vue");
+  // KANARIENVOGEL. Ein dynamischer Import liefert das Modul aus dem Cache — wer
+  // einen Vue-Skin STATISCH importiert, bevor {@link ensureDom} lief (der
+  // dokumentierte programmatische Weg an `cli.ts` vorbei), bekommt hier eine
+  // Laufzeit, die sich `document: null` gemerkt hat. Ihr `mount()` wirft, und der
+  // Wurf sähe aus wie ein Renderer, der nichts zeichnet: ein voll konformer Skin
+  // wäre als `undelivered` gemeldet worden.
+  //
+  // Ein triviales `div` klärt das vorab und kostet nichts. Wirft es, wird NICHT
+  // gemessen — und damit nichts behauptet.
+  const canary = document.createElement("div");
+  try {
+    const probeApp = vue.createApp({ render: () => vue.h("div") });
+    probeApp.mount(canary);
+    probeApp.unmount();
+  } catch {
+    return null;
+  }
+  return vue;
 }
 
 /**

@@ -94,11 +94,33 @@ export function ctxStub(overrides: Partial<Ctx> = {}): Ctx {
 
 /* ------------------------------------------------- PageHost-Stub (Vertrag 1.12) */
 
+/**
+ * Das Ziel des einen verlinkten Elements, das der Probelauf stellt.
+ *
+ * Es steht hier als Konstante, weil der Probelauf es GEGENPRUEFT: `followLink`
+ * muss mit genau diesem Ziel gerufen werden. Ein Renderer, der das gestellte
+ * `LayerItem` ignoriert und eine eigene Flaeche mit festverdrahtetem Ziel
+ * zeichnet, ruft `followLink` sonst ebenfalls — und der Host zieht seine eigene
+ * Affordanz zurueck, waehrend das Ziel des Items nirgends erreichbar ist.
+ */
+const PROBE_TARGET = "probe-target";
+
 /** Was ein Page-Renderer beim Probelauf am Host TATSÄCHLICH angefragt hat. */
 export interface PageHostProbe {
   readonly host: PageHost;
   /** Namen der aufgerufenen Link-Dienste, in Aufrufreihenfolge. */
   readonly linkCalls: string[];
+  /**
+   * Die Ziele, mit denen `followLink` gerufen wurde — in Aufrufreihenfolge.
+   *
+   * Der Name allein genuegt nicht: ein Renderer, der das verlinkte `LayerItem`
+   * ignoriert und irgendeine andere Flaeche mit einem festverdrahteten Ziel
+   * zeichnet, ruft `followLink` ebenfalls. Der Host wuerde daraufhin seine eigene
+   * Affordanz zurueckziehen, waehrend das Ziel des Items nirgends erreichbar ist.
+   */
+  readonly followedTargets: string[];
+  /** Das Ziel, das der Probelauf im gestellten Layer anbietet. */
+  readonly probeTarget: string;
   /**
    * Leert das Protokoll. Der Probelauf trennt damit zwei Phasen, die sonst in
    * einen Topf fielen: was der Renderer WÄHREND des Zeichnens am Host fragt, und
@@ -123,6 +145,7 @@ export interface PageHostProbe {
  */
 export function pageHostProbe(): PageHostProbe {
   const linkCalls: string[] = [];
+  const followedTargets: string[] = [];
   const note = <T>(name: string, value: T): T => {
     linkCalls.push(name);
     return value;
@@ -150,7 +173,7 @@ export function pageHostProbe(): PageHostProbe {
                 {
                   id: "probe-item",
                   position: { x: 0, y: 0, w: 10, h: 10 },
-                  link: { targetNodeId: "probe-target", activeIndicator: "dot" as const },
+                  link: { targetNodeId: PROBE_TARGET, activeIndicator: "dot" as const },
                 },
               ],
             },
@@ -163,15 +186,21 @@ export function pageHostProbe(): PageHostProbe {
     resolveLink: (link: PageLink) =>
       note("resolveLink", { kind: "navigate" as const, pageId: link.targetNodeId }),
     followLink: (link: PageLink) =>
-      note("followLink", { kind: "navigate" as const, pageId: link.targetNodeId }),
+      note("followLink", (followedTargets.push(link.targetNodeId), {
+        kind: "navigate" as const,
+        pageId: link.targetNodeId,
+      })),
     isLinkActive: () => note("isLinkActive", false),
     linkLabel: (link: PageLink) => note("linkLabel", `zur Seite ${link.targetNodeId}`),
   };
   return {
     host,
     linkCalls,
+    followedTargets,
+    probeTarget: PROBE_TARGET,
     reset: () => {
       linkCalls.length = 0;
+      followedTargets.length = 0;
     },
   };
 }
