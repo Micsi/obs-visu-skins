@@ -86,7 +86,7 @@ describe("terminal Zeilen-Layout (breite Form)", () => {
 
   it("gibt Label und Zustand einen Boden, deckelt ihn aber auf die Zeilenbreite", async () => {
     const src = await css();
-    const wide = /@container\s*\(min-width:\s*701px\)\s*\{([\s\S]*?)\n\}/.exec(src);
+    const wide = /@container\s*\(width\s*>\s*700px\)\s*\{([\s\S]*?)\n\}/.exec(src);
     expect(wide, "die breite Form muss es geben").not.toBeNull();
     const body = wide![1]!;
 
@@ -127,8 +127,36 @@ describe("terminal Zeilen-Layout (breite Form)", () => {
 
   it("laesst die schmale (gestapelte) Form ohne jeden max-content-Boden", async () => {
     const src = await css();
-    const narrow = /@container\s*\(max-width:\s*700px\)\s*\{([\s\S]*?)\n\}/.exec(src);
+    const narrow = /@container\s*\(width\s*<=\s*700px\)\s*\{([\s\S]*?)\n\}/.exec(src);
     expect(narrow).not.toBeNull();
     expect(narrow![1]!).not.toContain("max-content");
+  });
+  it("laesst zwischen den beiden Formen keine Luecke", async () => {
+    // `min-width: 701px` + `max-width: 700px` sahen komplementaer aus, waren es
+    // aber nicht: Containerbreiten sind gebrochen (Grid-Aufteilung, Zoom,
+    // Geraete-Pixel), und zwischen 700 und 701 px traf KEINE der beiden Regeln.
+    // Dort behielten die Felder ihr schrumpfbares `min-width: 0` und kuerzten
+    // wieder, statt zu stapeln — genau das Band, das beide Regeln schliessen.
+    //
+    // Geprueft wird die Lueckenlosigkeit selbst, nicht die Schreibweise: die
+    // beiden Bedingungen muessen dieselbe Schwelle nennen und sich an ihr
+    // beruehren (`>` auf der einen, `<=` auf der anderen Seite).
+    const src = (await css()).replace(/\/\*[\s\S]*?\*\//g, "");
+    const conds = [...src.matchAll(/@container\s*\(([^)]+)\)/g)].map((m) => m[1]!.trim());
+    expect(conds.length, "es gibt zwei Formen").toBeGreaterThanOrEqual(2);
+
+    const wide = conds.find((c) => /width\s*>/.test(c));
+    const narrow = conds.find((c) => /width\s*<=/.test(c));
+    expect(wide, `keine offene obere Form in ${conds.join(" · ")}`).toBeDefined();
+    expect(narrow, `keine geschlossene untere Form in ${conds.join(" · ")}`).toBeDefined();
+    // Dieselbe Zahl auf beiden Seiten — sonst klafft oder ueberlappt es.
+    const px = (c: string) => Number(/(\d+(?:\.\d+)?)px/.exec(c)?.[1]);
+    expect(px(wide!)).toBe(px(narrow!));
+    // Und KEINE der beiden darf die alte, luecken-erzeugende Form tragen.
+    for (const c of conds) {
+      expect(c, `min-/max-width laesst eine gebrochene Breite offen: ${c}`).not.toMatch(
+        /\b(?:min|max)-width\s*:/,
+      );
+    }
   });
 });
