@@ -222,12 +222,69 @@
   color: var(--t-dim);
 }
 
-/* ------------------------------------------------- schmale Spalte (Mobil) ---
- * Unter ~520 px reicht der Platz nicht für "Label | Zustand | Befehle" in einer
- * Zeile: das Label bliebe auf drei Zeichen gekürzt. Dann stapelt die Zeile —
- * Label, Zustand, Befehle untereinander, alles voll lesbar. Reihenfolge und
- * Gruppierung bleiben unangetastet (Goldene Regel 5). */
-@container (max-width: 520px) {
+/* ------------------------------------------------ breite Zeile: nicht kuerzen ---
+ * Oberhalb der Stapel-Schwelle war das Kuerzungsband NICHT weg: zwischen ~700 und
+ * ~1300 px kuerzte die Zeile weiter Labels ("Wintergarten · Jalou…") und schnitt
+ * Zustandsfragmente (" · Lamelle 0 %") ab. Ursache ist nicht die Schwelle, sondern
+ * die Schrumpf-Reihenfolge: `.t-label`/`.t-state` haben `flex-shrink: 1` und
+ * `min-width: 0`, also geben SIE nach, bevor die Zeile umbricht — obwohl die Zeile
+ * genau dafuer `flex-wrap: wrap` traegt ("reicht der Platz nicht, rutscht die
+ * Befehlsspalte auf eine eigene Zeile", siehe .t-row). Ein Boden auf der
+ * Inhaltsbreite kehrt die Reihenfolge um: erst umbricht die Befehlsspalte, und
+ * Label + Zustand bleiben vollstaendig lesbar.
+ *
+ * Bewusst NUR in der breiten Form. In der gestapelten (schmalen) Form sind Label
+ * und Zustand volle Zeilen; ein max-content-Boden wuerde dort genau den
+ * Horizontalscroll erzwingen, den die Stapelung vermeidet.
+ * Die Schwelle ist als BEREICH geschrieben (`width > 700px` / `width <= 700px`)
+ * und nicht als `min-width: 701px` / `max-width: 700px`. Containerbreiten sind
+ * gebrochen — Grid-Aufteilung, Zoom, Geraete-Pixel —, und zwischen 700 und 701 px
+ * traf vorher KEINE der beiden Regeln: dort behielten die Felder ihr
+ * schrumpfbares `min-width: 0` und kuerzten wieder, statt zu stapeln. Zwei
+ * Bereiche, die aneinander stossen, lassen kein solches Loch.
+ *
+ * Der Boden ist GEDECKELT, und das ist der Kern: ein nackter `max-content`-Boden
+ * ueberschreibt das `min-width: 0` der Spalte, und weil beide Felder
+ * `white-space: nowrap` tragen, konnte ein ueberlanges Label oder ein langer
+ * Zustandstext dann weder schrumpfen noch umbrechen noch ellipsieren — ein
+ * nutzergelieferter Wert erzwang genau den horizontalen Ueberlauf, den diese
+ * Regel verhindern sollte.
+ *
+ * Der Deckel ist eine ZEICHENBREITE, kein Inhaltsmass, und das ist keine
+ * Bequemlichkeit: `min(max-content, 100%)` waere die woertliche Formulierung der
+ * Absicht, ist aber UNGUELTIGES CSS — intrinsische Schluesselwoerter sind in einer
+ * Rechenfunktion nicht erlaubt, der Browser verwirft die Deklaration, und der
+ * Boden fehlte damit ganz (das Kuerzungsband war zurueck, ohne dass irgendetwas
+ * rot wurde). Ein inhaltsbezogener Deckel traegt hier grundsaetzlich nicht: bei
+ * `nowrap` ist `min-content` gleich `max-content`, also liefert auch
+ * `fit-content(100%)` wieder die volle Textbreite.
+ *
+ * Deshalb ein Boden knapp oberhalb der jeweiligen `flex-basis` (16ch/20ch): er
+ * kehrt die Schrumpf-Reihenfolge fuer jeden normalen Inhalt um — erst umbricht
+ * die Befehlsspalte —, und `100%` faengt den Rest ab, damit ein einzelner
+ * ueberlanger Wert die Zeile nicht sprengen kann. Was darueber hinausgeht,
+ * kuerzt wieder mit Ellipse; das ist der bewusste Rest, den gueltiges CSS an
+ * dieser Stelle nicht ausraeumen kann. */
+@container (width > 700px) {
+  .t-root .t-label {
+    min-width: min(24ch, 100%);
+  }
+  .t-root .t-state {
+    min-width: min(28ch, 100%);
+  }
+}
+
+/* ------------------------------------------- schmale Spalte (Mobil/Tablet) ---
+ * Unter ~700 px reicht der Platz nicht für "Label | Zustand | Befehle" in einer
+ * Zeile. Dann stapelt die Zeile — Label, Zustand, Befehle untereinander, alles
+ * voll lesbar. Reihenfolge und Gruppierung bleiben unangetastet (Goldene Regel 5).
+ *
+ * Die Schwelle lag bei 520 px und damit UNTER dem Bereich, in dem die einzeilige
+ * Form schon nicht mehr trägt: zwischen rund 530 und 1000 px kürzte die Zeile
+ * Labels ("Wintergarten · Jalou…") und schnitt Zustandsfragmente (" · Lamelle 0 %")
+ * ab — gestapelt hätte derselbe Inhalt vollständig gepasst. Die Schwelle gehört
+ * also an das obere Ende dieses Bandes, nicht an sein unteres. */
+@container (width <= 700px) {
   .t-root .t-row {
     flex-direction: column;
     align-items: stretch;

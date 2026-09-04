@@ -83,8 +83,10 @@ ein Vorschlag, DECISIONS.md → D4). Damit eine spätere Umbenennung trivial ble
 referenziert dieses Repo den Namen **nur über eine einzige Konstante**:
 
 ```ts
-import { CONTRACT_PACKAGE, TARGET_CONTRACT_VERSION } from "@obs-visu-skins/contract-ref";
+import { CONTRACT_PACKAGE } from "@obs-visu-skins/contract-ref";
 // CONTRACT_PACKAGE === "@obs/visu-contract"
+// Die Vertrags-ZIELversion steht nicht hier, sondern je Skin in seinem
+// `manifest.targetsContract` — die Skins ziehen nicht im Gleichschritt um.
 ```
 
 Wird der Vertrag umbenannt, ändert sich genau diese Konstante

@@ -11,7 +11,10 @@
  */
 export const CONTRACT_PACKAGE = "@obs/visu-contract" as const;
 
-/** Vertrags-Zielversion, auf die die Skins in diesem Repo zielen (`targetsContract`). */
-export const TARGET_CONTRACT_VERSION = "1.1" as const;
+// Bewusst KEINE `TARGET_CONTRACT_VERSION` hier. Die Zielversion eines Skins steht
+// in seinem eigenen `manifest.targetsContract` — genau eine Quelle je Skin, und die
+// Skins ziehen nicht im Gleichschritt um. Eine repo-weite Konstante daneben war
+// ungenutzt auf "1.1" stehengeblieben, waehrend die Manifeste bei 1.12 standen: eine
+// Falle mit exakt dem Namen, nach dem der naechste Autor greifen wuerde.
 
 export type ContractPackageName = typeof CONTRACT_PACKAGE;

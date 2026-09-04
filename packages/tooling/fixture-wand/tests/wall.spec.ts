@@ -11,6 +11,8 @@ import { describe, expect, it } from "vitest";
 import { isVNode } from "vue";
 import * as ionic from "@obs-visu-skins/ionic";
 import * as terminal from "@obs-visu-skins/terminal";
+import * as edomi from "@obs-visu-skins/edomi";
+import edomiManifest from "@obs-visu-skins/edomi/manifest.json" with { type: "json" };
 import fixtures from "@obs/visu-contract/fixtures.json" with { type: "json" };
 
 import { buildWall, type SkinTiles } from "../src/wall.js";
@@ -18,6 +20,13 @@ import { ionicTokens, terminalTokens, tokensStub, ctxStub } from "../src/stubs.j
 
 const ionicSkin: SkinTiles = { tiles: ionic.tiles, unsupported: [] };
 const terminalSkin: SkinTiles = { tiles: terminal.tiles, unsupported: [] };
+// edomi wird mit seinen ECHTEN Manifest-Aussagen gemessen, nicht mit leeren:
+// die Wand soll denselben Lauf zeigen wie der Konformitätsreport (wall.ts).
+const edomiSkin: SkinTiles = {
+  tiles: edomi.tiles,
+  unsupported: edomiManifest.unsupported,
+  widgets: edomiManifest.widgets,
+};
 
 /** Erwartete Anzahl Wand-Felder = Summe aller Zustände über alle Typ-Schlüssel. */
 function expectedCellCount(): number {
@@ -103,6 +112,25 @@ describe("fixture wall (terminal)", () => {
   });
 
   it("is green — terminal renders all nine core types without throwing", () => {
+    for (const c of cells) {
+      expect(c.status, `${c.type}.${c.state}`).toBe("ok");
+      expect(isVNode(c.vnode)).toBe(true);
+    }
+  });
+});
+
+describe("fixture wall (edomi)", () => {
+  const cells = buildWall(edomiSkin, ionicTokens, ctxStub());
+
+  it("covers every fixture state", () => {
+    expect(cells.length).toBe(expectedCellCount());
+  });
+
+  // edomi steht auf der Wand, weil ein Skin, der nicht auf ihr steht, nicht
+  // gemessen wird. Seine Content-Renderer SIND die ionic-Renderer (kein
+  // Datenfork, Renderer nach Typ adressiert) — die Wand belegt, dass das für
+  // jeden im Manifest deklarierten Typ auch wirklich trägt.
+  it("is green — every declared type renders without throwing", () => {
     for (const c of cells) {
       expect(c.status, `${c.type}.${c.state}`).toBe("ok");
       expect(isVNode(c.vnode)).toBe(true);

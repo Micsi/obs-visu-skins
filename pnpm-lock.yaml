@@ -138,6 +138,9 @@ importers:
       '@obs-visu-skins/conformance':
         specifier: workspace:*
         version: link:../conformance
+      '@obs-visu-skins/edomi':
+        specifier: workspace:*
+        version: link:../../skins/edomi
       '@obs-visu-skins/ionic':
         specifier: workspace:*
         version: link:../../skins/ionic
