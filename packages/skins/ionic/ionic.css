@@ -106,6 +106,11 @@
   --vz-fg-mute: #4a5160;
   --vz-fg-soft: #79808d;
 
+  /* Glas-Wasch im hellen Theme: der aufgezogene Ton ist Weiss — und Weiss IST hier
+     --vz-solid. Jede Wasch-Stufe liegt damit zwischen --vz-bg und --vz-solid, also
+     im Korridor, für den die Palette ohnehin ausgelegt ist. Genau diese Regel zieht
+     das dunkle Theme unten nach; dort war der aufgezogene Ton ebenfalls Weiss, der
+     Korridor endet aber schon bei --vz-solid-2. */
   --vz-tile-bg: rgba(255, 255, 255, var(--vz-tile-alpha));
   --vz-tile-bg-strong: rgba(255, 255, 255, 0.82);
   --vz-tile-border: rgba(255, 255, 255, 0.55);
@@ -126,11 +131,59 @@
   --vz-fg-mute: #aeb4c0;
   --vz-fg-soft: #7a808d;
 
-  --vz-tile-bg: rgba(255, 255, 255, calc(var(--vz-tile-alpha) * 0.34));
-  --vz-tile-bg-strong: rgba(255, 255, 255, 0.12);
+  /* Flächenton statt Weiss — die drei durchscheinenden Flächen ziehen im dunklen
+     Theme nicht mehr Weiss auf, sondern rgb(35 40 48) = #232830, den Flächenton
+     dieser Palette.
+
+     Warum das die Ursache trifft und nicht bloss eine Zahl dreht: ein Weiss-Wasch
+     über einer fast schwarzen Seite ist ein Leuchtdichte-Verstärker. Die sRGB-Kurve
+     steht nahe Schwarz sehr steil, deshalb landete --vz-tile-bg (0.187 Weiss in der
+     Werkseinstellung) bei #3b3e42 — der 8.6-fachen Leuchtdichte von --vz-bg — und
+     --vz-chip-bg, das sich als ZWEITER Wasch darüber legt, bei #535558, dem
+     16-fachen. Das sind mittlere Graus: zu hell für die hellen Vordergründe dieser
+     Palette, zu dunkel für dunkle. Die DECKENDEN Flächen desselben Skins liegen
+     dagegen beim 2- bis 3.2-fachen (--vz-solid #171b22, --vz-solid-2 #1f242d). Die
+     Glasfläche war also gar nicht dieselbe Fläche wie die Solid-Kachel, die sie in
+     den Stilen ios/md ersetzt — der Gestaltungsfehler war zugleich der Kontrastfehler.
+
+     Ein Wasch DES FLÄCHENTONS über --vz-bg liegt für jede Deckkraft zwischen --vz-bg
+     und dem Ton selbst. Damit ist die Fläche gedeckelt: weder der tileAlpha-Regler
+     (0.3…0.9) noch das Stapeln von Chip auf Kachel können sie aus dem Korridor
+     tragen. Der Ton liegt bis auf zwei Stufen am oberen Rand dessen, was die dunkle
+     Palette trägt: ab rgb(37 42 50) reisst --vz-bad auf dem Chip (4.45 gegen 4.5),
+     kurz danach --vz-acc-blue bei 0.7 Deckkraft. Nachgemessen in
+     tests/surfaces.spec.ts, nicht geschätzt.
+
+     Der Glas-Charakter bleibt: die Fläche ist weiter durchscheinend, backdrop-filter
+     (blur + saturate) greift unverändert, Hairline, Inset-Licht und Schatten stehen.
+     Der Faktor 0.7 an der Kachel hält die LEITER über den ganzen Reglerweg offen.
+     Ohne ihn wächst die Kachel bis zur vollen Deckkraft, Chip (0.85) und -strong
+     (0.95) sind aber feste Wasch-Stufen desselben Tons — bei tileAlpha=0.9 holt die
+     Kachel sie ein (Chip/Kachel 1.03:1, -strong/Kachel 1.01:1), und die Tasten in der
+     Kachel sind nur noch Umrisse. Mit 0.7 bleibt der Schritt bei 1.18 / 1.15 / 1.09
+     (Chip) bzw. 1.21 / 1.16 / 1.09 (-strong) über die Stopps 0.3 / 0.55 / 0.9. 0.7 ist
+     der grösste Faktor, bei dem BEIDE Schritte mit Reserve über 1.08 bleiben; ab 0.72
+     stehen sie auf der Schwelle. Er kostet die Kachel Präsenz gegen die Seite
+     (1.15:1 statt 1.24:1 am oberen Ende) und verbessert jeden gemessenen Kontrast AUF
+     der Kachel (--vz-off bei voller Deckkraft und tileAlpha=0.9: 3.84 → 4.14).
+
+     Die Leiter steht damit: --vz-bg (L* 5.0) < Kachel (L* 7.1 / 9.1 / 11.9) < Chip
+     (L* 14.6 / 14.9 / 15.3) <= Ton (L* 15.9). Die Kachel liegt in der Werkseinstellung
+     zwischen den deckenden Karten --vz-solid (L* 9.7) und --vz-solid-2 (L* 14.1) — die
+     Glaskachel ist dieselbe Fläche wie die Solid-Kachel, die sie in ios/md ersetzt.
+     Vorher lag sie bei L* 26 und der Chip bei L* 36, und ausgerechnet
+     --vz-tile-bg-strong (L* 18.6) war DUNKLER als die normale Kachel.
+
+     Die drei rgb-Tripel stehen ausgeschrieben statt in einem gemeinsamen Token: der
+     Konformitäts-Generator zerlegt einen rgba()-Wert textuell in Kanäle und kann
+     `rgba(var(--ton), a)` deshalb nicht auflösen — ein Token daraus zu machen nähme
+     die Flächen aus der MESSUNG. tests/surfaces.spec.ts hält die drei Tripel, den
+     Deckel, den Mindestschritt der Leiter und die daraus folgenden Kontraste zusammen. */
+  --vz-tile-bg: rgba(35, 40, 48, calc(var(--vz-tile-alpha) * 0.7));
+  --vz-tile-bg-strong: rgba(35, 40, 48, 0.95);
   --vz-tile-border: rgba(255, 255, 255, 0.12);
   --vz-tile-shadow: 0 1px 0 rgba(255, 255, 255, 0.06) inset, 0 8px 24px rgba(0, 0, 0, 0.45);
-  --vz-chip-bg: rgba(255, 255, 255, 0.12);
+  --vz-chip-bg: rgba(35, 40, 48, 0.85);
   --vz-divider: rgba(255, 255, 255, 0.1);
   --vz-hairline: rgba(255, 255, 255, 0.08);
   --vz-solid: #171b22;
