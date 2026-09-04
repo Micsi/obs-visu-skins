@@ -64,9 +64,17 @@ pnpm install        # neues Paket verlinken
   als `data-action` markieren (das meldet der Lauf als `broken`) — und was drinsteht,
   aber nirgends markiert ist, hebt die Stufe nicht. Deklaration und Marker gehören
   zusammen; eine Aktion, die der Vertrag gar nicht kennt, ist ebenfalls `broken`.
-- `manifest.json` → `layout.honors`: nur die Fähigkeiten, die du wirklich umsetzt
-  (`order`/`grouping` sind der Boden; `role` erst mit einer `roleMap`, `position`/`layers`/
-  `popup` erst mit einem Pixel-/Overlay-Layout).
+- `manifest.json` → `layout.honors`: nur die Fähigkeiten, die du wirklich umsetzt. Das
+  anerkannte Vokabular steht als geprüfte Liste im Vertrag
+  (`contract.schema.json → layoutHonors`): `order`/`grouping` sind der Boden; `role` erst
+  mit einer `roleMap`, `position`/`layers`/`popup` erst mit einem Pixel-/Overlay-Layout,
+  `nav` erst mit eigener Navigation, `link` (ab Vertrag 1.12) erst, wenn du das Sprungziel
+  eines platzierten Elements (`LayerItem.link`) auch wirklich als Affordanz zeichnest.
+  `link` steckt **nicht** in `layers`: Layer zu rendern und den Link fallenzulassen ist
+  erlaubt — dann darf `link` aber auch nicht dastehen (Goldene Regel 3). Zeichnest du ihn,
+  dann ausschliesslich über die Host-Dienste `resolveLink` / `followLink` / `isLinkActive` /
+  `linkLabel` am `PageHost`; ein eigener Abstieg durch den `navTree` ist ein Regelbruch
+  (Goldene Regel 4).
 - `renderers.ts` → ersetze `placeholderTile` Stück für Stück durch echte Renderer. Lagere
   pro Typ in `src/tiles/<type>.ts` aus (vgl. `packages/skins/terminal/src/tiles/`). Jede
   Funktion hat die Signatur `(d, t, ctx) => VNode` (Vue `h()`).

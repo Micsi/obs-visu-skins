@@ -8,7 +8,7 @@
 // data fork — items reference devices by id and the host renders their tiles.
 
 import { h, type VNode } from "vue";
-import type { NavNode, PageHost, PageLayer, PopupDescriptor } from "@obs/visu-contract";
+import type { LayerItem, NavNode, PageHost, PageLayer, PopupDescriptor } from "@obs/visu-contract";
 
 /** Absolute box from an author position (Edomi units = pixels). Emits plain `px`
  *  rather than `calc(var() * n)`: length*number typed arithmetic is invalid on
@@ -51,22 +51,147 @@ function navEntry(node: NavNode, host: PageHost): VNode {
   ]);
 }
 
+/**
+ * The jump affordance of a placed element (`LayerItem.link`, contract v1.12).
+ *
+ * Everything that needs KNOWLEDGE here is a host call:
+ *   - `host.resolveLink(link)` — what a click would do, WITHOUT doing it. A
+ *     LOCATION target, the `protected` PIN gate and an unknown node are already
+ *     decided when this returns; the skin only reads `kind`.
+ *   - `host.isLinkActive(link)` — target is the current page or an ancestor.
+ *     That BRANCH verdict drives the author's visual indicator only; the
+ *     accessible `aria-current="page"` needs the narrower question, and gets it
+ *     from `resolveLink`'s `pageId` (see below).
+ *   - `host.linkLabel(link, outcome)` — the accessible name. The outcome is
+ *     handed back so the NAME carries the state: a PIN-gated target announces
+ *     itself as gated, which a cursor or a colour cannot do on touch or to a
+ *     screen reader.
+ *   - `host.followLink(link)`  — perform the canonical action.
+ *
+ * FOR LINKS the skin therefore touches neither `host.navTree` nor
+ * `NavNode.access` nor any parent chain — it decides only WHERE the affordance
+ * sits and WHAT it looks like (golden rule 4). (The nav rail above legitimately
+ * reads both: that is the separate `honors: 'nav'` capability, not link logic.)
+ *
+ * A `<button role="link">` rather than an `<a>`: it is natively focusable and
+ * natively fires its click on Enter AND Space, so the skin maps no keyboard
+ * gesture of its own. It is stretched over the placed element, which is exactly
+ * #1194's case — an element with no click function of its own.
+ */
+function linkOverlay(
+  link: NonNullable<LayerItem["link"]>,
+  host: PageHost,
+  describedBy: string,
+): VNode | null {
+  const outcome = host.resolveLink(link);
+  // A target the host cannot resolve gets NO affordance: a dead-looking click
+  // area is worse than none. The item still marks it (`data-link-unknown`).
+  if (outcome.kind === "unknown") return null;
+  // `active` is the host's BRANCH verdict: the target is the current page OR an
+  // ancestor of it. That is the right input for the author's visual indicator —
+  // but NOT for `aria-current="page"`, which claims "this link points at the page
+  // you are on". On an ancestor target that claim is false: the link navigates
+  // somewhere else, and assistive tech would announce the user as already there.
+  // The page identity comes from the outcome the host just resolved, so the skin
+  // still walks no parent chain of its own (golden rule 4).
+  const isCurrentPage = outcome.kind === "navigate" && outcome.pageId === host.currentPageId;
+  return h("button", {
+    class: ["edomi-link", outcome.kind === "gate" && "is-gated"].filter(Boolean),
+    type: "button",
+    // Announced as a link (it navigates), operated as a button (native keys).
+    role: "link",
+    "aria-label": host.linkLabel(link, outcome),
+    // The covered tile is `inert`, and inert content is hidden from assistive
+    // tech — not merely unfocusable. Without this reference a screen-reader user
+    // heard the navigation label and NOTHING ELSE: device name, state, warning,
+    // the whole display content of the tile was gone. The description carries it
+    // back onto the one element that is still exposed. (A referenced element is
+    // traversed by the accessible description computation even when it is itself
+    // hidden — the same mechanism `aria-describedby` uses for `display: none`
+    // help text.)
+    "aria-describedby": describedBy,
+    "aria-current": isCurrentPage ? "page" : undefined,
+    "data-link": link.targetNodeId,
+    "data-link-outcome": outcome.kind,
+    onClick: () => {
+      host.followLink(link);
+    },
+  });
+}
+
+/**
+ * Hands out the ids that link descriptions point at, one per RENDERED
+ * PLACEMENT.
+ *
+ * Deriving the id from the device id alone was not enough: the same item can be
+ * placed more than once in one tree — the canvas shows a page's layers and an
+ * open popup shows its own, and a device may sit on both. Two elements then
+ * carried the SAME id, and `aria-describedby` resolves such a reference to
+ * whichever comes first: a screen-reader user heard another placement's tile.
+ *
+ * A counter passed through the render (not module state) keeps the ids unique
+ * within the tree AND deterministic for the same tree — the property the specs
+ * rely on.
+ */
+type BodyIds = { next: () => string };
+
+function bodyIds(): BodyIds {
+  let n = 0;
+  return { next: () => `edomi-item-body-${n++}` };
+}
+
 /** One composed layer, its items placed absolutely by their author box. */
-function layerCanvas(layer: PageLayer, host: PageHost): VNode {
+function layerCanvas(layer: PageLayer, host: PageHost, ids: BodyIds): VNode {
   return h(
     "div",
     { class: ["edomi-layer", `edomi-layer-${layer.origin}`], "data-layer": layer.id },
-    layer.items.map((item) =>
-      h(
+    layer.items.map((item) => {
+      const link = item.link;
+      // The author's active marker (`none`/`dot`/`bar`/`border`) is pure data; the
+      // skin draws it in its own language from the host's active verdict.
+      const active = link ? host.isLinkActive(link) : false;
+      // The id the link's description points at (see `linkOverlay`), unique per
+      // rendered placement rather than per device (see `bodyIds`).
+      const bodyId = link ? ids.next() : "";
+      const overlay = link ? linkOverlay(link, host, bodyId) : null;
+      return h(
         "div",
         {
           class: "edomi-item",
           "data-id": item.id,
           style: item.position ? boxStyle(item.position) : undefined,
+          ...(link
+            ? {
+                "data-link": link.targetNodeId,
+                "data-link-indicator": link.activeIndicator ?? "none",
+                ...(active ? { "data-link-active": "true" } : {}),
+                ...(overlay ? { "data-link-covers": "tile" } : { "data-link-unknown": "true" }),
+              }
+            : {}),
         },
-        [host.renderTile(item.id) as VNode],
-      ),
-    ),
+        overlay
+          ? [
+              // The overlay covers the tile for the POINTER (z-index). `inert`
+              // makes that true for keyboard too: without it a writable tile
+              // keeps its own `role="button" tabindex="0" aria-pressed` and
+              // becomes a second focus stop that announces a switch nobody can
+              // reach with a mouse (WCAG 4.1.2) — the same double affordance the
+              // host steps back from at the cell level. `inert` is the mechanism
+              // this file already uses for nav + popups.
+              //
+              // But `inert` suppresses more than OPERABILITY: inert content is
+              // hidden from assistive tech, so the tile's whole INFORMATION —
+              // device name, state, warning — vanished with its focus stop. The
+              // wrapper therefore carries an id and the link describes itself by
+              // it: the content stays unoperable but stays readable.
+              h("div", { class: "edomi-item-body", id: bodyId, inert: true }, [
+                host.renderTile(item.id) as VNode,
+              ]),
+              overlay,
+            ]
+          : [host.renderTile(item.id) as VNode],
+      );
+    }),
   );
 }
 
@@ -86,7 +211,7 @@ function layersExtent(layers: readonly PageLayer[]): { w: number; h: number } {
 
 /** A popup overlay: its own page's layers, host-owned open state. `inert` makes a
  *  sibling popup non-interactive while a modal popup is open (modal is exclusive). */
-function popup(desc: PopupDescriptor, host: PageHost, inert?: boolean): VNode {
+function popup(desc: PopupDescriptor, host: PageHost, ids: BodyIds, inert?: boolean): VNode {
   const centered = !desc.position;
   const layers = host.layersFor(desc.id);
   // A centered popup's layers are absolutely positioned (no intrinsic size), so
@@ -132,7 +257,7 @@ function popup(desc: PopupDescriptor, host: PageHost, inert?: boolean): VNode {
             "×",
           ),
           // The popup shows its own page's composed layers (id === popup id).
-          ...layers.map((layer) => layerCanvas(layer, host)),
+          ...layers.map((layer) => layerCanvas(layer, host, ids)),
         ],
       ),
     ],
@@ -147,6 +272,9 @@ function popup(desc: PopupDescriptor, host: PageHost, inert?: boolean): VNode {
 export function page(host: PageHost): VNode {
   const pageId = host.currentPageId;
   const layers = pageId ? host.layersFor(pageId) : [];
+  // One counter for the WHOLE tree — canvas and popups draw from it, so a device
+  // placed on both gets two distinct body ids (see `bodyIds`).
+  const ids = bodyIds();
   // A modal popup is exclusive: make the rest of the page inert so it drops out of
   // the tab order + pointer/keyboard interaction (not just visually dimmed).
   const hasModal = host.openPopups.some((p) => p.modal);
@@ -171,10 +299,10 @@ export function page(host: PageHost): VNode {
     h(
       "div",
       { class: "edomi-canvas", "data-page": pageId ?? "", inert },
-      layers.map((layer) => layerCanvas(layer, host)),
+      layers.map((layer) => layerCanvas(layer, host, ids)),
     ),
     // A modal is exclusive: while one is open, every popup except the topmost modal
     // is inert too (two modals → only the last stays interactive).
-    ...host.openPopups.map((p, i) => popup(p, host, hasModal && i !== topModalIdx)),
+    ...host.openPopups.map((p, i) => popup(p, host, ids, hasModal && i !== topModalIdx)),
   ]);
 }

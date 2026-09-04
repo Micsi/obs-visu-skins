@@ -14,6 +14,10 @@
 
 .edomi-root {
   --vz-pos-unit: 1px;
+  /* Der eigene Akzent des Skins, EINMAL benannt statt viermal hingeschrieben.
+     Er traegt Fokusring, Aktiv-Indikator und die Sprung-Marke — alles Grafik
+     (Nicht-Text, WCAG 3:1) auf dem Kachelgrund. */
+  --edomi-accent: #d6a800;
   display: grid;
   grid-template-columns: minmax(160px, max-content) 1fr;
   /* A definite floor (not a percentage that resolves to `auto` in an auto-height
@@ -102,8 +106,15 @@
   pointer-events: auto;
 }
 /* Fill the authored box with the reused ionic content tile (the host wraps the
-   tile in .skin-host-cell; ionic normally stretches it via flex). */
-.edomi-item > .skin-host-cell {
+   tile in .skin-host-cell; ionic normally stretches it via flex). On a LINKED
+   item the cell sits one level deeper, inside the `inert` body wrapper. */
+.edomi-item > .skin-host-cell,
+.edomi-item > .edomi-item-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+}
+.edomi-item-body > .skin-host-cell {
   flex: 1;
   min-width: 0;
   display: flex;
@@ -111,6 +122,108 @@
 .edomi-item .vz-tile,
 .edomi-item .jal-tile {
   flex: 1;
+}
+
+/* ------------------------------------------------------- page links (v1.12)
+ * The skin draws the jump itself (manifest `honors: [… "link"]`), so the host
+ * does NOT also stretch its own link over the cell. Everything below is pure
+ * appearance — where the affordance sits and what the author's active marker
+ * looks like. The decision (reachable · PIN-gated · unknown · active) is a host
+ * call, never CSS and never skin state.
+ */
+.edomi-item[data-link] {
+  /* Containing block for the stretched button. The host's inline box already
+     sets `position: absolute`, which wins; this only covers an unpositioned item. */
+  position: relative;
+}
+.edomi-link {
+  position: absolute;
+  inset: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  /* Above the tile: on a linked placed element the jump owns the whole box
+     (#1194 — an element without a click function of its own). */
+  z-index: 3;
+}
+/* THAT there is a jump here must be VISIBLE — permanently, and independently of
+   the author's `activeIndicator`.
+ *
+ * `activeIndicator` says by contract only whether the TARGET is active; its
+ * default `none` says nothing about whether a link exists. Without a mark of its
+ * own the stretched button had no content, no border and no background: on touch
+ * a sighted user saw an ordinary tile whose own control no longer responds (it is
+ * `inert` underneath) and whose tap navigates. A declared capability owes an
+ * affordance.
+ *
+ * Bottom-RIGHT corner flag: top-right carries the reused ionic tile's readonly
+ * lock badge, top-left its room label, bottom-left the author's `dot`. The
+ * remaining corner is free in every reused tile. */
+.edomi-link::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 0;
+  height: 0;
+  border-bottom: 10px solid var(--edomi-accent);
+  border-left: 10px solid transparent;
+  pointer-events: none;
+}
+/* Pointer/keyboard feedback on the same mark, so hover and focus are not two
+   unrelated languages. */
+.edomi-link:hover::after,
+.edomi-link:focus-visible::after {
+  border-bottom-width: 14px;
+  border-left-width: 14px;
+}
+.edomi-link:hover {
+  outline: 1px solid var(--edomi-accent);
+  outline-offset: -1px;
+}
+.edomi-link:focus-visible {
+  outline: 2px solid var(--edomi-accent);
+  outline-offset: -2px;
+}
+/* A PIN-gated target still jumps — onto the PIN path. The cursor says "this
+   asks first" rather than pretending the page is one click away; the corner flag
+   is dashed so touch (which has no cursor) sees the difference too. */
+.edomi-link.is-gated {
+  cursor: help;
+}
+.edomi-link.is-gated::after {
+  border-bottom-style: dashed;
+}
+
+/* The author's active indicator (V1 `active_indicator`), drawn Edomi-style in
+   the skin's own accent. `none` (the default) draws nothing. */
+.edomi-item[data-link-active][data-link-indicator="border"] {
+  box-shadow: inset 0 0 0 2px var(--edomi-accent);
+}
+.edomi-item[data-link-active][data-link-indicator="dot"]::after,
+.edomi-item[data-link-active][data-link-indicator="bar"]::after {
+  content: "";
+  position: absolute;
+  background: var(--edomi-accent);
+  pointer-events: none;
+  z-index: 4;
+}
+/* Bottom-LEFT. Not top-right: the reused ionic tile puts its readonly lock badge
+   there and the two markers overlapped. Not top-left either: the room label
+   starts there. The bottom-left corner is free in every reused tile. */
+.edomi-item[data-link-active][data-link-indicator="dot"]::after {
+  bottom: 6px;
+  left: 6px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+.edomi-item[data-link-active][data-link-indicator="bar"]::after {
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
 }
 
 /* ---------------------------------------------------------------- popups */
