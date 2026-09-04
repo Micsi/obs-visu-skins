@@ -136,6 +136,14 @@ export interface SkinInput {
  *                     Affordanz mehr.
  *  - `unrenderable` - `'link'` ohne jeden Page-Renderer: nichts kann den Sprung
  *                     zeichnen, denn nur der Page-Renderer sieht `LayerItem`.
+ *  - `unmeasured`   - der Lauf konnte die Achse NICHT messen (keine DOM-fähige
+ *                     Vue-Laufzeit). Bewusst ein Befund und kein stilles Bestehen:
+ *                     sonst genügte es, den Generator falsch aufzurufen, um eine
+ *                     Deklaration ungeprüft durchzubringen.
+ *  - `broken`       - der Page-Renderer WIRFT. Das fällt sonst nirgends auf: die
+ *                     Render-Achse fährt `tiles`/`details`/`presets`, aber nie
+ *                     `skin.page`. Ein Skin mit kaputtem Ganzseiten-Renderer bekam
+ *                     einen sauberen Report, solange er `link` nicht deklarierte.
  *  - `undeclared`   - die GEGENRICHTUNG: der Page-Renderer zeichnet den Sprung,
  *                     das Manifest deklariert ihn aber nicht. Der Host tritt nur
  *                     bei deklariertem Token zurueck, also liegen dann ZWEI
@@ -146,7 +154,13 @@ export interface SkinInput {
  */
 export interface HonorsFinding {
   readonly token: string;
-  readonly problem: "unknown" | "undelivered" | "unrenderable" | "undeclared";
+  readonly problem:
+    | "unknown"
+    | "undelivered"
+    | "unrenderable"
+    | "undeclared"
+    | "unmeasured"
+    | "broken";
   readonly detail: string;
 }
 
@@ -197,7 +211,24 @@ export async function checkHonors(skin: SkinInput): Promise<HonorsFinding[]> {
       });
     } else {
       const probe = pageHostProbe();
-      if ((await probeLinkDelivery(skin.page, probe)) === "absent") {
+      const outcome = await probeLinkDelivery(skin.page, probe);
+      if (outcome === "threw") {
+        findings.push({
+          token: "link",
+          problem: "broken",
+          detail: "der Page-Renderer wirft beim Zeichnen - er kann gar keine Affordanz liefern",
+        });
+      } else if (outcome === "unmeasured") {
+        // NICHT stillschweigend bestehen lassen. Ein Lauf ohne DOM-fähige
+        // Vue-Laufzeit misst nichts; das als Erfolg zu werten hiesse, dass ein
+        // falscher Aufruf des Generators jede Deklaration ungeprüft durchbringt.
+        findings.push({
+          token: "link",
+          problem: "unmeasured",
+          detail:
+            "keine DOM-faehige Vue-Laufzeit - die Achse wurde NICHT geprueft (ensureDom() vor dem Skin-Import aufrufen)",
+        });
+      } else if (outcome === "absent") {
         findings.push({
           token: "link",
           problem: "undelivered",
@@ -213,14 +244,25 @@ export async function checkHonors(skin: SkinInput): Promise<HonorsFinding[]> {
     // zwei Fokusstopps uebereinander. Ein vergessenes Token faellt sonst nirgends
     // auf - der Lauf blieb sauber, gerade WEIL nicht gemessen wurde.
     const probe = pageHostProbe();
-    if ((await probeLinkDelivery(skin.page, probe, "any")) === "delivered") {
+    const outcome = await probeLinkDelivery(skin.page, probe, "any");
+    if (outcome === "delivered") {
       findings.push({
         token: "link",
         problem: "undeclared",
         detail:
           "der Page-Renderer zeichnet einen Sprung (ein Klick ruft host.followLink), aber layout.honors nennt 'link' nicht - der Host tritt nicht zurueck und beide Affordanzen liegen uebereinander",
       });
+    } else if (outcome === "threw") {
+      // Auch OHNE Deklaration ein Befund: die Render-Achse fährt `skin.page` nie,
+      // ein kaputter Ganzseiten-Renderer bliebe sonst unentdeckt.
+      findings.push({
+        token: "link",
+        problem: "broken",
+        detail: "der Page-Renderer wirft beim Zeichnen",
+      });
     }
+    // `unmeasured` ist hier KEIN Befund: ohne Deklaration ist nichts versprochen,
+    // was ungeprüft bliebe.
   }
 
   return findings;
@@ -274,7 +316,7 @@ async function probeLinkDelivery(
    * genau dieser Fall stumm.
    */
   need: "all" | "any" = "all",
-): Promise<"delivered" | "absent" | "unmeasured"> {
+): Promise<"delivered" | "absent" | "threw" | "unmeasured"> {
   const vue = await domRuntime();
   // Ohne DOM-Laufzeit wird NICHT gemessen — und damit auch nichts behauptet.
   // Bewusst ein EIGENER Zustand statt eines gutmütigen `true`: seit auch die
@@ -309,11 +351,13 @@ async function probeLinkDelivery(
   try {
     app.mount(container);
   } catch {
-    // Wirft der Renderer, zeichnet er nichts — derselbe Befund wie ein leerer Baum.
+    // Ein Wurf ist NICHT dasselbe wie "zeichnet nichts": der Renderer ist kaputt,
+    // und das gehört gemeldet, auch wenn der Skin `link` gar nicht deklariert —
+    // die Render-Achse fährt `skin.page` nie, es fiele sonst nirgends auf.
     // Aufgeräumt wird trotzdem: ein Wurf MITTEN im Mounten lässt eine halb
     // gemountete Anwendung zurück, deren Knoten sonst im Dokument stehen bleiben.
     cleanup();
-    return "absent";
+    return "threw";
   }
 
   // ZWEI PHASEN: was der Renderer beim ZEICHNEN am Host fragt, wird verworfen;

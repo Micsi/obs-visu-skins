@@ -1386,8 +1386,10 @@ describe("honors-Probelauf — jeder Lauf misst nur sich selbst", () => {
       },
     });
     const page = () => vh(Boom as never, {});
+    // `broken`, nicht `undelivered`: ein Wurf ist ein anderer Mangel als „zeichnet
+    // nichts" — siehe den Block weiter unten.
     expect((await checkHonors(honorsSkin(["link"], page as never))).map((f) => f.problem)).toEqual([
-      "undelivered",
+      "broken",
     ]);
     expect(document.body.children.length, "die halb gemountete Anwendung blieb stehen").toBe(
       beforeCount,
@@ -1500,5 +1502,45 @@ describe("Aktions-Achse — die Komponente sieht ihre Props so, wie Vue sie lief
     const tile: Renderer = () => vh(Action as never, { enabled: "" }) as never;
     const { report } = await generateSupport(actionSkin({ switch: tile }));
     expect(report.widgets.switch?.actions).toBe("1/1");
+  });
+});
+
+describe("honors-Achse — nicht messen ist kein Bestehen, und ein Wurf ist ein Befund", () => {
+  it("meldet einen werfenden Page-Renderer AUCH ohne `link`-Deklaration", async () => {
+    // Die Render-Achse fährt `tiles`/`details`/`presets`, aber nie `skin.page`.
+    // Ein Skin mit kaputtem Ganzseiten-Renderer bekam deshalb einen sauberen
+    // Report, solange er `link` nicht deklarierte — der Fehler fiel nirgends auf.
+    const Boom = defineComponent({
+      setup() {
+        return () => {
+          throw new Error("kaputt");
+        };
+      },
+    });
+    const page = () => vh(Boom as never, {});
+    const findings = await checkHonors(honorsSkin(["order"], page as never));
+    expect(findings.map((f) => f.problem)).toEqual(["broken"]);
+  });
+
+  it("…und mit Deklaration ebenfalls als `broken`, nicht als `undelivered`", async () => {
+    // Der Unterschied trägt Information: „zeichnet nichts" ist ein anderer Mangel
+    // als „wirft beim Zeichnen".
+    const Boom = defineComponent({
+      setup() {
+        return () => {
+          throw new Error("kaputt");
+        };
+      },
+    });
+    const page = () => vh(Boom as never, {});
+    const findings = await checkHonors(honorsSkin(["link"], page as never));
+    expect(findings.map((f) => f.problem)).toEqual(["broken"]);
+  });
+
+  it("ein Renderer, der schlicht nichts Klickbares zeichnet, bleibt `undelivered`", async () => {
+    // Die Gegenprobe: `broken` darf den gewöhnlichen Fall nicht schlucken.
+    const page = () => vh("div", {}, "nichts zum Klicken");
+    const findings = await checkHonors(honorsSkin(["link"], page as never));
+    expect(findings.map((f) => f.problem)).toEqual(["undelivered"]);
   });
 });
