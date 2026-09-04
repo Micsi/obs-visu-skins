@@ -181,7 +181,7 @@ export async function checkHonors(skin: SkinInput): Promise<HonorsFinding[]> {
     // zwei Fokusstopps uebereinander. Ein vergessenes Token faellt sonst nirgends
     // auf - der Lauf blieb sauber, gerade WEIL nicht gemessen wurde.
     const probe = pageHostProbe();
-    if ((await probeLinkDelivery(skin.page, probe)) === "delivered") {
+    if ((await probeLinkDelivery(skin.page, probe, "any")) === "delivered") {
       findings.push({
         token: "link",
         problem: "undeclared",
@@ -231,6 +231,17 @@ export async function checkHonors(skin: SkinInput): Promise<HonorsFinding[]> {
 async function probeLinkDelivery(
   page: NonNullable<SkinInput["page"]>,
   probe: ReturnType<typeof pageHostProbe>,
+  /**
+   * Wie viel gezeichnet sein muss, damit der Lauf `delivered` meldet.
+   *
+   * `"all"` fuer die DEKLARIERTE Richtung: wer `honors: link` sagt, laesst den Host
+   * bei JEDEM verlinkten Element zurueckreten, also muss auch jedes eine Affordanz
+   * bekommen. `"any"` fuer die GEGENRICHTUNG: dort ist schon EIN gezeichneter
+   * Sprung der Befund — er ueberlagert die Affordanz, die der Host mangels
+   * Deklaration weiterhin selbst zeichnet. Mit demselben strengen Praedikat blieb
+   * genau dieser Fall stumm.
+   */
+  need: "all" | "any" = "all",
 ): Promise<"delivered" | "absent" | "unmeasured"> {
   const vue = await domRuntime();
   // Ohne DOM-Laufzeit wird NICHT gemessen — und damit auch nichts behauptet.
@@ -240,14 +251,36 @@ async function probeLinkDelivery(
   // `undelivered`. Nicht messen heisst: nichts behaupten.
   if (!vue) return "unmeasured";
 
+  // Der Stand des Bodys VOR dem Mount. Alles, was danach dazukommt, gehört zu
+  // diesem Lauf — und nur das wird geklickt und am Ende wieder abgeräumt.
   const container = document.createElement("div");
+  const before = new Set<Element>(Array.from(document.body.children));
   document.body.appendChild(container);
   const app = vue.createApp({ render: () => page(probe.host) });
+  const cleanup = () => {
+    try {
+      app.unmount();
+    } catch {
+      /* der Abbau gehört nicht zur Messung */
+    }
+    container.remove();
+    // Was der Lauf ausserhalb des Containers hinterlassen hat, geht mit. Vue
+    // räumt Teleport-Ziele beim `unmount` heute selbst ab — die Specs unten
+    // bestehen auch ohne diese Schleife, das ist nachgefahren. Sie bleibt als
+    // Zusicherung dieses Laufs stehen, nicht als Reparatur: dass das Dokument
+    // unverändert zurückbleibt, ist die Bedingung dafür, dass das Gate drei Skins
+    // nacheinander im selben Dokument messen kann.
+    for (const el of Array.from(document.body.children)) {
+      if (!before.has(el)) el.remove();
+    }
+  };
   try {
     app.mount(container);
   } catch {
     // Wirft der Renderer, zeichnet er nichts — derselbe Befund wie ein leerer Baum.
-    container.remove();
+    // Aufgeräumt wird trotzdem: ein Wurf MITTEN im Mounten lässt eine halb
+    // gemountete Anwendung zurück, deren Knoten sonst im Dokument stehen bleiben.
+    cleanup();
     return "absent";
   }
 
@@ -262,7 +295,7 @@ async function probeLinkDelivery(
   // fortsetzt. Lag `reset()` davor, landete genau dieser Aufruf im Protokoll und
   // wurde später als Klick-Beleg gelesen — der Renderer bestand also mit exakt
   // dem Verhalten, das der Schnitt ausschliessen soll.
-  await drain();
+  await drain(probe);
   probe.reset();
 
   const deadline = Date.now() + PROBE_BUDGET_MS;
@@ -279,7 +312,9 @@ async function probeLinkDelivery(
   //    PIN-geschützten Link. Ein Renderer, der nur für markierte oder nur für
   //    frei erreichbare Ziele zeichnet, liess die übrigen ohne Affordanz — und der
   //    Host ist bei allen zurückgetreten.
-  const hit = () => probe.probeTargets.every((t) => probe.followedTargets.includes(t));
+  const reached = (t: string) => probe.followedTargets.includes(t);
+  const hit = () =>
+    need === "all" ? probe.probeTargets.every(reached) : probe.probeTargets.some(reached);
 
   // Geklickt wird, was ein NUTZER anfassen kann. `dispatchEvent` umgeht die
   // Unterdrückung des Browsers und ruft auch Handler auf einem `disabled`
@@ -297,7 +332,7 @@ async function probeLinkDelivery(
   // Ziel getroffen ist, nichts Neues mehr auftaucht oder das Budget endet.
   const clicked = new Set<Element>();
   while (!hit() && Date.now() < deadline) {
-    const fresh = roots(container, app).filter((el) => !clicked.has(el));
+    const fresh = roots(container, before).filter((el) => !clicked.has(el));
     for (const el of fresh) {
       clicked.add(el);
       if (hit() || Date.now() > deadline) break;
@@ -315,31 +350,51 @@ async function probeLinkDelivery(
     let grew = false;
     while (!hit() && Date.now() < settleUntil && !grew) {
       await new Promise((resolve) => setTimeout(resolve, 10));
-      grew = roots(container, app).some((el) => !clicked.has(el));
+      grew = roots(container, before).some((el) => !clicked.has(el));
     }
     if (!grew && !hit()) break;
   }
 
   const delivered = hit();
-  try {
-    app.unmount();
-  } catch {
-    /* der Abbau gehört nicht zur Messung */
-  }
-  container.remove();
+  cleanup();
   return delivered ? "delivered" : "absent";
 }
 
 
+/** Wie lange die Mount-Arbeit ruhig sein muss, bevor der Phasenschnitt faellt. */
+const MOUNT_QUIET_MS = 120;
+/** Obergrenze fuer das Abfliessen der Mount-Arbeit. */
+const MOUNT_DRAIN_MS = 600;
+
 /**
- * Laesst die aufgeschobene Arbeit abfliessen — Mikrotasks UND kurze Timer.
+ * Laesst die aufgeschobene Mount-Arbeit abfliessen — bis RUHE, nicht fuer eine
+ * feste Zahl von Runden.
  *
- * Vue schiebt `onMounted` und seine Aktualisierungen in die Warteschlange, und ein
- * `async`-Rumpf setzt erst danach fort. Wer direkt nach `mount()` misst, misst zu
- * frueh.
+ * Drei Null-Timer reichten nur fuer Mikrotasks. Ein `onMounted(async () => { await
+ * delay(50); host.followLink(l) })` kam erst danach — der Phasenschnitt lag also
+ * davor, der Aufruf landete waehrend der Klick-Phase im Protokoll und galt als
+ * Beleg. Der Renderer bestand mit genau dem Verhalten, das der Schnitt
+ * ausschliessen soll: navigieren beim blossen Anzeigen.
+ *
+ * Gewartet wird deshalb, bis das Protokoll {@link MOUNT_QUIET_MS} lang unveraendert
+ * bleibt, hoechstens aber {@link MOUNT_DRAIN_MS}. Das ist eine Verbesserung, keine
+ * Garantie: ein Renderer, der noch spaeter von selbst navigiert, ist von einem
+ * Klick-Effekt zeitlich nicht mehr zu trennen. Diese Grenze ist bewusst benannt
+ * statt stillschweigend in Kauf genommen.
  */
-async function drain(): Promise<void> {
-  for (let i = 0; i < 3; i += 1) await new Promise((resolve) => setTimeout(resolve, 0));
+async function drain(probe: { readonly linkCalls: readonly string[] }): Promise<void> {
+  const until = Date.now() + MOUNT_DRAIN_MS;
+  let seen = probe.linkCalls.length;
+  let quietSince = Date.now();
+  while (Date.now() < until) {
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    if (probe.linkCalls.length !== seen) {
+      seen = probe.linkCalls.length;
+      quietSince = Date.now();
+    } else if (Date.now() - quietSince >= MOUNT_QUIET_MS) {
+      return;
+    }
+  }
 }
 
 /**
@@ -370,19 +425,19 @@ function isUnreachable(el: Element): boolean {
  * deshalb auch im Wurzelelement der Anwendung, aber NICHT im übrigen Dokument:
  * fremde Steuerelemente anderer Läufe gehen den Probelauf nichts an.
  */
-function roots(container: Element, app: { _container?: unknown }): Element[] {
+function roots(container: Element, before: ReadonlySet<Element>): Element[] {
   const out = new Set<Element>(Array.from(container.querySelectorAll("*")));
   for (const el of Array.from(document.body.children)) {
-    // Teleport-Ziele hängen als Geschwister des Containers am Body. Der Container
-    // selbst ist schon erfasst; alles andere, was NACH dem Mount dazukam, gehört
-    // zu dieser Anwendung.
-    if (el === container || el.contains(container)) continue;
-    if (!el.hasAttribute("data-conformance-foreign")) {
-      out.add(el);
-      for (const inner of Array.from(el.querySelectorAll("*"))) out.add(inner);
-    }
+    // Teleport-Ziele hängen als Geschwister des Containers am Body — sie gehören
+    // dazu. Aber NUR das, was dieser Mount erzeugt hat: `before` ist der Stand des
+    // Bodys VOR dem Mount. Ohne diesen Vergleich sammelte der Lauf alles ein, was
+    // noch dort stand, und das Gate fährt drei Skins nacheinander im SELBEN
+    // Dokument — Skin B hätte die Reste von Skin A mitgeklickt und deren
+    // `followLink` als eigene Affordanz gezählt.
+    if (el === container || el.contains(container) || before.has(el)) continue;
+    out.add(el);
+    for (const inner of Array.from(el.querySelectorAll("*"))) out.add(inner);
   }
-  void app;
   // TIEFSTE ZUERST. `querySelectorAll` liefert Vorfahren vor ihren Nachfahren, und
   // das verbrauchte zustandsbehaftete Listener: ein gültiger delegierter
   // `onClickOnce` am Wrapper, der nur folgt, wenn `event.target.closest(...)`

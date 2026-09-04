@@ -1298,3 +1298,111 @@ describe("honors-Probelauf — jede gestellte Link-FORM braucht eine Affordanz",
     expect(await checkHonors(honorsSkin(["link"], page))).toEqual([]);
   });
 });
+
+describe("honors-Probelauf — jeder Lauf misst nur sich selbst", () => {
+  it("klickt keine Steuerelemente, die vor dem Mount schon im Dokument standen", async () => {
+    // Das Gate faehrt drei Skins nacheinander im SELBEN Dokument. Was ein
+    // frueherer Lauf am Body hinterliess, sammelte der naechste mit ein — Skin B
+    // haette die Reste von Skin A geklickt und deren `followLink` als eigene
+    // Affordanz gezaehlt. Hier steht der Fremdkoerper stellvertretend dafuer.
+    const foreign = document.createElement("button");
+    let clickedForeign = false;
+    foreign.addEventListener("click", () => {
+      clickedForeign = true;
+    });
+    document.body.appendChild(foreign);
+    try {
+      const page = () => vh("div", {}, "nichts zum Klicken");
+      const findings = await checkHonors(honorsSkin(["link"], page as never));
+      expect(findings.map((f) => f.problem)).toEqual(["undelivered"]);
+      expect(clickedForeign, "ein fremdes Steuerelement wurde geklickt").toBe(false);
+    } finally {
+      foreign.remove();
+    }
+  });
+
+  it("laesst das Dokument so zurueck, wie es war — auch nach `Teleport`", async () => {
+    // `unmount()` entfernt nicht zwangslaeufig, was ein Teleport ausserhalb des
+    // Containers angelegt hat. Ohne Aufraeumen waechst das Dokument ueber die
+    // Skins hinweg, und der naechste Lauf faende fremde Steuerelemente vor.
+    const beforeCount = document.body.children.length;
+    const page = (host: never) => {
+      const svc = svcOf(host);
+      return vh(
+        Teleport,
+        { to: "body" },
+        allLinks(svc).map((link) => vh("button", { onClick: () => void svc.followLink(link) })),
+      );
+    };
+    expect(await checkHonors(honorsSkin(["link"], page))).toEqual([]);
+    expect(document.body.children.length, "der Lauf hat etwas zurueckgelassen").toBe(beforeCount);
+  });
+
+  it("raeumt auch auf, wenn der Renderer mitten im Mounten wirft", async () => {
+    const beforeCount = document.body.children.length;
+    const Boom = defineComponent({
+      setup() {
+        return () => {
+          throw new Error("mitten im Rendern");
+        };
+      },
+    });
+    const page = () => vh(Boom as never, {});
+    expect((await checkHonors(honorsSkin(["link"], page as never))).map((f) => f.problem)).toEqual([
+      "undelivered",
+    ]);
+    expect(document.body.children.length, "die halb gemountete Anwendung blieb stehen").toBe(
+      beforeCount,
+    );
+  });
+});
+
+describe("honors-Achse — die beiden Richtungen messen verschieden streng", () => {
+  it("meldet `undeclared` auch, wenn nur EINE Link-Form gezeichnet wird", async () => {
+    // Die verschaerfte Messung ("jede Form braucht eine Affordanz") gehoert zur
+    // DEKLARIERTEN Richtung. In der Gegenrichtung ist schon EIN gezeichneter
+    // Sprung der Befund: er ueberlagert die Affordanz, die der Host mangels
+    // Deklaration weiterhin selbst zeichnet. Mit demselben strengen Praedikat
+    // blieb genau dieser Fall stumm.
+    const page = (host: never) => {
+      const svc = svcOf(host);
+      const one = allLinks(svc)[0];
+      return vh("button", { onClick: () => void svc.followLink(one) });
+    };
+    const findings = await checkHonors(honorsSkin(["order"], page));
+    expect(findings.map((f) => f.problem)).toEqual(["undeclared"]);
+  });
+
+  it("…waehrend die deklarierte Richtung weiterhin ALLE Formen verlangt", async () => {
+    const page = (host: never) => {
+      const svc = svcOf(host);
+      const one = allLinks(svc)[0];
+      return vh("button", { onClick: () => void svc.followLink(one) });
+    };
+    expect((await checkHonors(honorsSkin(["link"], page))).map((f) => f.problem)).toEqual([
+      "undelivered",
+    ]);
+  });
+
+  it("verwirft einen Sprung aus SPAETER Mount-Arbeit, nicht nur aus sofortiger", async () => {
+    // Drei Null-Timer reichten nur fuer Mikrotasks. Ein `onMounted`, das 50 ms
+    // wartet, kam danach — der Aufruf landete waehrend der Klick-Phase im
+    // Protokoll und galt als Beleg, obwohl die Seite nichts Klickbares zeichnet.
+    const page = (host: never) => {
+      const svc = svcOf(host);
+      const Nav = defineComponent({
+        setup() {
+          onMounted(async () => {
+            await new Promise((r) => setTimeout(r, 50));
+            followAll(svc)();
+          });
+          return () => vh("div", {}, "nichts zum Klicken");
+        },
+      });
+      return vh(Nav as never, {});
+    };
+    expect((await checkHonors(honorsSkin(["link"], page))).map((f) => f.problem)).toEqual([
+      "undelivered",
+    ]);
+  }, 30_000);
+});
