@@ -236,7 +236,12 @@
  * Bewusst NUR in der breiten Form. In der gestapelten (schmalen) Form sind Label
  * und Zustand volle Zeilen; ein max-content-Boden wuerde dort genau den
  * Horizontalscroll erzwingen, den die Stapelung vermeidet.
- * 701px = komplementaer zur Stapel-Schwelle (max-width: 700px) unten.
+ * Die Schwelle ist als BEREICH geschrieben (`width > 700px` / `width <= 700px`)
+ * und nicht als `min-width: 701px` / `max-width: 700px`. Containerbreiten sind
+ * gebrochen — Grid-Aufteilung, Zoom, Geraete-Pixel —, und zwischen 700 und 701 px
+ * traf vorher KEINE der beiden Regeln: dort behielten die Felder ihr
+ * schrumpfbares `min-width: 0` und kuerzten wieder, statt zu stapeln. Zwei
+ * Bereiche, die aneinander stossen, lassen kein solches Loch.
  *
  * Der Boden ist GEDECKELT, und das ist der Kern: ein nackter `max-content`-Boden
  * ueberschreibt das `min-width: 0` der Spalte, und weil beide Felder
@@ -260,7 +265,7 @@
  * ueberlanger Wert die Zeile nicht sprengen kann. Was darueber hinausgeht,
  * kuerzt wieder mit Ellipse; das ist der bewusste Rest, den gueltiges CSS an
  * dieser Stelle nicht ausraeumen kann. */
-@container (min-width: 701px) {
+@container (width > 700px) {
   .t-root .t-label {
     min-width: min(24ch, 100%);
   }
@@ -279,7 +284,7 @@
  * Labels ("Wintergarten · Jalou…") und schnitt Zustandsfragmente (" · Lamelle 0 %")
  * ab — gestapelt hätte derselbe Inhalt vollständig gepasst. Die Schwelle gehört
  * also an das obere Ende dieses Bandes, nicht an sein unteres. */
-@container (max-width: 700px) {
+@container (width <= 700px) {
   .t-root .t-row {
     flex-direction: column;
     align-items: stretch;
