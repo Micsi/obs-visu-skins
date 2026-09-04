@@ -10,7 +10,7 @@
 import { describe, expect, it } from "vitest";
 // `vh` ist derselbe `h` — die Link-Specs binden `h` lokal an den Host-Stub und
 // brauchen daneben noch Vues Hyperscript.
-import { h, h as vh, mergeProps, type VNode } from "vue";
+import { Teleport, defineComponent, h, h as vh, mergeProps, ref, type VNode } from "vue";
 import type { Renderer, SkinManifest } from "@obs/visu-contract";
 import { tiles } from "@obs-visu-skins/ionic";
 import ionicManifest from "@obs-visu-skins/ionic/manifest.json" with { type: "json" };
@@ -1091,4 +1091,107 @@ describe("honors-Achse — die Gegenrichtung: geliefert, aber nicht deklariert",
     };
     expect(await checkHonors(honorsSkin(["link"], page))).toEqual([]);
   });
+});
+
+describe("honors-Probelauf — geklickt wird, was ein Nutzer anfassen kann", () => {
+  const svcOf = (host: never) =>
+    host as unknown as {
+      layersFor: (id: string) => { items: { link?: unknown }[] }[];
+      currentPageId: string;
+      followLink: (l: unknown) => unknown;
+    };
+  const firstLink = (svc: ReturnType<typeof svcOf>): unknown =>
+    svc.layersFor(svc.currentPageId)[0]?.items.find((i: { link?: unknown }) => i.link)?.link;
+
+  it("nimmt eine Affordanz auf einem `disabled` Steuerelement NICHT ab", async () => {
+    // `dispatchEvent` umgeht die Unterdrueckung des Browsers und ruft den Handler
+    // auch auf einem deaktivierten Steuerelement. Der Probelauf haette damit eine
+    // Affordanz abgenommen, die niemand aktivieren kann — das Gegenteil dessen,
+    // was die Deklaration verspricht.
+    const page = (host: never) => {
+      const svc = svcOf(host);
+      const link = firstLink(svc);
+      return vh("button", { disabled: true, onClick: () => void svc.followLink(link) });
+    };
+    expect((await checkHonors(honorsSkin(["link"], page))).map((f) => f.problem)).toEqual([
+      "undelivered",
+    ]);
+  });
+
+  it("…und auch keine in einem `inert`-Teilbaum", async () => {
+    const page = (host: never) => {
+      const svc = svcOf(host);
+      const link = firstLink(svc);
+      return vh("div", { inert: true }, [
+        vh("button", { onClick: () => void svc.followLink(link) }),
+      ]);
+    };
+    expect((await checkHonors(honorsSkin(["link"], page))).map((f) => f.problem)).toEqual([
+      "undelivered",
+    ]);
+  });
+
+  it("…aber dieselbe Flaeche ohne `disabled` zaehlt", async () => {
+    // Der Nachbarfall: das Aussortieren darf den Normalfall nicht mitnehmen.
+    const page = (host: never) => {
+      const svc = svcOf(host);
+      const link = firstLink(svc);
+      return vh("button", { onClick: () => void svc.followLink(link) });
+    };
+    expect(await checkHonors(honorsSkin(["link"], page))).toEqual([]);
+  });
+
+  it("verlangt, dass `followLink` das Ziel DES ITEMS bekommt", async () => {
+    // Der Name allein genuegt nicht: ein Renderer, der das gestellte `LayerItem`
+    // ignoriert und eine eigene Flaeche mit festverdrahtetem Ziel zeichnet, ruft
+    // `followLink` ebenfalls — der Host zoege daraufhin seine Affordanz zurueck,
+    // waehrend das Ziel des Items nirgends erreichbar ist.
+    const page = (host: never) => {
+      const svc = svcOf(host);
+      return vh("button", {
+        onClick: () => void svc.followLink({ targetNodeId: "ganz-woanders" }),
+      });
+    };
+    expect((await checkHonors(honorsSkin(["link"], page))).map((f) => f.problem)).toEqual([
+      "undelivered",
+    ]);
+  });
+
+  it("findet eine Affordanz, die per `Teleport` ausserhalb des Containers landet", async () => {
+    // Eine Overlay-Flaeche nach `document.body` zu teleportieren ist ein voellig
+    // gueltiger Renderer. Wer nur den Container absucht, meldet ihn als
+    // `undelivered`.
+    const page = (host: never) => {
+      const svc = svcOf(host);
+      const link = firstLink(svc);
+      return vh(Teleport, { to: "body" }, [
+        vh("button", { onClick: () => void svc.followLink(link) }),
+      ]);
+    };
+    expect(await checkHonors(honorsSkin(["link"], page))).toEqual([]);
+  });
+
+  it("findet eine Affordanz, die erst NACH dem Mount erscheint", async () => {
+    // `defineAsyncComponent`, `Suspense` oder eine Komponente, die sich nach dem
+    // Mount aktualisiert: ein einmaliger Schnappschuss der Elemente sieht die
+    // Affordanz nie.
+    const page = (host: never) => {
+      const svc = svcOf(host);
+      const link = firstLink(svc);
+      const Late = defineComponent({
+        setup() {
+          const ready = ref(false);
+          setTimeout(() => {
+            ready.value = true;
+          }, 30);
+          return () =>
+            ready.value
+              ? vh("button", { onClick: () => void svc.followLink(link) })
+              : vh("span", {}, "lädt");
+        },
+      });
+      return vh(Late as never, {});
+    };
+    expect(await checkHonors(honorsSkin(["link"], page))).toEqual([]);
+  }, 20_000);
 });
