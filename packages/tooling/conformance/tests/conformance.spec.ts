@@ -10,7 +10,16 @@
 import { describe, expect, it } from "vitest";
 // `vh` ist derselbe `h` — die Link-Specs binden `h` lokal an den Host-Stub und
 // brauchen daneben noch Vues Hyperscript.
-import { Teleport, defineComponent, h, h as vh, mergeProps, ref, type VNode } from "vue";
+import {
+  Teleport,
+  defineComponent,
+  h,
+  h as vh,
+  mergeProps,
+  onMounted,
+  ref,
+  type VNode,
+} from "vue";
 import type { Renderer, SkinManifest } from "@obs/visu-contract";
 import { tiles } from "@obs-visu-skins/ionic";
 import ionicManifest from "@obs-visu-skins/ionic/manifest.json" with { type: "json" };
@@ -357,6 +366,33 @@ const honorsSkin = (honors: string[], page?: (host: never) => unknown) => ({
  * verlässlich "zeichnet den Sprung" von "hat den Host nur gefragt" — mehr soll
  * es nicht leisten.
  */
+const svcOf = (host: never) =>
+  host as unknown as {
+    layersFor: (id: string) => { items: { link?: unknown }[] }[];
+    currentPageId: string;
+    followLink: (l: unknown) => unknown;
+  };
+  // ALLE Links des gestellten Layers. Der Probelauf stellt drei Formen — markiert,
+  // gewoehnlich, PIN-geschuetzt — und verlangt fuer jede eine Affordanz, so wie der
+  // Host bei jeder zurueckgetreten ist. Ein Renderer, der nur eine bedient, faellt
+  // durch; die Specs bilden deshalb ab, was ein echter Renderer tut.
+const allLinks = (svc: ReturnType<typeof svcOf>): unknown[] =>
+  (svc.layersFor(svc.currentPageId)[0]?.items ?? [])
+    .filter((i: { link?: unknown }) => i.link)
+    .map((i: { link?: unknown }) => i.link);
+  /**
+   * Ein Handler, der JEDE gestellte Link-Form bedient.
+   *
+   * Die Specs in diesem Block pruefen VUE-VERHALTEN (Emits, Fallthrough,
+   * Ereignis-Ziel, Teleport, spaeter Mount) — nicht, ob ein Renderer alle Formen
+   * abdeckt. Dafuer gibt es einen eigenen Block. Damit sie am verschaerften
+   * Probelauf nicht aus dem falschen Grund scheitern, folgt ihre eine Flaeche
+   * allen Zielen.
+   */
+const followAll = (svc: ReturnType<typeof svcOf>) => () => {
+  for (const l of allLinks(svc)) void svc.followLink(l);
+  };
+
 describe("honors-Achse — der Deklarations-Slot wird gemessen, nicht geglaubt", () => {
   it("kennt das Vokabular AUS dem Vertrag, nicht aus einer Kopie", async () => {
     // Kommt die Liste aus dem Schema, wächst sie mit jedem Vertrags-Bump mit.
@@ -772,9 +808,8 @@ describe("honors-Achse — der Deklarations-Slot wird gemessen, nicht geglaubt",
         currentPageId: string;
         followLink: (l: unknown) => unknown;
       };
-      const link = svc.layersFor(svc.currentPageId)[0]?.items.find((i) => i.link)?.link;
       const Emitter = { emits: ["click"], render: () => h("div", null, []) };
-      return h(Emitter as never, { onClick: () => void svc.followLink(link) });
+      return h(Emitter as never, { onClick: followAll(svc) });
     };
     expect((await checkHonors(honorsSkin(["link"], page))).map((f) => f.problem)).toEqual([
       "undelivered",
@@ -792,9 +827,8 @@ describe("honors-Achse — der Deklarations-Slot wird gemessen, nicht geglaubt",
         currentPageId: string;
         followLink: (l: unknown) => unknown;
       };
-      const link = svc.layersFor(svc.currentPageId)[0]?.items.find((i) => i.link)?.link;
       const Plain = { render: () => h("div", null, []) };
-      return h(Plain as never, { onClick: () => void svc.followLink(link) });
+      return h(Plain as never, { onClick: followAll(svc) });
     };
     expect(await checkHonors(honorsSkin(["link"], page))).toEqual([]);
   });
@@ -811,11 +845,10 @@ describe("honors-Achse — der Deklarations-Slot wird gemessen, nicht geglaubt",
         currentPageId: string;
         followLink: (l: unknown) => unknown;
       };
-      const link = svc.layersFor(svc.currentPageId)[0]?.items.find((i) => i.link)?.link;
       return h("button", {
         onClick: [
           (e: { stopImmediatePropagation: () => void }) => e.stopImmediatePropagation(),
-          () => void svc.followLink(link),
+          followAll(svc),
         ],
       });
     };
@@ -831,8 +864,7 @@ describe("honors-Achse — der Deklarations-Slot wird gemessen, nicht geglaubt",
         currentPageId: string;
         followLink: (l: unknown) => unknown;
       };
-      const link = svc.layersFor(svc.currentPageId)[0]?.items.find((i) => i.link)?.link;
-      return h("button", { onClick: [() => {}, () => void svc.followLink(link)] });
+      return h("button", { onClick: [() => {}, followAll(svc)] });
     };
     expect(await checkHonors(honorsSkin(["link"], page))).toEqual([]);
   });
@@ -907,14 +939,6 @@ describe("honors-Achse — der Deklarations-Slot wird gemessen, nicht geglaubt",
  * stimmt, und wuerden rot, wenn jemand wieder anfinge, sie nachzubauen.
  */
 describe("honors-Probelauf — Vue liefert die Semantik, nicht unsere Nachbildung", () => {
-  const svcOf = (host: never) =>
-    host as unknown as {
-      layersFor: (id: string) => { items: { link?: unknown }[] }[];
-      currentPageId: string;
-      followLink: (l: unknown) => unknown;
-    };
-  const firstLink = (svc: ReturnType<typeof svcOf>): unknown =>
-    svc.layersFor(svc.currentPageId)[0]?.items.find((i: { link?: unknown }) => i.link)?.link;
 
   it("routet ein Komponenten-Ereignis an den Listener des Eltern-VNode", async () => {
     // `emits: ["click"]` + `emit("click")` im Kind: Vue ruft damit den `onClick`
@@ -923,14 +947,13 @@ describe("honors-Probelauf — Vue liefert die Semantik, nicht unsere Nachbildun
     // komponenten-vermittelter Sprung galt als `undelivered`.
     const page = (host: never) => {
       const svc = svcOf(host);
-      const link = firstLink(svc);
       const Button = {
         emits: ["click"],
         setup(_p: unknown, { emit }: { emit: (e: string) => void }) {
           return () => vh("button", { onClick: () => emit("click") });
         },
       };
-      return vh(Button as never, { onClick: () => void svc.followLink(link) });
+      return vh(Button as never, { onClick: followAll(svc) });
     };
     expect(await checkHonors(honorsSkin(["link"], page))).toEqual([]);
   });
@@ -940,9 +963,8 @@ describe("honors-Probelauf — Vue liefert die Semantik, nicht unsere Nachbildun
     // ihn trotzdem direkt auf und nahm eine Seite ab, die im Browser nichts tut.
     const page = (host: never) => {
       const svc = svcOf(host);
-      const link = firstLink(svc);
       const Isolated = { inheritAttrs: false, render: () => vh("div", {}, []) };
-      return vh(Isolated as never, { onClick: () => void svc.followLink(link) });
+      return vh(Isolated as never, { onClick: followAll(svc) });
     };
     expect((await checkHonors(honorsSkin(["link"], page))).map((f) => f.problem)).toEqual([
       "undelivered",
@@ -955,10 +977,9 @@ describe("honors-Probelauf — Vue liefert die Semantik, nicht unsere Nachbildun
     // Getrennte Dispatches mit je frischem Ereignis liessen ihn durch.
     const page = (host: never) => {
       const svc = svcOf(host);
-      const link = firstLink(svc);
       return vh("button", {
         onClick: (e: MouseEvent) => e.stopImmediatePropagation(),
-        onClickOnce: () => void svc.followLink(link),
+        onClickOnce: followAll(svc),
       });
     };
     expect((await checkHonors(honorsSkin(["link"], page))).map((f) => f.problem)).toEqual([
@@ -988,14 +1009,13 @@ describe("honors-Probelauf — Vue liefert die Semantik, nicht unsere Nachbildun
     // konformer Skin fiel durch, weil seine Bedingung nie zutraf.
     const page = (host: never) => {
       const svc = svcOf(host);
-      const link = firstLink(svc);
       return vh("button", {
         "data-link": "keller",
         onClick: (e: MouseEvent) => {
           const el = e.currentTarget as HTMLElement;
           if (el.dataset.link !== "keller") return;
           if (el.getAttribute("data-link") !== "keller") return;
-          void svc.followLink(link);
+          followAll(svc)();
         },
       });
     };
@@ -1008,10 +1028,9 @@ describe("honors-Probelauf — Vue liefert die Semantik, nicht unsere Nachbildun
     // einen verworfenen Button den Skin durchbringen.
     const page = (host: never) => {
       const svc = svcOf(host);
-      const link = firstLink(svc);
       const Discards = { render: () => vh("div", {}, ["nichts vom Slot"]) };
       return vh(Discards as never, {}, {
-        default: () => [vh("button", { onClick: () => void svc.followLink(link) })],
+        default: () => [vh("button", { onClick: followAll(svc) })],
       } as never);
     };
     expect((await checkHonors(honorsSkin(["link"], page))).map((f) => f.problem)).toEqual([
@@ -1025,15 +1044,13 @@ describe("honors-Probelauf — Vue liefert die Semantik, nicht unsere Nachbildun
     // genau falsch herum.
     const withColon = (host: never) => {
       const svc = svcOf(host);
-      const link = firstLink(svc);
-      return vh("button", { "on:click": () => void svc.followLink(link) });
+      return vh("button", { "on:click": followAll(svc) });
     };
     expect(await checkHonors(honorsSkin(["link"], withColon))).toEqual([]);
 
     const withHyphen = (host: never) => {
       const svc = svcOf(host);
-      const link = firstLink(svc);
-      return vh("button", { "on-click": () => void svc.followLink(link) });
+      return vh("button", { "on-click": followAll(svc) });
     };
     expect((await checkHonors(honorsSkin(["link"], withHyphen))).map((f) => f.problem)).toEqual([
       "undelivered",
@@ -1094,14 +1111,6 @@ describe("honors-Achse — die Gegenrichtung: geliefert, aber nicht deklariert",
 });
 
 describe("honors-Probelauf — geklickt wird, was ein Nutzer anfassen kann", () => {
-  const svcOf = (host: never) =>
-    host as unknown as {
-      layersFor: (id: string) => { items: { link?: unknown }[] }[];
-      currentPageId: string;
-      followLink: (l: unknown) => unknown;
-    };
-  const firstLink = (svc: ReturnType<typeof svcOf>): unknown =>
-    svc.layersFor(svc.currentPageId)[0]?.items.find((i: { link?: unknown }) => i.link)?.link;
 
   it("nimmt eine Affordanz auf einem `disabled` Steuerelement NICHT ab", async () => {
     // `dispatchEvent` umgeht die Unterdrueckung des Browsers und ruft den Handler
@@ -1110,8 +1119,7 @@ describe("honors-Probelauf — geklickt wird, was ein Nutzer anfassen kann", () 
     // was die Deklaration verspricht.
     const page = (host: never) => {
       const svc = svcOf(host);
-      const link = firstLink(svc);
-      return vh("button", { disabled: true, onClick: () => void svc.followLink(link) });
+      return vh("button", { disabled: true, onClick: followAll(svc) });
     };
     expect((await checkHonors(honorsSkin(["link"], page))).map((f) => f.problem)).toEqual([
       "undelivered",
@@ -1121,9 +1129,8 @@ describe("honors-Probelauf — geklickt wird, was ein Nutzer anfassen kann", () 
   it("…und auch keine in einem `inert`-Teilbaum", async () => {
     const page = (host: never) => {
       const svc = svcOf(host);
-      const link = firstLink(svc);
       return vh("div", { inert: true }, [
-        vh("button", { onClick: () => void svc.followLink(link) }),
+        vh("button", { onClick: followAll(svc) }),
       ]);
     };
     expect((await checkHonors(honorsSkin(["link"], page))).map((f) => f.problem)).toEqual([
@@ -1135,8 +1142,7 @@ describe("honors-Probelauf — geklickt wird, was ein Nutzer anfassen kann", () 
     // Der Nachbarfall: das Aussortieren darf den Normalfall nicht mitnehmen.
     const page = (host: never) => {
       const svc = svcOf(host);
-      const link = firstLink(svc);
-      return vh("button", { onClick: () => void svc.followLink(link) });
+      return vh("button", { onClick: followAll(svc) });
     };
     expect(await checkHonors(honorsSkin(["link"], page))).toEqual([]);
   });
@@ -1163,9 +1169,8 @@ describe("honors-Probelauf — geklickt wird, was ein Nutzer anfassen kann", () 
     // `undelivered`.
     const page = (host: never) => {
       const svc = svcOf(host);
-      const link = firstLink(svc);
       return vh(Teleport, { to: "body" }, [
-        vh("button", { onClick: () => void svc.followLink(link) }),
+        vh("button", { onClick: followAll(svc) }),
       ]);
     };
     expect(await checkHonors(honorsSkin(["link"], page))).toEqual([]);
@@ -1177,7 +1182,6 @@ describe("honors-Probelauf — geklickt wird, was ein Nutzer anfassen kann", () 
     // Affordanz nie.
     const page = (host: never) => {
       const svc = svcOf(host);
-      const link = firstLink(svc);
       const Late = defineComponent({
         setup() {
           const ready = ref(false);
@@ -1186,7 +1190,7 @@ describe("honors-Probelauf — geklickt wird, was ein Nutzer anfassen kann", () 
           }, 30);
           return () =>
             ready.value
-              ? vh("button", { onClick: () => void svc.followLink(link) })
+              ? vh("button", { onClick: followAll(svc) })
               : vh("span", {}, "lädt");
         },
       });
@@ -1194,4 +1198,103 @@ describe("honors-Probelauf — geklickt wird, was ein Nutzer anfassen kann", () 
     };
     expect(await checkHonors(honorsSkin(["link"], page))).toEqual([]);
   }, 20_000);
+});
+
+describe("honors-Probelauf — jede gestellte Link-FORM braucht eine Affordanz", () => {
+  it("lehnt einen Renderer ab, der nur markierte Links bedient", async () => {
+    // `activeIndicator` ist optional, dokumentierter Default `none`. Ein Renderer,
+    // der seine Klickflaeche nur fuer markierte Links baut, liess jeden
+    // GEWOEHNLICHEN Link ohne Affordanz — nachdem der Host wegen der Deklaration
+    // zurueckgetreten war.
+    const page = (host: never) => {
+      const svc = svcOf(host);
+      const items = (svc.layersFor(svc.currentPageId)[0]?.items ?? []) as {
+        link?: { targetNodeId: string; activeIndicator?: string };
+      }[];
+      return vh(
+        "div",
+        {},
+        items
+          .filter((i) => i.link?.activeIndicator)
+          .map((i) => vh("button", { onClick: () => void svc.followLink(i.link) })),
+      );
+    };
+    expect((await checkHonors(honorsSkin(["link"], page))).map((f) => f.problem)).toEqual([
+      "undelivered",
+    ]);
+  });
+
+  it("lehnt einen Renderer ab, der nur frei erreichbare Ziele bedient", async () => {
+    // Ein PIN-geschuetztes Ziel loest als `gate` auf. Genau dort ist die Affordanz
+    // noetig — sie fuehrt auf den PIN-Pfad. Wer nur bei `navigate` zeichnet, laesst
+    // sie weg, waehrend der Host zurueckgetreten ist.
+    const page = (host: never) => {
+      const svc = host as unknown as {
+        layersFor: (id: string) => { items: { link?: unknown }[] }[];
+        currentPageId: string;
+        resolveLink: (l: unknown) => { kind: string };
+        followLink: (l: unknown) => unknown;
+      };
+      const links = (svc.layersFor(svc.currentPageId)[0]?.items ?? [])
+        .filter((i) => i.link)
+        .map((i) => i.link);
+      return vh(
+        "div",
+        {},
+        links
+          .filter((l) => svc.resolveLink(l).kind === "navigate")
+          .map((l) => vh("button", { onClick: () => void svc.followLink(l) })),
+      );
+    };
+    expect((await checkHonors(honorsSkin(["link"], page))).map((f) => f.problem)).toEqual([
+      "undelivered",
+    ]);
+  });
+
+  it("verwirft einen Sprung aus aufgeschobener Mount-Arbeit", async () => {
+    // `app.mount()` kehrt zurueck, BEVOR ein `onMounted(async () => { await …;
+    // followLink() })` fortsetzt. Lag der Phasenschnitt davor, landete genau
+    // dieser Aufruf im Protokoll und galt spaeter als Klick-Beleg — der Renderer
+    // bestand also mit exakt dem Verhalten, das der Schnitt ausschliessen soll:
+    // navigieren beim blossen Anzeigen.
+    const page = (host: never) => {
+      const svc = svcOf(host);
+      const Nav = defineComponent({
+        setup() {
+          onMounted(async () => {
+            await Promise.resolve();
+            followAll(svc)();
+          });
+          return () => vh("div", {}, "nichts zum Klicken");
+        },
+      });
+      return vh(Nav as never, {});
+    };
+    expect((await checkHonors(honorsSkin(["link"], page))).map((f) => f.problem)).toEqual([
+      "undelivered",
+    ]);
+  });
+
+  it("verbraucht einen delegierten `once`-Listener nicht mit einem Rahmen-Klick", async () => {
+    // `querySelectorAll` liefert Vorfahren VOR ihren Nachfahren. Ein gueltiger
+    // delegierter `onClickOnce` am Rahmen, der nur folgt, wenn
+    // `event.target.closest(...)` trifft, wurde dadurch vom Klick auf den Rahmen
+    // selbst aufgezehrt — der spaetere Klick auf den Knopf erreichte ihn nicht
+    // mehr, obwohl ein Nutzer genau dort zuerst klickt.
+    const page = (host: never) => {
+      const svc = svcOf(host);
+      return vh(
+        "div",
+        {
+          onClickOnce: (e: MouseEvent) => {
+            const el = e.target as HTMLElement;
+            if (!el.closest("[data-link]")) return;
+            followAll(svc)();
+          },
+        },
+        [vh("button", { "data-link": "ja" }, "spring")],
+      );
+    };
+    expect(await checkHonors(honorsSkin(["link"], page))).toEqual([]);
+  });
 });
