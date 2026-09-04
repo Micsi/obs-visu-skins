@@ -14,6 +14,9 @@ export default defineConfig({
     // Der erste dynamische Import eines Skins zieht Vue + alle Renderer nach und
     // liegt knapp über dem 5s-Default (lokal ~5.0s für ionic) — der Lauf ist echt,
     // nur der Default zu knapp. 30s gibt dem Kaltstart Luft, ohne echte Hänger zu decken.
-    testTimeout: 30_000,
+    // 60 s aus demselben Grund wie bei den Specs: der Kaltstart zieht Vue, die
+    // Renderer und die DOM-Laufzeit auf einmal hoch. Das Budget des Probelaufs
+    // (3 s je Skin) bleibt die Grenze, die echte Hänger fängt.
+    testTimeout: 60_000,
   },
 });
