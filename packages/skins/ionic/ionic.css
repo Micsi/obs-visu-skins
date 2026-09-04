@@ -66,13 +66,18 @@
   --vz-acc-blue: #5a93dd;
   --vz-acc-rose: #d97a8d;
   --vz-acc-amber: #e8b441;
-  --vz-acc-slate: #7e8696;
-  --vz-accent: var(--vz-acc-orange);
+  /* Slate ist der einzige Akzent, der die 0.7-Dämpfung der gesperrten Kachel NICHT
+     überlebte: #7e8696 fiel auf --vz-chip-bg auf 2.76:1 (Ziel 3:1 für Grafik). Eine
+     Spur heller (OKLab L 0.619 → 0.659, Farbton und Chroma unverändert) trägt er
+     gedimmt 3.10:1 und ungedimmt 4.80:1. */
+  --vz-acc-slate: #8a92a3;
 
   /* AA-Ink je Palette-Akzent (#19): akzentgefüllter Text fiel bisher auf Weiß
      zurück — gegen JEDEN dieser hellen Akzente unter WCAG AA (Weiß erreicht max.
-     3.66:1). Dunkle Ink (#10131a) erfüllt AA gegen alle acht (min. 5.08:1). Der
-     Host liefert die zum Akzent passende Ink via t.accentInk(token) → var(--ink-<token>). */
+     3.16:1). Dunkle Ink (#10131a) erfüllt AA gegen alle acht (min. 5.89:1). Der
+     Host liefert die zum Akzent passende Ink via t.accentInk(token) → var(--ink-<token>).
+     Die Werte hier gelten für den dunklen Boden; das helle Theme setzt eine tiefere
+     Tonstufe der Palette und kippt die Ink dort auf Hell (siehe unten). */
   --ink-orange: #10131a;
   --ink-teal: #10131a;
   --ink-violet: #10131a;
@@ -81,14 +86,25 @@
   --ink-rose: #10131a;
   --ink-amber: #10131a;
   --ink-slate: #10131a;
-  /* Globaler Ink-Default, gepaart mit dem Default-Akzent (orange). Ein vom Host
-     gesetztes --vz-accent-ink gewinnt (Element-Style schlägt :root in der Kaskade). */
-  --vz-accent-ink: var(--ink-orange);
 
+  /* --vz-accent und --vz-accent-ink stehen mit Absicht NICHT hier, sondern im
+     .visu-root-Block weiter unten: sie sind Aliasse auf diese Palette, und ein Alias
+     wird auf dem Element aufgelöst, das seine Deklaration trägt. Hier — auf <html> —
+     bekäme er den dunklen Boden eingefroren und würde ihn an das helle Theme
+     weitervererben. Die Begründung steht ausführlich an der Deklaration. */
+
+  /* Die Zustandsfarben tragen dieselbe 0.7-Dämpfung wie die Akzente. --vz-on,
+     --vz-warn und --vz-good hielten sie auf dem dunklen Grund bereits (3.64:1 …
+     4.61:1); --vz-off und --vz-bad nicht. */
   --vz-on: #6fbf6a;
-  --vz-off: #79808d;
+  /* LED AUS, Grafik-Schwelle 3:1. #79808d fiel gedimmt auf 2.59:1 auf --vz-chip-bg;
+     OKLab L 0.598 → 0.661 hebt ihn auf 3.12:1, ohne aus dem Neutralgrau zu laufen. */
+  --vz-off: #8b93a0;
   --vz-warn: #e8b441;
-  --vz-bad: #e36767;
+  /* Fehlertext, Text-Schwelle 4.5:1. #e36767 fiel gedimmt auf 2.95:1. Ein dunkles
+     Theme braucht dafür ein HELLES Rot (Material 3 setzt dort #f2b8b5) — L 0.665 →
+     0.808 gibt gedimmt 4.62:1 und ungedimmt 7.92:1, der Farbton bleibt exakt. */
+  --vz-bad: #ffa4a1;
   --vz-good: #5cb568;
 }
 
@@ -102,9 +118,93 @@
   --vz-bg: #e9ecef;
   --vz-bg-grad: radial-gradient(120% 90% at 0% 0%, #cfd6df 0%, #e9ecef 55%, #f2f4f7 100%);
   --vz-bg-image: none;
-  --vz-fg: #1a1d23;
-  --vz-fg-mute: #4a5160;
-  --vz-fg-soft: #79808d;
+  /* Text-Leiter, gerechnet gegen den DUNKELSTEN hellen Grund (--vz-bg #e9ecef —
+     auf Weiss ist dunkler Text immer besser dran) und gegen die 0.7-Dämpfung der
+     gesperrten Kachel. Spiegelbild der dunklen Leiter: gestaucht auf L 0.155 …
+     0.313, drei Stufen à rund 0.08 OKLab-L.
+       fg      #0a0c12  L 0.155  ungedimmt 16.49:1  gedimmt 6.90:1
+       fg-mute #181d2a  L 0.232  ungedimmt 14.19:1  gedimmt 5.73:1  (war 3.37:1)
+       fg-soft #2b313c  L 0.312  ungedimmt 11.02:1  gedimmt 4.65:1  (war 2.21:1) */
+  --vz-fg: #0a0c12;
+  --vz-fg-mute: #181d2a;
+  --vz-fg-soft: #2b313c;
+
+  /* ===================================================================
+     Palette-Tonstufe für den hellen Grund.
+
+     Die acht Marken-Akzente in :root sind für einen dunklen Grund gestimmt und
+     erreichen auf einer nahezu weissen Seite nicht einmal ungedimmt die 3:1 aus
+     WCAG 1.4.11 (amber 1.60:1, green 1.90:1, orange 2.13:1 auf --vz-bg). Kein
+     Wasch der Fläche kann das heilen — es ist ein Farbwert-, kein Flächenproblem.
+
+     Deshalb bekommt das helle Theme dieselben acht Farbtöne eine Tonstufe tiefer:
+     der OKLab-FARBTON bleibt stehen (Abweichung senkrecht zur Farbachse höchstens
+     0.005, also unterhalb der Sichtbarkeit), nur L sinkt auf die Höhe, die 3:1 auch
+     unter der 0.7-Dämpfung der gesperrten Kachel hält. Das ist die übliche Bauweise
+     eines Zwei-Themen-Systems — Material 3 nimmt für Light ebenfalls einen tieferen
+     Ton derselben Familie — und ausdrücklich NICHT ein Einebnen: der kleinste
+     paarweise OKLab-Abstand der acht liegt hier bei 0.075 (teal/slate) gegen 0.095
+     im dunklen Boden, beides weit über der Unterscheidungsschwelle von rund 0.02.
+     Die Chroma sinkt dort, wo der sRGB-Raum tiefer unten enger wird (orange 0.150 →
+     0.123, amber 0.141 → 0.088); mehr Chroma wäre nur um den Preis eines wandernden
+     Farbtons zu haben, und ein wandernder Farbton ist genau das, was die acht
+     Akzente nicht dürfen.
+
+     Amber steht bewusst eine Stufe tiefer als seine Schwelle verlangt (L 0.429 statt
+     0.477): auf gleicher Höhe rückte er dem orange auf 0.060 — der einzige Abstand
+     der Palette, der unter den dunklen Boden gefallen wäre. Tiefer gesetzt sind es
+     0.089, und er trägt 3.50:1 statt 3.10:1.
+
+     Gemessen gegen --vz-bg #e9ecef (der schlechteste helle Grund, weil dunkler Text
+     auf Weiss immer besser dasteht):
+       Token   alt      neu      ungedimmt   gedimmt 0.7   (alt gedimmt)
+       orange  #ec8b3a  #954a00  5.44:1      3.10:1        1.71:1
+       teal    #45b1ae  #006968  5.50:1      3.12:1        1.71:1
+       violet  #a489d9  #684c97  5.77:1      3.12:1        1.84:1
+       green   #6fbf6a  #186c17  5.54:1      3.12:1        1.56:1
+       blue    #5a93dd  #255da2  5.59:1      3.10:1        1.94:1
+       rose    #d97a8d  #994155  5.46:1      3.10:1        1.87:1
+       amber   #e8b441  #674a00  6.93:1      3.50:1        1.40:1
+       slate   #8a92a3  #525a68  5.86:1      3.10:1        2.10:1
+     =================================================================== */
+  --vz-acc-orange: #954a00;
+  --vz-acc-teal: #006968;
+  --vz-acc-violet: #684c97;
+  --vz-acc-green: #186c17;
+  --vz-acc-blue: #255da2;
+  --vz-acc-rose: #994155;
+  --vz-acc-amber: #674a00;
+  --vz-acc-slate: #525a68;
+
+  /* Die Ink kippt mit. Auf dem tiefen Ton reisst die dunkle Ink des Grundthemes
+     (#10131a) mit 2.73:1 … 3.00:1 die Textschwelle; die helle Ink trägt gegen alle
+     acht 6.07:1 … 7.73:1. --vz-accent-ink zeigt auf --ink-orange und folgt damit
+     ohne eigene Zeile. */
+  --ink-orange: #f7f8fa;
+  --ink-teal: #f7f8fa;
+  --ink-violet: #f7f8fa;
+  --ink-green: #f7f8fa;
+  --ink-blue: #f7f8fa;
+  --ink-rose: #f7f8fa;
+  --ink-amber: #f7f8fa;
+  --ink-slate: #f7f8fa;
+  /* Die drei `-rgb`-Zwillinge des Brückenblocks sind Zahlentripel, keine Token —
+     Ionic mischt daraus seine Ripple- und Fokus-Schleier. Sie MÜSSEN mitziehen,
+     sonst legt der Schleier den dunklen Boden über die helle Tonstufe. */
+  --ion-color-primary-contrast-rgb: 247, 248, 250;
+  --ion-color-primary-rgb: 149, 74, 0;
+  --ion-color-success-rgb: 24, 108, 23;
+
+  /* Zustandsfarben nach derselben Regel: Farbton stehen lassen, L auf die Schwelle.
+     on/off/good sind Grafik (3:1), warn/bad Text (4.5:1) — deshalb liegen die beiden
+     Textfarben deutlich tiefer als die drei LED-Farben. Ein dunkles Bernstein als
+     Warntext auf hellem Grund ist die übliche Lösung (Bootstrap setzt dort #664d03);
+     unter der 0.7-Dämpfung muss es noch eine Stufe tiefer. */
+  --vz-on: #186c17;
+  --vz-off: #535966;
+  --vz-good: #026f25;
+  --vz-warn: #442f00;
+  --vz-bad: #88091d;
 
   /* Glas-Wasch im hellen Theme: der aufgezogene Ton ist Weiss — und Weiss IST hier
      --vz-solid. Jede Wasch-Stufe liegt damit zwischen --vz-bg und --vz-solid, also
@@ -128,8 +228,17 @@
   --vz-bg-grad: radial-gradient(120% 90% at 0% 0%, #1a2030 0%, #11141b 55%, #0a0c11 100%);
   --vz-bg-image: none;
   --vz-fg: #eef0f4;
-  --vz-fg-mute: #aeb4c0;
-  --vz-fg-soft: #7a808d;
+  /* Die Text-Leiter des dunklen Themes, gerechnet gegen den HELLSTEN erklärten
+     Grund (--vz-tile-bg-strong #22272f) und gegen die 0.7-Dämpfung der gesperrten
+     Kachel. Der Dimmer kostet rund den Faktor 1.7 an Verhältnis; damit passen
+     Fließtext, Muted und Soft nicht mehr über die alte Spanne L 0.955 … 0.599,
+     sondern nur noch über L 0.955 … 0.794. Die Leiter wird also gestaucht, nicht
+     eingeebnet: drei Stufen mit je rund 0.08 OKLab-L bleiben sichtbar getrennt.
+       fg      #eef0f4  L 0.955  ungedimmt 13.15:1  gedimmt 7.20:1
+       fg-mute #cfd5e1  L 0.872  ungedimmt 10.19:1  gedimmt 5.77:1  (war 4.32:1)
+       fg-soft #b5bcca  L 0.794  ungedimmt  7.87:1  gedimmt 4.64:1  (war 2.60:1) */
+  --vz-fg-mute: #cfd5e1;
+  --vz-fg-soft: #b5bcca;
 
   /* Flächenton statt Weiss — die drei durchscheinenden Flächen ziehen im dunklen
      Theme nicht mehr Weiss auf, sondern rgb(35 40 48) = #232830, den Flächenton
@@ -217,6 +326,31 @@
    IONIC VARIABLE BRIDGE — feed Visu tokens into Ionic so native components blend
    =========================================================================== */
 .visu-root {
+  /* ══ Diese beiden Aliasse MÜSSEN hier stehen und nicht in :root ══
+     Die Substitution einer Custom Property passiert auf dem Element, das die
+     DEKLARATION trägt, nicht auf dem, das sie liest. `:root` ist <html>;
+     `[data-theme]` sitzt immer auf einem Nachfahren-div (.visu-root). Stand
+     `--vz-accent: var(--vz-acc-orange)` in :root, löste der Browser es dort gegen
+     die Palette von <html> auf — also gegen den DUNKLEN Boden — und vererbte das
+     fertige Literal nach unten. Die helle Tonstufe von --vz-acc-orange kam nie an:
+     gemessen lieferte ein <div class="visu-root" data-theme="light"> ein
+     --vz-accent von #ec8b3a (2.13:1 auf --vz-bg) statt #954a00, und ein
+     --vz-accent-ink von #10131a (2.26:1 … 2.88:1 auf den tiefen Akzenten) statt
+     #f7f8fa. Hier deklariert, laufen beide gegen die Palette DES GETHEMTEN
+     ELEMENTS und liefern hell #954a00/#f7f8fa, dunkel #ec8b3a/#10131a.
+
+     Ein vom Host gesetztes --vz-accent / --vz-accent-ink gewinnt weiterhin: ein
+     Element-Style schlägt jeden Klassenselektor. Was NICHT mehr gilt: dass ein
+     Ableger ausserhalb von .visu-root noch einen Akzent erbt — dort gibt es
+     keinen, und das ist richtig so, weil es dort auch kein Theme gibt.
+
+     Ein Wächter dagegen steht in tests/contrast.spec.ts („kein Alias in :root
+     zeigt auf ein Token, das ein Theme überschreibt"). Der Konformitätslauf kann
+     das NICHT sehen: er baut je Theme eine flache Variablen-Karte und kennt kein
+     Element, auf dem eine Deklaration sitzt. */
+  --vz-accent: var(--vz-acc-orange);
+  --vz-accent-ink: var(--ink-orange);
+
   --ion-font-family: var(--vz-font);
   --ion-background-color: var(--vz-bg);
   --ion-text-color: var(--vz-fg);
@@ -229,15 +363,18 @@
   --ion-color-primary: var(--vz-accent);
   --ion-color-primary-rgb: 236, 139, 58;
   /* Text AUF dem akzentgefüllten Ionic-Button. Weiss erreicht gegen KEINEN der
-     acht Palette-Akzente die 4.5:1 aus WCAG 1.4.3 — bestenfalls 3.66:1 (slate),
-     schlimmstenfalls 1.90:1 (amber). Der Skin hat dieses Problem für sein EIGENES
+     acht Palette-Akzente des dunklen Bodens die 4.5:1 aus WCAG 1.4.3 —
+     bestenfalls 3.16:1 (blue), schlimmstenfalls 1.90:1 (amber). Der Skin hat
+     dieses Problem für sein EIGENES
      Markup längst mit --ink-… und --vz-accent-ink gelöst (siehe :root oben); nur der
      Ionic-Komponentenpfad blieb auf Weiss stehen. Er zieht jetzt denselben Ton,
      womit gefüllter Button und gefüllte Kachel auch optisch wieder eine Sprache
      sprechen. Der Akzent selbst bleibt unangetastet — nur die Schrift darauf
      kippt von Weiss auf die zum Akzent gehörende Ink (min. 5.08:1 gegen slate,
      9.77:1 gegen amber). Setzt der Host --vz-accent-ink je Gerät, folgt der
-     Button automatisch mit. */
+     Button automatisch mit. Im hellen Theme dreht sich die Rechnung um: die Palette
+     liegt dort eine Tonstufe tiefer, und --ink-… trägt Hell statt Dunkel. Weil hier
+     nur der TOKEN steht und keine Farbe, folgt der Button beiden Themes von selbst. */
   --ion-color-primary-contrast: var(--vz-accent-ink);
   /* Ionic mischt hieraus seine Ripple-/Focus-Schleier. Muss dem Ton oben folgen,
      sonst leuchtet ein weisser Schleier über dunkler Schrift. */

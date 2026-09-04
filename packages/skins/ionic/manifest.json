@@ -495,7 +495,7 @@
           "--vz-acc-slate",
           "--vz-accent"
         ],
-        "reason": "Text AUF dem akzentgefüllten Ionic-Button. Zieht jetzt dieselbe Ink wie das eigene Markup des Skins (--vz-accent-ink, Boden --ink-orange = #10131a) statt Weiss — Weiss erreicht gegen keinen der acht Palette-Akzente 4.5:1."
+        "reason": "Text AUF dem akzentgefüllten Ionic-Button. Zieht jetzt dieselbe Ink wie das eigene Markup des Skins (--vz-accent-ink -> --ink-orange) statt einer festen Farbe. Auf dem dunklen Boden ist das die dunkle Ink #10131a (Weiss erreicht dort gegen keinen der acht Akzente 4.5:1); im hellen Theme liegt die Palette eine Tonstufe tiefer und dieselbe Kette liefert die helle Ink #f7f8fa. Der Token entscheidet, nicht das Blatt."
       },
       "--handle-background": {
         "role": "graphic",

@@ -28,11 +28,12 @@
 //
 // ══ Was die Spec NICHT behauptet
 //
-// Sie prüft die drei Flächen, nicht die Palette. Die Token, die schon auf --vz-bg
-// oder --vz-solid scheitern (siehe REST unten), scheitern auch hier — das ist eine
-// Eigenschaft dieser Token, keine der Fläche, und gehört auf die Palette-Achse.
-// Sie stehen namentlich in REST, damit die Auslassung eine Aussage bleibt und nicht
-// ein Vergessen (Goldene Regel 3).
+// Sie prüft die drei Flächen, nicht die Palette. Token, die schon auf --vz-bg oder
+// --vz-solid scheitern, scheitern auch hier — das ist eine Eigenschaft dieser Token,
+// keine der Fläche, und gehört auf die Palette-Achse. Sie standen namentlich in REST,
+// damit die Auslassung eine Aussage blieb und nicht ein Vergessen (Goldene Regel 3);
+// die Palette-Achse hat inzwischen geliefert, REST ist leer, und die Flächen-Ratsche
+// misst damit wieder jede Paarung selbst.
 
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -63,16 +64,16 @@ const SURFACES = ["--vz-tile-bg", "--vz-tile-bg-strong", "--vz-chip-bg"] as cons
  * Vordergrund/Deckkraft-Paare, die auf diesen Flächen weiterhin reissen, weil sie es
  * schon auf einem DECKENDEN Grund tun. Jeder Eintrag nennt den Grund, auf dem er
  * ebenfalls fällt — wer ihn hier streichen will, muss zuerst dort liefern.
+ *
+ * Die Liste ist LEER, seit die Palette-Achse geliefert hat. Sie stand mit sechs
+ * Einträgen da (--vz-fg-soft@1 und @0.7, --vz-off@0.7, --vz-bad@0.7,
+ * --vz-acc-slate@0.7, --vz-fg-mute@0.7); jeder von ihnen war ein Farbwert, der schon
+ * auf --vz-bg, --vz-solid oder --vz-solid-2 riss, und jeder trägt seine Schwelle
+ * inzwischen auf jedem erklärten Grund (siehe contrast.spec.ts). Der Mechanismus
+ * bleibt stehen, weil er die Bauform für den nächsten begründeten Rest ist — ein
+ * Eintrag hier setzt eine Messung AUS, also darf er nie ohne Begründung dastehen.
  */
-const REST: Readonly<Record<string, string>> = {
-  "--vz-fg-soft@1":
-    "#7a808d erreicht auf --vz-bg selbst nur 4.77:1 — 6% Luft über der Schwelle. Jede erhabene Fläche verbraucht sie; selbst --vz-solid (#171b22) würde reissen, es wird dort nur nicht gemessen, weil --vz-fg-soft ihn nicht in seinem on führt.",
-  "--vz-fg-soft@0.7": "reisst schon auf --vz-bg (2.94:1) — bei 0.7 Deckkraft unerreichbar.",
-  "--vz-off@0.7": "reisst schon auf --vz-bg (2.93:1).",
-  "--vz-bad@0.7": "reisst schon auf --vz-bg (3.37:1 gegen 4.5).",
-  "--vz-acc-slate@0.7": "reisst schon auf --vz-solid (2.99:1).",
-  "--vz-fg-mute@0.7": "reisst schon auf --vz-solid-2 (4.42:1 gegen 4.5).",
-};
+const REST: Readonly<Record<string, string>> = {};
 
 /* ------------------------------------------------------------------ Parsing */
 
@@ -91,11 +92,21 @@ function declOf(block: string, name: string): string {
 
 const ROOT = blockOf(":root");
 const DARK = blockOf('.visu-root[data-theme="dark"]');
+/**
+ * Der `--ion-*`-Brückenblock. Er sitzt auf DEMSELBEN Element wie `[data-theme]` und
+ * trägt deshalb die Aliasse, die ihr Theme sehen müssen (`--vz-accent`,
+ * `--vz-accent-ink`) — in `:root`, also auf <html>, wären sie auf den dunklen Boden
+ * eingefroren, weil eine Custom Property auf dem Element substituiert wird, das ihre
+ * Deklaration trägt. Ohne diese Zeile fände die Spec `--vz-accent` gar nicht mehr.
+ */
+const BRIDGE = blockOf(".visu-root");
 
-/** Erst der dunkle Block, dann :root — dieselbe Reihenfolge, die die Kaskade hätte. */
+/** Theme, dann Brücke, dann :root — dieselbe Reihenfolge, die die Kaskade hätte. */
 function tokenValue(name: string): string {
   const dark = new RegExp(`${name}\\s*:\\s*([^;]+);`).exec(DARK);
   if (dark) return dark[1]!.trim();
+  const bridge = new RegExp(`${name}\\s*:\\s*([^;]+);`).exec(BRIDGE);
+  if (bridge) return bridge[1]!.trim();
   return declOf(ROOT, name);
 }
 

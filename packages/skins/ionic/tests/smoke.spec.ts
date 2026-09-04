@@ -117,7 +117,10 @@ describe("ionic accent ink is AA-safe (#19)", () => {
     blue: "#5a93dd",
     rose: "#d97a8d",
     amber: "#e8b441",
-    slate: "#7e8696",
+    // Slate steht seit der Palette-Achse eine Spur heller (war #7e8696): er war der
+    // einzige Akzent, der die 0.7-Daempfung der gesperrten Kachel nicht ueberlebte.
+    // Die Ink wird davon besser, nicht schlechter (5.08:1 -> 5.95:1).
+    slate: "#8a92a3",
   };
 
   it("defines a per-accent --ink-<token> and an --vz-accent-ink default", () => {
@@ -128,8 +131,11 @@ describe("ionic accent ink is AA-safe (#19)", () => {
   });
 
   it("legt auch den Ionic-Komponentenpfad auf die Ink-Achse, nicht auf hartes Weiss", () => {
-    // Die RATSCHE zu dieser Farbklasse. Weiss erreicht gegen die acht Akzente nur
-    // 1.90 (amber) bis 3.66 (slate) — keiner schafft die 4.5 fuer Text. Der Skin
+    // Die RATSCHE zu dieser Farbklasse. Weiss erreicht gegen die acht Akzente des
+    // DUNKLEN Bodens nur 1.90 (amber) bis 3.16 (blue) — keiner schafft die 4.5 fuer
+    // Text. (Im hellen Theme liegt die Palette eine Tonstufe tiefer, dort ist es
+    // genau umgekehrt: die Ink kippt auf #f7f8fa. Beides laeuft ueber denselben
+    // Token, deshalb steht hier keine Farbe, sondern der Verweis.) Der Skin
     // hatte die Loesung laengst (`--vz-accent-ink`, seit #19), nur der
     // Ionic-Brueckenblock stand noch auf `#ffffff`.
     //
