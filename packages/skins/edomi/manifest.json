@@ -104,56 +104,56 @@
       "--vz-acc-orange": {
         "role": "graphic",
         "on": ["--vz-bg", "--vz-tile-bg", "--vz-tile-bg-strong", "--vz-solid", "--vz-chip-bg"],
-        "reason": "Balkenfüllung, LED, Ring und Glow — Nicht-Text, aber bedeutungstragend Deckkraft: die gesperrte/readonly Kachel dimmt ihren Rumpf auf 0.7, ein inertes Bedienelement auf 0.55 — beides trifft diesen Token.",
-        "alphas": [1, 0.7, 0.55]
+        "reason": "Balkenfüllung, LED, Ring und Glow — Nicht-Text, aber bedeutungstragend Deckkraft: die gesperrte/readonly Kachel dimmt ihren Rumpf auf 0.7 — gemessen, weil readonly lesbar bleibt. Ein INERTES Bedienelement dimmt auf 0.55; das ist nach WCAG 1.4.3/1.4.11 ausgenommen („inactive user interface components have no contrast requirement“) und wird deshalb nicht gemessen.",
+        "alphas": [1, 0.7]
       },
       "--vz-acc-teal": {
         "role": "graphic",
         "on": ["--vz-bg", "--vz-tile-bg", "--vz-tile-bg-strong", "--vz-solid", "--vz-chip-bg"],
-        "reason": "Balkenfüllung, LED, Ring und Glow — Nicht-Text, aber bedeutungstragend Deckkraft: die gesperrte/readonly Kachel dimmt ihren Rumpf auf 0.7, ein inertes Bedienelement auf 0.55 — beides trifft diesen Token.",
-        "alphas": [1, 0.7, 0.55]
+        "reason": "Balkenfüllung, LED, Ring und Glow — Nicht-Text, aber bedeutungstragend Deckkraft: die gesperrte/readonly Kachel dimmt ihren Rumpf auf 0.7 — gemessen, weil readonly lesbar bleibt. Ein INERTES Bedienelement dimmt auf 0.55; das ist nach WCAG 1.4.3/1.4.11 ausgenommen („inactive user interface components have no contrast requirement“) und wird deshalb nicht gemessen.",
+        "alphas": [1, 0.7]
       },
       "--vz-acc-violet": {
         "role": "graphic",
         "on": ["--vz-bg", "--vz-tile-bg", "--vz-tile-bg-strong", "--vz-solid", "--vz-chip-bg"],
-        "reason": "Balkenfüllung, LED, Ring und Glow — Nicht-Text, aber bedeutungstragend Deckkraft: die gesperrte/readonly Kachel dimmt ihren Rumpf auf 0.7, ein inertes Bedienelement auf 0.55 — beides trifft diesen Token.",
-        "alphas": [1, 0.7, 0.55]
+        "reason": "Balkenfüllung, LED, Ring und Glow — Nicht-Text, aber bedeutungstragend Deckkraft: die gesperrte/readonly Kachel dimmt ihren Rumpf auf 0.7 — gemessen, weil readonly lesbar bleibt. Ein INERTES Bedienelement dimmt auf 0.55; das ist nach WCAG 1.4.3/1.4.11 ausgenommen („inactive user interface components have no contrast requirement“) und wird deshalb nicht gemessen.",
+        "alphas": [1, 0.7]
       },
       "--vz-acc-green": {
         "role": "graphic",
         "on": ["--vz-bg", "--vz-tile-bg", "--vz-tile-bg-strong", "--vz-solid", "--vz-chip-bg"],
-        "reason": "Balkenfüllung, LED, Ring und Glow — Nicht-Text, aber bedeutungstragend Deckkraft: die gesperrte/readonly Kachel dimmt ihren Rumpf auf 0.7, ein inertes Bedienelement auf 0.55 — beides trifft diesen Token.",
-        "alphas": [1, 0.7, 0.55]
+        "reason": "Balkenfüllung, LED, Ring und Glow — Nicht-Text, aber bedeutungstragend Deckkraft: die gesperrte/readonly Kachel dimmt ihren Rumpf auf 0.7 — gemessen, weil readonly lesbar bleibt. Ein INERTES Bedienelement dimmt auf 0.55; das ist nach WCAG 1.4.3/1.4.11 ausgenommen („inactive user interface components have no contrast requirement“) und wird deshalb nicht gemessen.",
+        "alphas": [1, 0.7]
       },
       "--vz-acc-blue": {
         "role": "graphic",
         "on": ["--vz-bg", "--vz-tile-bg", "--vz-tile-bg-strong", "--vz-solid", "--vz-chip-bg"],
-        "reason": "Balkenfüllung, LED, Ring und Glow — Nicht-Text, aber bedeutungstragend Deckkraft: die gesperrte/readonly Kachel dimmt ihren Rumpf auf 0.7, ein inertes Bedienelement auf 0.55 — beides trifft diesen Token.",
-        "alphas": [1, 0.7, 0.55]
+        "reason": "Balkenfüllung, LED, Ring und Glow — Nicht-Text, aber bedeutungstragend Deckkraft: die gesperrte/readonly Kachel dimmt ihren Rumpf auf 0.7 — gemessen, weil readonly lesbar bleibt. Ein INERTES Bedienelement dimmt auf 0.55; das ist nach WCAG 1.4.3/1.4.11 ausgenommen („inactive user interface components have no contrast requirement“) und wird deshalb nicht gemessen.",
+        "alphas": [1, 0.7]
       },
       "--vz-acc-rose": {
         "role": "graphic",
         "on": ["--vz-bg", "--vz-tile-bg", "--vz-tile-bg-strong", "--vz-solid", "--vz-chip-bg"],
-        "reason": "Balkenfüllung, LED, Ring und Glow — Nicht-Text, aber bedeutungstragend Deckkraft: die gesperrte/readonly Kachel dimmt ihren Rumpf auf 0.7, ein inertes Bedienelement auf 0.55 — beides trifft diesen Token.",
-        "alphas": [1, 0.7, 0.55]
+        "reason": "Balkenfüllung, LED, Ring und Glow — Nicht-Text, aber bedeutungstragend Deckkraft: die gesperrte/readonly Kachel dimmt ihren Rumpf auf 0.7 — gemessen, weil readonly lesbar bleibt. Ein INERTES Bedienelement dimmt auf 0.55; das ist nach WCAG 1.4.3/1.4.11 ausgenommen („inactive user interface components have no contrast requirement“) und wird deshalb nicht gemessen.",
+        "alphas": [1, 0.7]
       },
       "--vz-acc-amber": {
         "role": "graphic",
         "on": ["--vz-bg", "--vz-tile-bg", "--vz-tile-bg-strong", "--vz-solid", "--vz-chip-bg"],
-        "reason": "Balkenfüllung, LED, Ring und Glow — Nicht-Text, aber bedeutungstragend Deckkraft: die gesperrte/readonly Kachel dimmt ihren Rumpf auf 0.7, ein inertes Bedienelement auf 0.55 — beides trifft diesen Token.",
-        "alphas": [1, 0.7, 0.55]
+        "reason": "Balkenfüllung, LED, Ring und Glow — Nicht-Text, aber bedeutungstragend Deckkraft: die gesperrte/readonly Kachel dimmt ihren Rumpf auf 0.7 — gemessen, weil readonly lesbar bleibt. Ein INERTES Bedienelement dimmt auf 0.55; das ist nach WCAG 1.4.3/1.4.11 ausgenommen („inactive user interface components have no contrast requirement“) und wird deshalb nicht gemessen.",
+        "alphas": [1, 0.7]
       },
       "--vz-acc-slate": {
         "role": "graphic",
         "on": ["--vz-bg", "--vz-tile-bg", "--vz-tile-bg-strong", "--vz-solid", "--vz-chip-bg"],
-        "reason": "Balkenfüllung, LED, Ring und Glow — Nicht-Text, aber bedeutungstragend Deckkraft: die gesperrte/readonly Kachel dimmt ihren Rumpf auf 0.7, ein inertes Bedienelement auf 0.55 — beides trifft diesen Token.",
-        "alphas": [1, 0.7, 0.55]
+        "reason": "Balkenfüllung, LED, Ring und Glow — Nicht-Text, aber bedeutungstragend Deckkraft: die gesperrte/readonly Kachel dimmt ihren Rumpf auf 0.7 — gemessen, weil readonly lesbar bleibt. Ein INERTES Bedienelement dimmt auf 0.55; das ist nach WCAG 1.4.3/1.4.11 ausgenommen („inactive user interface components have no contrast requirement“) und wird deshalb nicht gemessen.",
+        "alphas": [1, 0.7]
       },
       "--vz-accent": {
         "role": "graphic",
         "on": ["--vz-bg", "--vz-tile-bg", "--vz-tile-bg-strong", "--vz-solid", "--vz-chip-bg"],
-        "reason": "der vom Host je Gerät gesetzte Akzent; der Boden ist orange Deckkraft: die gesperrte/readonly Kachel dimmt ihren Rumpf auf 0.7, ein inertes Bedienelement auf 0.55 — beides trifft diesen Token.",
-        "alphas": [1, 0.7, 0.55]
+        "reason": "der vom Host je Gerät gesetzte Akzent; der Boden ist orange Deckkraft: die gesperrte/readonly Kachel dimmt ihren Rumpf auf 0.7 — gemessen, weil readonly lesbar bleibt. Ein INERTES Bedienelement dimmt auf 0.55; das ist nach WCAG 1.4.3/1.4.11 ausgenommen („inactive user interface components have no contrast requirement“) und wird deshalb nicht gemessen.",
+        "alphas": [1, 0.7]
       },
       "--ink-orange": {
         "role": "text",
@@ -203,32 +203,32 @@
       "--vz-on": {
         "role": "graphic",
         "on": ["--vz-tile-bg", "--vz-chip-bg", "--vz-bg"],
-        "reason": "LED-Punkt EIN Deckkraft: die gesperrte/readonly Kachel dimmt ihren Rumpf auf 0.7, ein inertes Bedienelement auf 0.55 — beides trifft diesen Token.",
-        "alphas": [1, 0.7, 0.55]
+        "reason": "LED-Punkt EIN Deckkraft: die gesperrte/readonly Kachel dimmt ihren Rumpf auf 0.7 — gemessen, weil readonly lesbar bleibt. Ein INERTES Bedienelement dimmt auf 0.55; das ist nach WCAG 1.4.3/1.4.11 ausgenommen („inactive user interface components have no contrast requirement“) und wird deshalb nicht gemessen.",
+        "alphas": [1, 0.7]
       },
       "--vz-off": {
         "role": "graphic",
         "on": ["--vz-tile-bg", "--vz-chip-bg", "--vz-bg"],
-        "reason": "LED-Punkt AUS Deckkraft: die gesperrte/readonly Kachel dimmt ihren Rumpf auf 0.7, ein inertes Bedienelement auf 0.55 — beides trifft diesen Token.",
-        "alphas": [1, 0.7, 0.55]
+        "reason": "LED-Punkt AUS Deckkraft: die gesperrte/readonly Kachel dimmt ihren Rumpf auf 0.7 — gemessen, weil readonly lesbar bleibt. Ein INERTES Bedienelement dimmt auf 0.55; das ist nach WCAG 1.4.3/1.4.11 ausgenommen („inactive user interface components have no contrast requirement“) und wird deshalb nicht gemessen.",
+        "alphas": [1, 0.7]
       },
       "--vz-good": {
         "role": "graphic",
         "on": ["--vz-tile-bg", "--vz-chip-bg", "--vz-bg"],
-        "reason": "LED-Punkt OK Deckkraft: die gesperrte/readonly Kachel dimmt ihren Rumpf auf 0.7, ein inertes Bedienelement auf 0.55 — beides trifft diesen Token.",
-        "alphas": [1, 0.7, 0.55]
+        "reason": "LED-Punkt OK Deckkraft: die gesperrte/readonly Kachel dimmt ihren Rumpf auf 0.7 — gemessen, weil readonly lesbar bleibt. Ein INERTES Bedienelement dimmt auf 0.55; das ist nach WCAG 1.4.3/1.4.11 ausgenommen („inactive user interface components have no contrast requirement“) und wird deshalb nicht gemessen.",
+        "alphas": [1, 0.7]
       },
       "--vz-warn": {
         "role": "text",
         "on": ["--vz-tile-bg", "--vz-bg"],
-        "reason": "färbt Warntext (.vz-… color) Deckkraft: die gesperrte/readonly Kachel dimmt ihren Rumpf auf 0.7, ein inertes Bedienelement auf 0.55 — beides trifft diesen Token.",
-        "alphas": [1, 0.7, 0.55]
+        "reason": "färbt Warntext (.vz-… color) Deckkraft: die gesperrte/readonly Kachel dimmt ihren Rumpf auf 0.7 — gemessen, weil readonly lesbar bleibt. Ein INERTES Bedienelement dimmt auf 0.55; das ist nach WCAG 1.4.3/1.4.11 ausgenommen („inactive user interface components have no contrast requirement“) und wird deshalb nicht gemessen.",
+        "alphas": [1, 0.7]
       },
       "--vz-bad": {
         "role": "text",
         "on": ["--vz-chip-bg", "--vz-tile-bg", "--vz-bg"],
-        "reason": "färbt Fehlertext UND den Störungs-Punkt — als Text gemessen, das ist die strengere Schwelle Deckkraft: die gesperrte/readonly Kachel dimmt ihren Rumpf auf 0.7, ein inertes Bedienelement auf 0.55 — beides trifft diesen Token.",
-        "alphas": [1, 0.7, 0.55]
+        "reason": "färbt Fehlertext UND den Störungs-Punkt — als Text gemessen, das ist die strengere Schwelle Deckkraft: die gesperrte/readonly Kachel dimmt ihren Rumpf auf 0.7 — gemessen, weil readonly lesbar bleibt. Ein INERTES Bedienelement dimmt auf 0.55; das ist nach WCAG 1.4.3/1.4.11 ausgenommen („inactive user interface components have no contrast requirement“) und wird deshalb nicht gemessen.",
+        "alphas": [1, 0.7]
       },
       "--vz-bg": {
         "role": "ground",
@@ -244,8 +244,8 @@
           "--vz-solid-2",
           "--vz-chip-bg"
         ],
-        "alphas": [1, 0.7, 0.55],
-        "reason": " Deckkraft: die gesperrte/readonly Kachel dimmt ihren Rumpf auf 0.7, ein inertes Bedienelement auf 0.55 — beides trifft diesen Token."
+        "alphas": [1, 0.7],
+        "reason": " Deckkraft: die gesperrte/readonly Kachel dimmt ihren Rumpf auf 0.7 — gemessen, weil readonly lesbar bleibt. Ein INERTES Bedienelement dimmt auf 0.55; das ist nach WCAG 1.4.3/1.4.11 ausgenommen („inactive user interface components have no contrast requirement“) und wird deshalb nicht gemessen."
       },
       "--vz-fg-mute": {
         "role": "text",
@@ -257,14 +257,14 @@
           "--vz-solid-2",
           "--vz-chip-bg"
         ],
-        "reason": "Eyebrow, Einheit, Popup-Text — überall Fließtext Deckkraft: die gesperrte/readonly Kachel dimmt ihren Rumpf auf 0.7, ein inertes Bedienelement auf 0.55 — beides trifft diesen Token.",
-        "alphas": [1, 0.7, 0.55]
+        "reason": "Eyebrow, Einheit, Popup-Text — überall Fließtext Deckkraft: die gesperrte/readonly Kachel dimmt ihren Rumpf auf 0.7 — gemessen, weil readonly lesbar bleibt. Ein INERTES Bedienelement dimmt auf 0.55; das ist nach WCAG 1.4.3/1.4.11 ausgenommen („inactive user interface components have no contrast requirement“) und wird deshalb nicht gemessen.",
+        "alphas": [1, 0.7]
       },
       "--vz-fg-soft": {
         "role": "text",
         "on": ["--vz-bg", "--vz-tile-bg", "--vz-chip-bg"],
-        "reason": "Raum-Meta auf der Seite, Kamera-Platzhalter auf der Kachel Deckkraft: die gesperrte/readonly Kachel dimmt ihren Rumpf auf 0.7, ein inertes Bedienelement auf 0.55 — beides trifft diesen Token.",
-        "alphas": [1, 0.7, 0.55]
+        "reason": "Raum-Meta auf der Seite, Kamera-Platzhalter auf der Kachel Deckkraft: die gesperrte/readonly Kachel dimmt ihren Rumpf auf 0.7 — gemessen, weil readonly lesbar bleibt. Ein INERTES Bedienelement dimmt auf 0.55; das ist nach WCAG 1.4.3/1.4.11 ausgenommen („inactive user interface components have no contrast requirement“) und wird deshalb nicht gemessen.",
+        "alphas": [1, 0.7]
       },
       "--vz-tile-bg": {
         "role": "ground",
