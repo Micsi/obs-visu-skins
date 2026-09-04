@@ -175,8 +175,20 @@
   /* primary = current app accent */
   --ion-color-primary: var(--vz-accent);
   --ion-color-primary-rgb: 236, 139, 58;
-  --ion-color-primary-contrast: #ffffff;
-  --ion-color-primary-contrast-rgb: 255, 255, 255;
+  /* Text AUF dem akzentgefüllten Ionic-Button. Weiss erreicht gegen KEINEN der
+     acht Palette-Akzente die 4.5:1 aus WCAG 1.4.3 — bestenfalls 3.66:1 (slate),
+     schlimmstenfalls 1.90:1 (amber). Der Skin hat dieses Problem für sein EIGENES
+     Markup längst mit --ink-… und --vz-accent-ink gelöst (siehe :root oben); nur der
+     Ionic-Komponentenpfad blieb auf Weiss stehen. Er zieht jetzt denselben Ton,
+     womit gefüllter Button und gefüllte Kachel auch optisch wieder eine Sprache
+     sprechen. Der Akzent selbst bleibt unangetastet — nur die Schrift darauf
+     kippt von Weiss auf die zum Akzent gehörende Ink (min. 5.08:1 gegen slate,
+     9.77:1 gegen amber). Setzt der Host --vz-accent-ink je Gerät, folgt der
+     Button automatisch mit. */
+  --ion-color-primary-contrast: var(--vz-accent-ink);
+  /* Ionic mischt hieraus seine Ripple-/Focus-Schleier. Muss dem Ton oben folgen,
+     sonst leuchtet ein weisser Schleier über dunkler Schrift. */
+  --ion-color-primary-contrast-rgb: 16, 19, 26;
   --ion-color-primary-shade: var(
     --vz-accent-shade,
     color-mix(in oklab, var(--vz-accent) 86%, #000)

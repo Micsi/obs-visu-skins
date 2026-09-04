@@ -495,7 +495,7 @@
           "--vz-acc-slate",
           "--vz-accent"
         ],
-        "reason": "Text AUF dem akzentgefüllten Ionic-Button. Der Skin hat dasselbe Problem für sein EIGENES Markup mit --ink-* gelöst (Kommentar in ionic.css); der Komponentenpfad blieb auf Weiss."
+        "reason": "Text AUF dem akzentgefüllten Ionic-Button. Zieht jetzt dieselbe Ink wie das eigene Markup des Skins (--vz-accent-ink, Boden --ink-orange = #10131a) statt Weiss — Weiss erreicht gegen keinen der acht Palette-Akzente 4.5:1."
       },
       "--handle-background": {
         "role": "graphic",

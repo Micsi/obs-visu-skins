@@ -127,6 +127,22 @@ describe("ionic accent ink is AA-safe (#19)", () => {
     expect(cssText).toMatch(/--vz-accent-ink:\s*var\(--ink-orange\)/);
   });
 
+  it("legt auch den Ionic-Komponentenpfad auf die Ink-Achse, nicht auf hartes Weiss", () => {
+    // Die RATSCHE zu dieser Farbklasse. Weiss erreicht gegen die acht Akzente nur
+    // 1.90 (amber) bis 3.66 (slate) — keiner schafft die 4.5 fuer Text. Der Skin
+    // hatte die Loesung laengst (`--vz-accent-ink`, seit #19), nur der
+    // Ionic-Brueckenblock stand noch auf `#ffffff`.
+    //
+    // Warum ein eigener Spec und nicht das Konformitaets-Gate: solange ein Skin
+    // insgesamt `fail` ist, veraendert ein Rueckfall auf Weiss den Exit-Code NICHT.
+    // Es gaebe also keinen Waechter — genau die Luecke, die diese Zeile schliesst.
+    expect(cssText).toMatch(/--ion-color-primary-contrast:\s*var\(--vz-accent-ink\)/);
+    // Das `-rgb`-Pendant muss mitziehen: Ionic mischt daraus seine Ripple- und
+    // Fokus-Schleier. Bliebe es auf `255, 255, 255`, laege ein heller Schleier
+    // ueber dunkler Schrift.
+    expect(cssText).toMatch(/--ion-color-primary-contrast-rgb:\s*16,\s*19,\s*26/);
+  });
+
   it("every built-in accent reaches WCAG AA (>= 4.5:1) with its default ink", () => {
     for (const [token, accent] of Object.entries(accents)) {
       const ink = cssText.match(new RegExp(`--ink-${token}:\\s*(#[0-9a-fA-F]{6})`))?.[1];
