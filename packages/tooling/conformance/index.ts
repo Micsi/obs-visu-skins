@@ -240,14 +240,36 @@ async function probeLinkDelivery(
   // `undelivered`. Nicht messen heisst: nichts behaupten.
   if (!vue) return "unmeasured";
 
+  // Der Stand des Bodys VOR dem Mount. Alles, was danach dazukommt, gehört zu
+  // diesem Lauf — und nur das wird geklickt und am Ende wieder abgeräumt.
   const container = document.createElement("div");
+  const before = new Set<Element>(Array.from(document.body.children));
   document.body.appendChild(container);
   const app = vue.createApp({ render: () => page(probe.host) });
+  const cleanup = () => {
+    try {
+      app.unmount();
+    } catch {
+      /* der Abbau gehört nicht zur Messung */
+    }
+    container.remove();
+    // Was der Lauf ausserhalb des Containers hinterlassen hat, geht mit. Vue
+    // räumt Teleport-Ziele beim `unmount` heute selbst ab — die Specs unten
+    // bestehen auch ohne diese Schleife, das ist nachgefahren. Sie bleibt als
+    // Zusicherung dieses Laufs stehen, nicht als Reparatur: dass das Dokument
+    // unverändert zurückbleibt, ist die Bedingung dafür, dass das Gate drei Skins
+    // nacheinander im selben Dokument messen kann.
+    for (const el of Array.from(document.body.children)) {
+      if (!before.has(el)) el.remove();
+    }
+  };
   try {
     app.mount(container);
   } catch {
     // Wirft der Renderer, zeichnet er nichts — derselbe Befund wie ein leerer Baum.
-    container.remove();
+    // Aufgeräumt wird trotzdem: ein Wurf MITTEN im Mounten lässt eine halb
+    // gemountete Anwendung zurück, deren Knoten sonst im Dokument stehen bleiben.
+    cleanup();
     return "absent";
   }
 
@@ -297,7 +319,7 @@ async function probeLinkDelivery(
   // Ziel getroffen ist, nichts Neues mehr auftaucht oder das Budget endet.
   const clicked = new Set<Element>();
   while (!hit() && Date.now() < deadline) {
-    const fresh = roots(container, app).filter((el) => !clicked.has(el));
+    const fresh = roots(container, before).filter((el) => !clicked.has(el));
     for (const el of fresh) {
       clicked.add(el);
       if (hit() || Date.now() > deadline) break;
@@ -315,18 +337,13 @@ async function probeLinkDelivery(
     let grew = false;
     while (!hit() && Date.now() < settleUntil && !grew) {
       await new Promise((resolve) => setTimeout(resolve, 10));
-      grew = roots(container, app).some((el) => !clicked.has(el));
+      grew = roots(container, before).some((el) => !clicked.has(el));
     }
     if (!grew && !hit()) break;
   }
 
   const delivered = hit();
-  try {
-    app.unmount();
-  } catch {
-    /* der Abbau gehört nicht zur Messung */
-  }
-  container.remove();
+  cleanup();
   return delivered ? "delivered" : "absent";
 }
 
@@ -370,19 +387,19 @@ function isUnreachable(el: Element): boolean {
  * deshalb auch im Wurzelelement der Anwendung, aber NICHT im übrigen Dokument:
  * fremde Steuerelemente anderer Läufe gehen den Probelauf nichts an.
  */
-function roots(container: Element, app: { _container?: unknown }): Element[] {
+function roots(container: Element, before: ReadonlySet<Element>): Element[] {
   const out = new Set<Element>(Array.from(container.querySelectorAll("*")));
   for (const el of Array.from(document.body.children)) {
-    // Teleport-Ziele hängen als Geschwister des Containers am Body. Der Container
-    // selbst ist schon erfasst; alles andere, was NACH dem Mount dazukam, gehört
-    // zu dieser Anwendung.
-    if (el === container || el.contains(container)) continue;
-    if (!el.hasAttribute("data-conformance-foreign")) {
-      out.add(el);
-      for (const inner of Array.from(el.querySelectorAll("*"))) out.add(inner);
-    }
+    // Teleport-Ziele hängen als Geschwister des Containers am Body — sie gehören
+    // dazu. Aber NUR das, was dieser Mount erzeugt hat: `before` ist der Stand des
+    // Bodys VOR dem Mount. Ohne diesen Vergleich sammelte der Lauf alles ein, was
+    // noch dort stand, und das Gate fährt drei Skins nacheinander im SELBEN
+    // Dokument — Skin B hätte die Reste von Skin A mitgeklickt und deren
+    // `followLink` als eigene Affordanz gezählt.
+    if (el === container || el.contains(container) || before.has(el)) continue;
+    out.add(el);
+    for (const inner of Array.from(el.querySelectorAll("*"))) out.add(inner);
   }
-  void app;
   // TIEFSTE ZUERST. `querySelectorAll` liefert Vorfahren vor ihren Nachfahren, und
   // das verbrauchte zustandsbehaftete Listener: ein gültiger delegierter
   // `onClickOnce` am Wrapper, der nur folgt, wenn `event.target.closest(...)`
