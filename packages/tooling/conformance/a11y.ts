@@ -98,18 +98,51 @@ export const A11Y_ROLES: readonly string[] = Object.freeze([
 interface Rule {
   readonly selectors: readonly string[];
   readonly body: string;
+  /**
+   * Steht der Block in einer At-Bedingung (`@media`/`@supports`/`@container`)?
+   * Solche Blöcke bleiben aus der Standard-Umgebung heraus: sie gelten nur unter
+   * ihrer Bedingung, und sie als immer aktiv zu behandeln liesse eine
+   * kontrastschwache Standard-Darstellung mit einem Wert bestehen, den nur der
+   * Sonderfall zeigt.
+   */
+  readonly conditional: boolean;
 }
 
-/** Kommentare raus, dann jeden INNERSTEN Block einsammeln (`@media` fällt dabei weg). */
+/**
+ * Kommentare raus, dann jeden INNERSTEN Block einsammeln.
+ *
+ * Ein Block, der in einer Bedingung steht (`@media`, `@supports`, `@container`),
+ * wird MARKIERT statt stillschweigend übernommen. Vorher fiel die Bedingung
+ * einfach weg und die Regel galt universell: ein späteres
+ * `@media (forced-colors: active) { … --fg: #fff }` überschrieb während der
+ * Messung ein kontrastschwaches `--fg`, und die normale Darstellung bestand mit
+ * einem Wert, den sie nie zeigt.
+ */
 export function parseRules(css: string): Rule[] {
   const clean = css.replace(/\/\*[\s\S]*?\*\//g, "");
   const out: Rule[] = [];
+  // Die Zeichenbereiche, die innerhalb einer At-Bedingung liegen.
+  const conditional: [number, number][] = [];
+  for (const at of clean.matchAll(/@(?:media|supports|container)[^{]*\{/g)) {
+    const start = at.index! + at[0].length;
+    let depth = 1;
+    let i = start;
+    for (; i < clean.length && depth > 0; i += 1) {
+      if (clean[i] === "{") depth += 1;
+      else if (clean[i] === "}") depth -= 1;
+    }
+    conditional.push([start, i]);
+  }
+  const inCondition = (at: number): boolean =>
+    conditional.some(([a, b]) => at >= a && at < b);
+
   for (const m of clean.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
     const selectors = (m[1] ?? "")
       .split(",")
       .map((s) => s.trim())
-      .filter((s) => s.length > 0);
-    if (selectors.length > 0) out.push({ selectors, body: m[2] ?? "" });
+      .filter((s) => s.length > 0 && !s.startsWith("@"));
+    if (selectors.length === 0) continue;
+    out.push({ selectors, body: m[2] ?? "", conditional: inCondition(m.index!) });
   }
   return out;
 }
@@ -151,6 +184,10 @@ export function tokensFor(sources: readonly string[], selector: string): Map<str
   const out = new Map<string, string>();
   for (const css of sources) {
     for (const rule of parseRules(css)) {
+      // Bedingte Blöcke bleiben draussen: sie gelten nur unter ihrer Bedingung.
+      // Der Vollständigkeits-Scan sieht sie weiterhin — sonst wäre `@media` das
+      // neue Versteck für unklassifizierte Farbe.
+      if (rule.conditional) continue;
       if (!rule.selectors.includes(selector)) continue;
       for (const [name, value] of declarations(rule.body)) out.set(name, value);
     }
@@ -189,8 +226,19 @@ export function allDeclarations(sources: readonly string[]): [string, string, st
  * bekommen, statt den Token als fehlend zu melden.
  */
 function cascadesInto(selector: string, own: string, foreign: readonly string[]): boolean {
-  if (own.length > 0 && selector.includes(own)) return true;
-  return !foreign.some((f) => f.length > 0 && selector.includes(f));
+  const sel = selector.trim();
+  if (own.length > 0 && sel.includes(own)) return true;
+  // Ein fremdes Theme nie.
+  if (foreign.some((f) => f.length > 0 && sel.includes(f))) return false;
+  // Wurzeln gelten für alles.
+  if (/^(?::root|html|body|\*)\b/.test(sel)) return true;
+  // Sonst nur, was der eigene Selektor WIRKLICH erbt: ein Block, dessen Selektor
+  // ein Präfix des eigenen ist (`.visu-root` für `.visu-root[data-theme="dark"]`
+  // — ionics `--ion-*`-Brücke). Vorher galt jeder Selektor, der bloss kein fremdes
+  // Theme nennt: `.unrelated-root { --fg: #fff }` wanderte in die Umgebung, und
+  // eine dunkle Palette ohne eigenes `--fg` borgte sich den Wert und bestand,
+  // obwohl CSS zwischen diesen Elementen nie kaskadiert.
+  return own.length > 0 && own.startsWith(sel);
 }
 
 /**
@@ -208,6 +256,7 @@ function themeEnv(
   const out = new Map<string, string>();
   for (const css of sources) {
     for (const rule of parseRules(css)) {
+      if (rule.conditional) continue; // siehe `tokensFor`
       if (!rule.selectors.some((sel) => cascadesInto(sel, own, foreign))) continue;
       for (const [name, value] of declarations(rule.body)) out.set(name, value);
     }
@@ -582,10 +631,14 @@ export function measureA11y(input: A11yInput): SupportA11y {
         detail: `Theme ${theme} ist ausgenommen, ohne Begründung — das ist ein Vergessen, keine Aussage`,
       });
     }
-    if (!(theme in decl.themes)) {
+    // Ein ausgenommenes Theme braucht KEINEN Selektor — genau das ist der Sinn der
+    // Ausnahme, und der Authoring-Guide nennt `a11y.themes` oder `exemptThemes`
+    // ausdrücklich als Alternative. Gemeldet wird nur ein Eintrag, den weder die
+    // Deklaration noch das Manifest kennt: ein Phantom, das nichts stilllegt.
+    if (!(theme in decl.themes) && !(input.manifest.themes ?? []).includes(theme)) {
       findings.push({
         problem: "selector-missing",
-        detail: `exemptThemes nennt ${theme}, das in themes gar nicht steht`,
+        detail: `exemptThemes nennt ${theme} — weder in a11y.themes noch in manifest.themes`,
       });
     }
   }

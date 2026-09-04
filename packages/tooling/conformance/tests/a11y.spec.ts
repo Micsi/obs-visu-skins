@@ -359,7 +359,11 @@ describe("Vollständigkeit über das GANZE Blatt (Riegel 1)", () => {
   it("löst einen Token auf, der NUR ausserhalb der erklärten Blöcke steht", () => {
     // Klassifizieren allein reicht nicht: er muss auch messbar sein, sonst wäre
     // "steht in keinem erklärten Block" die nächste Hintertür.
-    const css = `${CSS}.irgendwo{--ink:#8a8a8a;}`;
+    // `:root` statt eines beliebigen Selektors: der Token steht weiterhin in keinem
+    // ERKLÄRTEN Block, kaskadiert aber wirklich in das gemessene Theme. Ein
+    // unverwandter Selektor täte das nicht — dazu die Spec „borgt keinen Wert aus
+    // einem Selektor, der gar nicht kaskadiert" weiter unten.
+    const css = `${CSS}:root{--ink:#8a8a8a;}`;
     const r = measure(
       {
         ...DECL,
@@ -376,6 +380,18 @@ describe("Vollständigkeit über das GANZE Blatt (Riegel 1)", () => {
     expect(r.findings).toEqual([]);
     expect(r.combinations).toBe(2);
     expect(r.status).toBe("pass");
+  });
+
+  it("borgt keinen Wert aus einem Selektor, der gar nicht kaskadiert", () => {
+    // `.unrelated-root { --fg }` kaskadiert nie in `.p[data-theme="dark"]`. Vorher
+    // galt jeder Selektor, der bloss kein FREMDES Theme nennt — eine dunkle
+    // Palette ohne eigenes `--fg` borgte sich den Wert und bestand.
+    const css = `${CSS.replace("--fg:#ffffff;", "")}.unrelated-root{--fg:#ffffff;}`;
+    const r = measure(DECL, css);
+    // Scharf auf die MESSUNG: mit dem geborgten `--fg` (#ffffff auf #000000) waere
+    // die Paarung sauber gemessen worden. Ohne ihn ist sie gar nicht auflösbar —
+    // es gibt also einen Befund GENAU zu diesem Token.
+    expect(r.findings.map((f) => f.detail).join(" ")).toContain("--fg");
   });
 
   it("hält einen var()-Alias auf eine Nicht-Farbe für keine Farbe", () => {
@@ -765,5 +781,40 @@ describe("CSS-Parsen — der Waechter darf nicht an der Schreibweise scheitern",
     // "existiert" — der Rueckfall wurde nie versucht.
     const env = new Map(declarations("--optional: initial"));
     expect(resolveColor("var(--optional, #fff)", env)).toEqual({ r: 255, g: 255, b: 255, a: 1 });
+  });
+});
+
+describe("bedingte Bloecke — was nur unter einer Bedingung gilt, misst nicht den Normalfall", () => {
+  const DECL = {
+    stylesheet: SHEET,
+    base: ":root",
+    themes: { dark: '.p[data-theme="dark"]' },
+    grounds: [{ token: "--bg" }],
+    tokens: { "--bg": { role: "ground" }, "--fg": { role: "text" } },
+  };
+
+  it("nimmt einen `@media`-Override NICHT in die Standard-Umgebung", () => {
+    // Die Bedingung fiel beim Parsen weg, die Regel galt universell: ein spaeteres
+    // `@media (forced-colors: active) { … --fg: #fff }` ueberschrieb waehrend der
+    // Messung ein kontrastschwaches `--fg`, und die normale Darstellung bestand mit
+    // einem Wert, den sie nie zeigt.
+    const css =
+      '.p[data-theme="dark"]{--bg:#000000;--fg:#111111;}' +
+      '@media (forced-colors: active){.p[data-theme="dark"]{--fg:#ffffff;}}';
+    const r = measure(DECL, css);
+    // Scharf auf die MESSUNG, nicht auf den Status: der kann aus anderem Grund
+    // fallen. Gemessen werden muss das schwache `--fg` des Normalfalls, also gibt
+    // es einen Verstoss. Mit dem @media-Wert (#ffffff auf #000000) gaebe es keinen.
+    expect(r.violationCount).toBeGreaterThan(0);
+  });
+
+  it("…sieht ihn aber weiterhin im Vollstaendigkeits-Scan", () => {
+    // Sonst waere `@media` das neue Versteck: unklassifizierte Farbe einfach in
+    // eine Bedingung schreiben.
+    const css =
+      '.p[data-theme="dark"]{--bg:#000000;--fg:#ffffff;}' +
+      '@media (min-width: 40em){.p[data-theme="dark"]{--geheim:#abcdef;}}';
+    const r = measure(DECL, css);
+    expect(r.findings.map((f) => f.detail).join(" ")).toContain("--geheim");
   });
 });
