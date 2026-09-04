@@ -1078,3 +1078,55 @@ describe("honors-Probelauf — Vue liefert die Semantik, nicht unsere Nachbildun
     ]);
   });
 });
+
+describe("honors-Achse — die Gegenrichtung: geliefert, aber nicht deklariert", () => {
+  it("meldet einen gezeichneten Sprung, den das Manifest nicht deklariert", async () => {
+    // Der Host tritt mit seiner EIGENEN Sprung-Affordanz nur zurueck, wenn das
+    // Token deklariert ist. Zeichnet der Skin den Sprung trotzdem, liegen zwei
+    // Klickflaechen und zwei Fokusstopps uebereinander — und weil ohne
+    // Deklaration bisher gar nicht gemessen wurde, blieb der Lauf sauber,
+    // GERADE WEIL der Fehler da war.
+    const page = (host: never) => {
+      const svc = host as unknown as {
+        layersFor: (id: string) => { items: { link?: unknown }[] }[];
+        currentPageId: string;
+        followLink: (l: unknown) => unknown;
+      };
+      const children: VNode[] = [];
+      for (const layer of svc.layersFor(svc.currentPageId)) {
+        for (const item of layer.items) {
+          if (item.link) children.push(vh("button", { onClick: () => void svc.followLink(item.link) }));
+        }
+      }
+      return vh("div", {}, children);
+    };
+    const findings = await checkHonors(honorsSkin(["order"], page));
+    expect(findings.map((f) => f.problem)).toEqual(["undeclared"]);
+    expect(findings[0]?.token).toBe("link");
+  });
+
+  it("…und schweigt, wenn der Renderer keinen Sprung zeichnet", async () => {
+    // Die Gegenprobe: ein Page-Renderer OHNE Sprung darf ohne Deklaration nicht
+    // gemeldet werden — sonst waere jeder Skin mit Seiten-Renderer ein Befund.
+    const page = () => vh("div", {}, [vh("button", {})]);
+    expect(await checkHonors(honorsSkin(["order"], page as never))).toEqual([]);
+  });
+
+  it("…und meldet den Sprung NICHT doppelt, wenn er deklariert ist", async () => {
+    const page = (host: never) => {
+      const svc = host as unknown as {
+        layersFor: (id: string) => { items: { link?: unknown }[] }[];
+        currentPageId: string;
+        followLink: (l: unknown) => unknown;
+      };
+      const children: VNode[] = [];
+      for (const layer of svc.layersFor(svc.currentPageId)) {
+        for (const item of layer.items) {
+          if (item.link) children.push(vh("button", { onClick: () => void svc.followLink(item.link) }));
+        }
+      }
+      return vh("div", {}, children);
+    };
+    expect(await checkHonors(honorsSkin(["link"], page))).toEqual([]);
+  });
+});
