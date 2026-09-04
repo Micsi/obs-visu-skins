@@ -255,17 +255,31 @@ async function probeLinkDelivery(
   // gezählt wird nur, was ein KLICK auslöst. Ohne diesen Schnitt bestünde ein
   // Renderer, der `followLink` schon beim Rendern ruft und nichts zeichnet — im
   // Browser wäre er kaputt: er navigierte beim blossen Anzeigen der Seite.
+  //
+  // Der Schnitt kommt NACH der aufgeschobenen Mount-Arbeit, und das ist der
+  // Unterschied zwischen einer Trennung und ihrem Anschein: `app.mount()` kehrt
+  // zurück, bevor ein `onMounted(async () => { await …; host.followLink(l) })`
+  // fortsetzt. Lag `reset()` davor, landete genau dieser Aufruf im Protokoll und
+  // wurde später als Klick-Beleg gelesen — der Renderer bestand also mit exakt
+  // dem Verhalten, das der Schnitt ausschliessen soll.
+  await drain();
   probe.reset();
 
   const deadline = Date.now() + PROBE_BUDGET_MS;
 
-  // Was der Probelauf als GELIEFERT anerkennt: `followLink` MIT dem Ziel des
-  // gestellten Items. Der blosse Aufruf genügt nicht — ein Renderer, der das
-  // verlinkte `LayerItem` ignoriert und irgendeine eigene Fläche mit einem
-  // festverdrahteten Ziel zeichnet, ruft `followLink` ebenfalls; der Host zöge
-  // daraufhin seine Affordanz zurück, während das Ziel des Items nirgends
-  // erreichbar wäre.
-  const hit = () => probe.followedTargets.includes(probe.probeTarget);
+  // Was der Probelauf als GELIEFERT anerkennt: `followLink` mit dem Ziel JEDES
+  // gestellten Items. Zwei Verschärfungen stecken darin:
+  //
+  //  - Der blosse Aufruf genügt nicht. Ein Renderer, der die verlinkten
+  //    `LayerItem`s ignoriert und eine eigene Fläche mit festverdrahtetem Ziel
+  //    zeichnet, ruft `followLink` ebenfalls; der Host zöge daraufhin seine
+  //    Affordanz zurück, während die Ziele der Items nirgends erreichbar wären.
+  //  - ALLE Formen, nicht irgendeine. Der Probelauf stellt einen markierten, einen
+  //    gewöhnlichen (ohne `activeIndicator`, der dokumentierte Default) und einen
+  //    PIN-geschützten Link. Ein Renderer, der nur für markierte oder nur für
+  //    frei erreichbare Ziele zeichnet, liess die übrigen ohne Affordanz — und der
+  //    Host ist bei allen zurückgetreten.
+  const hit = () => probe.probeTargets.every((t) => probe.followedTargets.includes(t));
 
   // Geklickt wird, was ein NUTZER anfassen kann. `dispatchEvent` umgeht die
   // Unterdrückung des Browsers und ruft auch Handler auf einem `disabled`
@@ -318,6 +332,17 @@ async function probeLinkDelivery(
 
 
 /**
+ * Laesst die aufgeschobene Arbeit abfliessen — Mikrotasks UND kurze Timer.
+ *
+ * Vue schiebt `onMounted` und seine Aktualisierungen in die Warteschlange, und ein
+ * `async`-Rumpf setzt erst danach fort. Wer direkt nach `mount()` misst, misst zu
+ * frueh.
+ */
+async function drain(): Promise<void> {
+  for (let i = 0; i < 3; i += 1) await new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+/**
  * Ob ein Element für einen Nutzer unerreichbar ist.
  *
  * `disabled` verschluckt den Klick im Browser, und ein `inert`-Teilbaum ist weder
@@ -358,7 +383,22 @@ function roots(container: Element, app: { _container?: unknown }): Element[] {
     }
   }
   void app;
-  return Array.from(out);
+  // TIEFSTE ZUERST. `querySelectorAll` liefert Vorfahren vor ihren Nachfahren, und
+  // das verbrauchte zustandsbehaftete Listener: ein gültiger delegierter
+  // `onClickOnce` am Wrapper, der nur folgt, wenn `event.target.closest(...)`
+  // trifft, wurde vom Klick auf den Wrapper selbst aufgezehrt — der spätere Klick
+  // auf den Knopf erreichte ihn nicht mehr, obwohl ein Nutzer genau dort zuerst
+  // klickt. Von innen nach aussen zu klicken trifft die Reihenfolge, in der ein
+  // echter Klick durch den Baum läuft (Ziel zuerst, dann die Vorfahren per
+  // Bubbling).
+  return Array.from(out).sort((a, b) => depth(b) - depth(a));
+}
+
+/** Wie tief ein Element im Dokument haengt (fuer die Klick-Reihenfolge). */
+function depth(el: Element): number {
+  let n = 0;
+  for (let p = el.parentElement; p; p = p.parentElement) n += 1;
+  return n;
 }
 
 /**

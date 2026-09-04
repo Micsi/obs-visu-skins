@@ -7,7 +7,7 @@
 //
 // Bewusst KEIN State (Goldene Regel 4) — reine Funktionen über die Fixture-Daten.
 
-import type { Ctx, Device, PageHost, PageLink, Tokens } from "@obs/visu-contract";
+import type { Ctx, Device, LinkOutcome, PageHost, PageLink, Tokens } from "@obs/visu-contract";
 
 /** Neutrale Tokens: der headless Lauf prüft Struktur, nicht Farbe. */
 export const tokensStub: Tokens = {
@@ -95,15 +95,29 @@ export function ctxStub(overrides: Partial<Ctx> = {}): Ctx {
 /* ------------------------------------------------- PageHost-Stub (Vertrag 1.12) */
 
 /**
- * Das Ziel des einen verlinkten Elements, das der Probelauf stellt.
+ * Die Link-FORMEN, die der Probelauf stellt — und die ein Skin alle bedienen muss.
  *
- * Es steht hier als Konstante, weil der Probelauf es GEGENPRUEFT: `followLink`
- * muss mit genau diesem Ziel gerufen werden. Ein Renderer, der das gestellte
- * `LayerItem` ignoriert und eine eigene Flaeche mit festverdrahtetem Ziel
- * zeichnet, ruft `followLink` sonst ebenfalls — und der Host zieht seine eigene
- * Affordanz zurueck, waehrend das Ziel des Items nirgends erreichbar ist.
+ * Ein einziges Element genuegte nicht, und zwar in zwei Richtungen:
+ *
+ *  - Es trug immer `activeIndicator: "dot"`. Ein Renderer, der seine Klickflaeche
+ *    nur fuer markierte Links baut, bestand damit — waehrend jeder GEWOEHNLICHE
+ *    Link (das Feld ist optional, dokumentierter Default `none`) ohne Affordanz
+ *    blieb, nachdem der Host wegen der Deklaration zurueckgetreten war.
+ *  - Es loeste immer als `navigate` auf. Ein Renderer, der nur bei
+ *    `resolveLink(...).kind === "navigate"` zeichnet, bestand ebenfalls — waehrend
+ *    ein PIN-geschuetztes Ziel (`gate`) leer ausging. Genau dort ist die
+ *    Affordanz aber noetig: sie fuehrt auf den PIN-Pfad.
+ *
+ * `unknown` steht bewusst NICHT hier: dort ist es dokumentiert richtig, KEINE
+ * Affordanz zu zeichnen (eine tote Klickflaeche ist schlimmer als keine).
  */
-const PROBE_TARGET = "probe-target";
+const PROBE_LINKS = [
+  { target: "probe-target", indicator: "dot" as const, outcome: "navigate" as const },
+  { target: "probe-plain", indicator: undefined, outcome: "navigate" as const },
+  { target: "probe-gated", indicator: undefined, outcome: "gate" as const },
+] as const;
+
+const PROBE_TARGET = PROBE_LINKS[0].target;
 
 /** Was ein Page-Renderer beim Probelauf am Host TATSÄCHLICH angefragt hat. */
 export interface PageHostProbe {
@@ -119,8 +133,14 @@ export interface PageHostProbe {
    * Affordanz zurueckziehen, waehrend das Ziel des Items nirgends erreichbar ist.
    */
   readonly followedTargets: string[];
-  /** Das Ziel, das der Probelauf im gestellten Layer anbietet. */
+  /** Das erste Ziel, das der Probelauf anbietet (Rueckwaertskompatibilitaet). */
   readonly probeTarget: string;
+  /**
+   * ALLE Ziele des gestellten Layers — markiert, gewoehnlich, PIN-geschuetzt.
+   * Der Probelauf verlangt eine Affordanz fuer JEDES davon: der Host tritt wegen
+   * der Deklaration bei allen zurueck, also darf keines leer ausgehen.
+   */
+  readonly probeTargets: readonly string[];
   /**
    * Leert das Protokoll. Der Probelauf trennt damit zwei Phasen, die sonst in
    * einen Topf fielen: was der Renderer WÄHREND des Zeichnens am Host fragt, und
@@ -150,6 +170,15 @@ export function pageHostProbe(): PageHostProbe {
     linkCalls.push(name);
     return value;
   };
+  /** Das Urteil des Hosts je Ziel — `navigate` fuer die offenen, `gate` fuer das
+   *  PIN-geschuetzte. Ein unbekanntes Ziel gilt als `unknown`, wie beim echten Host. */
+  const outcomeFor = (target: string): LinkOutcome => {
+    const form = PROBE_LINKS.find((l) => l.target === target);
+    if (!form) return { kind: "unknown", targetNodeId: target };
+    return form.outcome === "gate"
+      ? { kind: "gate", pageId: target, accessNodeId: "probe-page" }
+      : { kind: "navigate", pageId: target };
+  };
   const host: PageHost = {
     navTree: [
       {
@@ -169,13 +198,13 @@ export function pageHostProbe(): PageHostProbe {
               id: "probe-page",
               origin: "own" as const,
               order: 0,
-              items: [
-                {
-                  id: "probe-item",
-                  position: { x: 0, y: 0, w: 10, h: 10 },
-                  link: { targetNodeId: PROBE_TARGET, activeIndicator: "dot" as const },
-                },
-              ],
+              items: PROBE_LINKS.map((l, i) => ({
+                id: `probe-item-${i}`,
+                position: { x: 0, y: i * 10, w: 10, h: 10 },
+                link: l.indicator
+                  ? { targetNodeId: l.target, activeIndicator: l.indicator }
+                  : { targetNodeId: l.target },
+              })),
             },
           ]
         : [],
@@ -183,13 +212,9 @@ export function pageHostProbe(): PageHostProbe {
     openPopups: [],
     openPopup: () => {},
     closePopup: () => {},
-    resolveLink: (link: PageLink) =>
-      note("resolveLink", { kind: "navigate" as const, pageId: link.targetNodeId }),
+    resolveLink: (link: PageLink) => note("resolveLink", outcomeFor(link.targetNodeId)),
     followLink: (link: PageLink) =>
-      note("followLink", (followedTargets.push(link.targetNodeId), {
-        kind: "navigate" as const,
-        pageId: link.targetNodeId,
-      })),
+      note("followLink", (followedTargets.push(link.targetNodeId), outcomeFor(link.targetNodeId))),
     isLinkActive: () => note("isLinkActive", false),
     linkLabel: (link: PageLink) => note("linkLabel", `zur Seite ${link.targetNodeId}`),
   };
@@ -198,6 +223,7 @@ export function pageHostProbe(): PageHostProbe {
     linkCalls,
     followedTargets,
     probeTarget: PROBE_TARGET,
+    probeTargets: PROBE_LINKS.map((l) => l.target),
     reset: () => {
       linkCalls.length = 0;
       followedTargets.length = 0;
