@@ -52,8 +52,20 @@ export interface IonicTweaks {
   roomGap?: number;
   /** Titelleiste (Logo + Uhr) zeigen. */
   showTitlebar?: boolean;
-  /** Akzentfarbe als CSS-Farbe (Palette-Token-Wert; vom Host aufgelöst). */
-  accent?: string;
+  /**
+   * Akzent als PALETTE-SCHLÜSSEL (`orange` … `slate`), nicht als freie CSS-Farbe.
+   *
+   * Vorher stand hier eine beliebige Farbe, die direkt auf `--vz-accent` geschrieben
+   * wurde — und `--vz-accent` ist ein gemessener Text-Token UND der Grund für
+   * `--vz-accent-ink`. Ein kontrastarmer Host-Akzent wäre damit ausgeliefert worden,
+   * während der Konformitätsbericht `pass` sagt: die Messung kennt nur den Wert aus
+   * dem Blatt und kann eine Farbe, die zur Laufzeit von aussen kommt, nicht sehen.
+   *
+   * Der Vertrag beschreibt das Feld ohnehin als Palette-Schlüssel. Ein unbekannter
+   * Wert wird deshalb verworfen (Rückfall auf den Blatt-Akzent), so wie es die
+   * Select-Tweaks seit jeher tun.
+   */
+  accent?: AccentToken;
   /** Hintergrundbild-URL für theme=image. */
   photo?: string;
 }
@@ -107,6 +119,22 @@ const RANGES = {
 const clamp = (v: number, min: number, max: number): number => (v < min ? min : v > max ? max : v);
 
 /** Erlaubte Select-Werte (Spiegel von manifest.json → `tweaks`/`themes`). */
+/**
+ * Die acht Palette-Schluessel des Vertrags — dieselben, die `--vz-acc-*` im Blatt
+ * fuehrt und die die a11y-Deklaration misst.
+ */
+const ACCENT_TOKENS = [
+  "orange",
+  "teal",
+  "violet",
+  "green",
+  "blue",
+  "rose",
+  "amber",
+  "slate",
+] as const;
+export type AccentToken = (typeof ACCENT_TOKENS)[number];
+
 const SELECT_OPTIONS = {
   stil: ["glass", "ios", "md"],
   accentStyle: ["bar", "glow", "ring"],
@@ -173,9 +201,16 @@ export function applyTweaks(tweaks: IonicTweaks = {}): RootTweakStyle {
     "--vz-glow": `${glow}`,
     "--vz-room-gap": `${roomGroup === "off" ? 0 : t.roomGap}px`,
   };
-  // Akzentfarbe und Hintergrundbild sind optional — nur setzen, wenn der Host sie
+  // Akzent und Hintergrundbild sind optional — nur setzen, wenn der Host sie
   // liefert, sonst greifen die Boden-Tokens aus ionic.css (--vz-accent / --vz-photo).
-  if (tweaks.accent !== undefined) style["--vz-accent"] = tweaks.accent;
+  //
+  // Der Akzent wird auf die GEMESSENE Palette gezwungen: er zeigt auf eines der acht
+  // `--vz-acc-*`, nie auf eine freie Farbe. Alles andere waere eine Farbe, die die
+  // Konformitaetsmessung nicht sehen kann, an einem Token, das sie als Text misst und
+  // als Grund fuer `--vz-accent-ink` benutzt.
+  if (tweaks.accent !== undefined && ACCENT_TOKENS.includes(tweaks.accent)) {
+    style["--vz-accent"] = `var(--vz-acc-${tweaks.accent})`;
+  }
   if (tweaks.photo !== undefined) style["--vz-photo"] = `url('${cssUrlEscape(tweaks.photo)}')`;
 
   return {

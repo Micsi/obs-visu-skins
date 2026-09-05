@@ -12,26 +12,76 @@
  */
 @import '@obs-visu-skins/ionic/ionic.css';
 
-.edomi-root {
-  --vz-pos-unit: 1px;
+/* ══ Wo die Farben dieses Skins stehen — und warum es zwei Bloecke sind ══
+
+   manifest.a11y nennt :root als `base`. Nur was dort (oder in einem Block, der in
+   das gemessene Theme kaskadiert) deklariert ist, findet der Konformitaetslauf —
+   --edomi-accent stand in .edomi-root und fiel deshalb als „steht in keinem der
+   erklaerten Bloecke" aus jeder Messung, obwohl das Manifest ihn als Grafik fuehrte.
+
+   In :root darf aber NUR stehen, was keinen fremden Token liest. Die Substitution
+   einer Custom Property passiert auf dem Element, das die DEKLARATION traegt, und
+   :root ist <html>. Die Ionic-Bruecke (--ion-background-color / --ion-text-color)
+   steht dagegen auf .visu-root — und .visu-root IST das Wurzel-div dieses Skins
+   (page.ts setzt class: ["edomi-root", "visu-root"]), also ein NACHFAHRE von <html>.
+   Ein Alias darauf, in :root deklariert, findet die Bruecke nicht und faellt auf
+   seinen Rueckfall zurueck: im Browser gemessen bg #0f1216 statt #0e1116 und fg
+   #e8ecf2 statt #eef0f4. Schlimmer als die zwei Farbeinheiten ist, dass der
+   Generator dann etwas MISST, was der Browser nie malt: `themeEnv` faltet den
+   .visu-root-Block in seine Umgebung und loest den Alias sehr wohl auf --vz-bg /
+   --vz-fg auf. Genau dieser Fehler steckte in ionic (--vz-accent in :root) und hat
+   dort tests/contrast.spec.ts als Waechter bekommen; hier steht er in
+   tests/alias.spec.ts.
+
+   Also: Literale nach :root, Aliasse nach .visu-root. ══ */
+:root {
   /* Der eigene Akzent des Skins, EINMAL benannt statt viermal hingeschrieben.
      Er traegt Fokusring, Aktiv-Indikator und die Sprung-Marke — alles Grafik
      (Nicht-Text, WCAG 3:1) auf dem Kachelgrund. */
   --edomi-accent: #d6a800;
+
+  /* Navigationsschiene: Trennkante, Zeiger-Wasch, aktive Seite. */
+  --edomi-nav-border: rgba(255, 255, 255, 0.08);
+  --edomi-nav-hover-bg: rgba(255, 255, 255, 0.06);
+  --edomi-nav-active-bg: rgba(90, 160, 255, 0.22);
+
+  /* Popup: Abdunklung der Seite, Kartenflaeche, Schatten, Schliessknopf. */
+  --edomi-dim: rgba(0, 0, 0, 0.45);
+  --edomi-popup-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+  --edomi-close-bg: rgba(255, 255, 255, 0.1);
+}
+
+/* Seite und Schrift der Seite — die beiden ALIASSE auf die Ionic-Bruecke. Sie
+   stehen hier, weil .visu-root das Element ist, das die Bruecke traegt: dort
+   loesen sie auf --vz-bg / --vz-fg auf. Der Rueckfall greift nur, wenn der Skin
+   ohne die Bruecke laeuft. */
+.visu-root {
+  --edomi-canvas-bg: var(--ion-background-color, #0f1216);
+  --edomi-canvas-ink: var(--ion-text-color, #e8ecf2);
+  /* Die Popup-Flaeche gehoert hierher, aus demselben Grund: sie stand in :root und
+     loeste --ion-card-background DORT auf. Setzt die einbettende App den Wert auf
+     dem Skin-Wurzelelement, sieht die :root-Deklaration ihn nie — sie friert auf
+     ihren Rueckfall #1a1f26 ein, und das Popup folgt der eingestellten Ionic-Karte
+     nicht mehr. Substitution passiert am Element, das die DEKLARATION traegt. */
+  --edomi-popup-bg: var(--ion-card-background, #1a1f26);
+}
+
+.edomi-root {
+  --vz-pos-unit: 1px;
   display: grid;
   grid-template-columns: minmax(160px, max-content) 1fr;
   /* A definite floor (not a percentage that resolves to `auto` in an auto-height
      container): the canvas's layers are absolutely positioned and contribute no
      intrinsic height, so without this the page could collapse. */
   min-height: 100dvh;
-  background: var(--ion-background-color, #0f1216);
-  color: var(--ion-text-color, #e8ecf2);
+  background: var(--edomi-canvas-bg);
+  color: var(--edomi-canvas-ink);
 }
 
 /* ------------------------------------------------------------------- nav rail */
 .edomi-nav {
   padding: 12px 8px;
-  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  border-right: 1px solid var(--edomi-nav-border);
   overflow: auto;
 }
 .edomi-nav-list,
@@ -57,10 +107,10 @@
   cursor: pointer;
 }
 .edomi-nav-link:hover {
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--edomi-nav-hover-bg);
 }
 .edomi-nav-link.is-active {
-  background: rgba(90, 160, 255, 0.22);
+  background: var(--edomi-nav-active-bg);
   font-weight: 600;
 }
 .edomi-nav-link:disabled {
@@ -239,7 +289,7 @@
    must NOT block controls behind it. Only a MODAL popup captures pointer input on
    the wrapper (exclusive open). */
 .edomi-popup-wrap.is-dimmed {
-  background: rgba(0, 0, 0, 0.45);
+  background: var(--edomi-dim);
 }
 .edomi-popup-wrap.is-modal {
   pointer-events: auto;
@@ -247,7 +297,7 @@
 }
 .edomi-popup {
   position: relative;
-  background: var(--ion-card-background, #1a1f26);
+  background: var(--edomi-popup-bg);
   border-radius: 12px;
   pointer-events: auto;
 }
@@ -267,7 +317,7 @@
   min-height: 80px;
 }
 .edomi-popup.has-shadow {
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+  box-shadow: var(--edomi-popup-shadow);
 }
 .edomi-popup.is-animated {
   animation: edomi-pop-in 160ms ease-out;
@@ -296,7 +346,7 @@
   height: 28px;
   border: 0;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--edomi-close-bg);
   color: inherit;
   font-size: 18px;
   line-height: 1;

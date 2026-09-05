@@ -61,11 +61,32 @@ describe("ionic skin — applyTweaks (I5)", () => {
     expect(style["--vz-room-gap"]).toBe("0px");
   });
 
-  it("setzt Akzentfarbe und Hintergrundbild nur, wenn der Host sie liefert", () => {
+  it("setzt Akzent und Hintergrundbild nur, wenn der Host sie liefert", () => {
     expect(applyTweaks().style["--vz-accent"]).toBeUndefined();
-    const set = applyTweaks({ accent: "#45b1ae", photo: "p.jpg" });
-    expect(set.style["--vz-accent"]).toBe("#45b1ae");
+    const set = applyTweaks({ accent: "teal", photo: "p.jpg" });
+    // Der Akzent zeigt auf ein GEMESSENES Token, nicht auf eine freie Farbe.
+    expect(set.style["--vz-accent"]).toBe("var(--vz-acc-teal)");
     expect(set.style["--vz-photo"]).toBe("url('p.jpg')");
+  });
+
+  it("verwirft einen Akzent, den die gemessene Palette nicht kennt", () => {
+    // Der Punkt: `--vz-accent` ist ein gemessener Text-Token UND der Grund fuer
+    // `--vz-accent-ink`. Eine freie CSS-Farbe von aussen waere eine Farbe, die die
+    // Konformitaetsmessung nicht sehen kann — ein kontrastarmer Host-Akzent wuerde
+    // ausgeliefert, waehrend der Bericht `pass` sagt.
+    const freeColour = applyTweaks({ accent: "#45b1ae" as never });
+    expect(freeColour.style["--vz-accent"]).toBeUndefined();
+    const nonsense = applyTweaks({ accent: "gibtsnicht" as never });
+    expect(nonsense.style["--vz-accent"]).toBeUndefined();
+  });
+
+  it("jeder Palette-Schluessel loest auf sein Token auf", () => {
+    // Sonst waere die Einschraenkung gruen, wuerde aber die halbe Palette verwerfen.
+    for (const key of ["orange", "teal", "violet", "green", "blue", "rose", "amber", "slate"]) {
+      expect(applyTweaks({ accent: key as never }).style["--vz-accent"]).toBe(
+        `var(--vz-acc-${key})`,
+      );
+    }
   });
 
   it("maskiert Anführungszeichen/Backslashes in der Foto-URL (kein CSS-Bruch)", () => {

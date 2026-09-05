@@ -17,6 +17,9 @@ export default defineConfig({
     // 60 s aus demselben Grund wie bei den Specs: der Kaltstart zieht Vue, die
     // Renderer und die DOM-Laufzeit auf einmal hoch. Das Budget des Probelaufs
     // (3 s je Skin) bleibt die Grenze, die echte Hänger fängt.
-    testTimeout: 60_000,
+    // 120 s wie bei den Specs: das Gate misst je Skin die volle Farbfläche, und ein
+    // Lauf unter Last (parallele Pakete, Kaltstart) braucht deutlich mehr als der
+    // Einzellauf. Echte Hänger fängt das Budget des Probelaufs, nicht diese Grenze.
+    testTimeout: 120_000,
   },
 });

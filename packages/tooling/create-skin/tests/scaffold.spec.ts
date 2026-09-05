@@ -15,8 +15,12 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, describe, expect, it } from "vitest";
 
-import { generateSupport } from "@obs-visu-skins/conformance";
-import { version as contractVersion, type SkinManifest } from "@obs/visu-contract";
+import { ensureDom, generateSupport } from "@obs-visu-skins/conformance";
+import {
+  schema as contractSchema,
+  version as contractVersion,
+  type SkinManifest,
+} from "@obs/visu-contract";
 import { scaffoldSkin, scaffoldFiles } from "../index.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -93,11 +97,26 @@ describe("scaffoldSkin (end-to-end against a temporary target)", () => {
 
     try {
       const manifest = JSON.parse(readFileSync(join(dir, "manifest.json"), "utf8")) as SkinManifest;
+      // VOR dem Skin-Import: der zieht Vue nach, und `@vue/runtime-dom` greift
+      // `document` beim MODUL-LADEN ab. Steht das Dokument erst danach, merkt sich
+      // die Laufzeit `document: null`, und jedes spaetere `mount()` wirft — die
+      // Aktions-Achse meldete dann jeden Typ als `broken` mit der Begruendung "keine
+      // DOM-Laufzeit". `cli.ts` haelt dieselbe Reihenfolge ein; wer `generateSupport`
+      // programmatisch aufruft, muss sie ebenfalls einhalten.
+      await ensureDom();
       const mod = (await import(/* @vite-ignore */ join(dir, "renderers.ts"))) as {
         tiles: Record<string, unknown>;
       };
 
-      const { hasGap, report } = await generateSupport({ manifest, tiles: mod.tiles });
+      // Wie das CLI: die in `manifest.a11y.stylesheet` genannte Datei wird GELESEN
+      // und mitgegeben. Ohne sie meldet die Farb-Achse `stylesheet-unreadable` — der
+      // Generator misst Farbe, er raet sie nicht.
+      const styles: Record<string, string> = {};
+      for (const sheet of [manifest.a11y?.stylesheet ?? []].flat()) {
+        styles[sheet] = readFileSync(join(dir, sheet), "utf8");
+      }
+
+      const { hasGap, report } = await generateSupport({ manifest, tiles: mod.tiles, styles });
       expect(hasGap).toBe(false);
       expect(report.summary.gap).toBe(0);
       expect(report.summary.broken).toBe(0);
@@ -112,6 +131,15 @@ describe("scaffoldSkin (end-to-end against a temporary target)", () => {
         // Keine unbelegte Deklaration: das Manifest verspricht keine Aktion.
         expect(report.widgets[type]?.reason ?? "").not.toContain("declared but never marked");
       }
+
+      // Goldene Regel 6: das frische Skin ist AA-GEMESSEN gruen, nicht ungemessen.
+      // `pass` statt `undeclared` ist der ganze Unterschied — und die Zahl der
+      // Paarungen belegt, dass wirklich etwas gerechnet wurde (ein Waechter, der
+      // nichts misst, faellt nie).
+      expect(report.a11y?.status).toBe("pass");
+      expect(report.a11y?.violationCount).toBe(0);
+      expect(report.a11y?.combinations).toBeGreaterThan(0);
+      expect(report.a11y?.checkedTweakExtremes).toBe(true);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
@@ -173,4 +201,35 @@ describe("scaffoldSkin (end-to-end against a temporary target)", () => {
       });
     }
   }, 180_000);
+});
+
+describe("das Akzent-Vokabular kommt aus dem Vertrag", () => {
+  it("die Palette ist dieselbe, die der Vertrag beschreibt", () => {
+    // Eine feste Liste hier wuerde vom Vertrag wegdriften: kaeme ein Akzent dazu,
+    // riefe ein frisch erzeugter Skin `t.accent(d.accent)` dafuer auf, ohne die
+    // zugehoerige `--s-acc-*`-Variable oder eine a11y-Deklaration zu schreiben — und
+    // die mitgenerierten Tests wiederholten dieselbe feste Liste, wuerden es also
+    // nicht zeigen.
+    const described = (
+      contractSchema as { widgets?: Record<string, { data?: Record<string, unknown> }> }
+    ).widgets?.["light"]?.data?.["accent"];
+    const fromContract = /Palette-Schl(?:ü|ue)ssel:\s*([a-z|]+)/i
+      .exec(String(described))?.[1]
+      ?.split("|");
+    expect(fromContract, "der Vertrag beschreibt die Akzente nicht mehr so").toBeDefined();
+
+    // Jeder Akzent des Vertrags bekommt eine CSS-Variable UND eine a11y-Deklaration.
+    const files = scaffoldFiles({ name: "probe" });
+    const css = files.find((f) => f.path.endsWith("probe.css"))!.contents;
+    const manifest = JSON.parse(files.find((f) => f.path.endsWith("manifest.json"))!.contents) as {
+      a11y: { tokens: Record<string, unknown> };
+    };
+    for (const accent of fromContract!) {
+      expect(css, `--s-acc-${accent} fehlt im Blatt`).toContain(`--s-acc-${accent}`);
+      expect(
+        Object.keys(manifest.a11y.tokens),
+        `--s-acc-${accent} fehlt in a11y.tokens`,
+      ).toContain(`--s-acc-${accent}`);
+    }
+  });
 });

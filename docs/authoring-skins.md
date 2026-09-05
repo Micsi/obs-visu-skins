@@ -19,8 +19,12 @@ bis zum in der App registrierten Skin.
    deinem Modell passt — eine pauschale Abwahl stellt den Typ still und nimmt dir die
    `gap`-Meldung, wenn der Vertrag ihn später erweitert. Rendert dein Skin alles, bleibt
    die Angabe als leeres Array stehen.
-4. **AA-Pflicht.** Farben nur über die `Tokens`-Helfer (`t.accent`, `t.accentInk`) — die
-   liefern AA-sichere Werte. Keine hartkodierten Kontraste.
+4. **AA-Pflicht — und sie wird GEMESSEN.** Farben im Renderer nur über die
+   `Tokens`-Helfer (`t.accent`, `t.accentInk`); die eigentliche Palette lebt in deinem
+   Stylesheet und wird in `manifest.json → a11y` deklariert. Der Konformitätslauf liest
+   dein Blatt und rechnet WCAG darauf — auch an den Extremen jedes farbwirksamen Tweaks.
+   Ohne `a11y`-Block meldet er `undeclared` und wird rot: AA ist Pflicht, und
+   „ungemessen" ist nicht dasselbe wie „bestanden" (Schritt 3a).
 
 ## 0. Setup
 
@@ -36,12 +40,18 @@ pnpm new-skin <name> --layout list  # Listen-Layout
 ```
 
 Das erzeugt `packages/skins/<name>/` mit `package.json`, `manifest.json`, `renderers.ts`,
-`tsconfig.json` und `tests/scaffold.spec.ts` — und trägt das Paket **automatisch** in die
-Root-`tsconfig.json` (`references`) ein. Das frische Skin ist sofort konformitäts-grün:
+`<name>.css`, `tsconfig.json` und `tests/scaffold.spec.ts` — und trägt das Paket
+**automatisch** in die Root-`tsconfig.json` (`references`) ein. Das frische Skin ist sofort konformitäts-grün:
 jeder Kern-Typ des Vertrags (`light · switch · blind · jalousie · sensor · scene · media ·
 camera · climate` — die Liste kommt **aus dem Schema**, nicht aus dem Scaffold) hat einen
 **Platzhalter-Renderer** (eine schlichte Kachel: Label · Typ · Zustand) und
 `targetsContract` steht auf der aktuellen Vertragsversion.
+
+`<name>.css` bringt eine **gemessen AA-sichere Startpalette** in beiden Themes mit
+(alle acht Akzent-Token des Vertrags plus Grund/Fläche/Text), und `manifest.json → a11y`
+deklariert, welcher Token welche Rolle trägt. Ein frisches Skin ist damit nicht nur
+gap-frei, sondern AA-**gemessen** grün — du fängst über der Schwelle an und siehst
+sofort, wenn deine eigene Farbwahl darunter fällt.
 
 **Die Aktionslisten sind absichtlich leer.** Ein frisches Skin ist `display`-only: es zeigt
 jeden Typ an und behauptet keine einzige Bedienung. Aktionen kommen erst dazu, wenn du sie
@@ -52,6 +62,13 @@ Markup, eine Deklaration allein hebt die Stufe nicht. Danach einmal:
 ```bash
 pnpm install        # neues Paket verlinken
 ```
+
+> **Achtung, Dev-Link:** `pnpm install` legt die `link:`-Symlinks auf
+> `@obs/visu-contract` neu an — immer auf den Pfad aus `package.json`
+> (`…/openbridgeserver-visu-integrate/packages/contract`). Wer den Vertrag gerade in
+> einem ANDEREN Worktree ändert, muss nach jedem Install wieder umhängen
+> (`./scripts/contract-link.sh <pfad>`), sonst misst der Lauf gegen den alten Vertrag —
+> und `targetsContract` im frischen Manifest steht dann auf dessen Version.
 
 ## 2. Manifest + Renderer ausfüllen
 
@@ -74,7 +91,14 @@ pnpm install        # neues Paket verlinken
   erlaubt — dann darf `link` aber auch nicht dastehen (Goldene Regel 3). Zeichnest du ihn,
   dann ausschliesslich über die Host-Dienste `resolveLink` / `followLink` / `isLinkActive` /
   `linkLabel` am `PageHost`; ein eigener Abstieg durch den `navTree` ist ein Regelbruch
-  (Goldene Regel 4).
+  (Goldene Regel 4). Der Lauf MISST das, und zwar am echten DOM: er montiert deinen
+  Page-Renderer mit Vue in ein jsdom-Dokument, klickt jedes **erreichbare** Element mit
+  einem nativen `MouseEvent` an (deaktivierte und `inert` gestellte Elemente bleiben
+  aussen vor, wie im Browser) und verlangt, dass **jede** angebotene Link-Form ihr Ziel
+  über `host.followLink` erreicht — nicht bloss irgendein Aufruf. Fällt die Probe, steht
+  der Befund als `layout.honorsFindings` **in** `support.json`, nicht nur im Exit-Code.
+  Kann der Lauf gar nicht montieren (kein DOM verfügbar), sagt er `unmeasured` statt
+  stillschweigend zu bestehen.
 - `renderers.ts` → ersetze `placeholderTile` Stück für Stück durch echte Renderer. Lagere
   pro Typ in `src/tiles/<type>.ts` aus (vgl. `packages/skins/terminal/src/tiles/`). Jede
   Funktion hat die Signatur `(d, t, ctx) => VNode` (Vue `h()`).
@@ -97,7 +121,158 @@ Renderer und vergibt die Stufe — du behauptest sie nie selbst:
 | `gap`         | **Fehler** — weder gerendert noch abgewählt                                   |
 | `broken`      | **Fehler** — der Renderer wirft an einer Fixture                              |
 
-`gap` und `broken` setzen den Exit-Code ≠ 0. Das frische Scaffold ist bereits grün.
+`gap` und `broken` setzen den Exit-Code ≠ 0 — **und seit Vertrag 1.13 auch alles, was
+nicht `a11y: pass` ist** (Schritt 3a). Das frische Scaffold ist auf beiden Achsen bereits
+grün.
+
+### 3a. AA deklarieren (Vertrag 1.13)
+
+Der Generator misst Render- und Aktions-Achse am erzeugten Markup — Farbe steht dort
+nicht. Damit er auch die **Farb-Achse** messen kann, deklarierst du in
+`manifest.json → a11y`, was deine Farben TUN; die WERTE liest er aus deinem Stylesheet.
+Du deklarierst also nie ein Kontrastverhältnis (das wäre beim nächsten Farbdreher still
+falsch), sondern nur die Semantik:
+
+```jsonc
+"a11y": {
+  "stylesheet": "./mein.css",              // `./…` relativ zum Manifest, `/…` absolut,
+                                            // alles andere ein Paket-Export
+  "base": ":root",                          // optional: themenunabhängiger Token-Block
+  "themes": { "dark": ".mein-root[data-theme=\"dark\"]" },
+  "grounds": [
+    { "token": "--bg" },                    // der erste Grund muss DECKEND sein
+    { "token": "--tile", "over": "--bg" }   // durchscheinend? dann sag, was darunter liegt
+  ],
+  "alphas": [1],                            // Deckkräfte, die du auf Farbe legst
+  "tokens": {
+    "--bg":   { "role": "ground" },
+    "--fg":   { "role": "text", "on": ["--bg", "--tile"] },
+    "--dot":  { "role": "graphic", "on": ["--tile"] },
+    "--grad": { "role": "exempt", "reason": "Verlauf, kein flaches Pixel" }
+  },
+  "tweakAxes": [{ "tweak": "tileAlpha", "cssVar": "--tile-alpha" }],
+  "neutralTweaks":    { "edge": "Eckenradius — reine Geometrie" },
+  "unmeasuredTweaks": { "stil": "attributgeschaltet statt variablengetrieben" }
+}
+```
+
+Vier Rollen, aus dem Vertrag (`contract.schema.json → a11y.roles`):
+
+| Rolle     | Schwelle           | wofür                                         |
+| --------- | ------------------ | --------------------------------------------- |
+| `text`    | 4.5:1 (WCAG 1.4.3) | alles, was Schrift einfärbt                   |
+| `graphic` | 3:1 (WCAG 1.4.11)  | bedeutungstragende Nicht-Text-Grafik          |
+| `ground`  | —                  | Fläche, gegen die gemessen wird               |
+| `exempt`  | —                  | bewusst ausgenommen, **`reason` ist Pflicht** |
+
+Jeder Weg AUS der Messung heraus muss eine **begründete Aussage** sein, nie ein
+Weglassen. Acht Riegel:
+
+1. **Farbe weglassen** → jede Farb-Deklaration in **jedem** Block deiner Stylesheets
+   braucht eine Rolle, nicht nur die in `base`/`themes`. Ein dritter Block ist kein
+   Versteck (ionics `--ion-*`-Brücke unter `.visu-root` war genau das). Befund:
+   `unclassified`.
+2. **Grund weglassen** → ein Token `role: "ground"` zu nennen und dann **nicht** in
+   `grounds` zu führen macht ihn komplett ungemessen. Erlaubt (eine Trennlinie ist
+   wirklich kein Vordergrund), aber nur mit `reason`; er steht dann als
+   `unmeasuredGrounds` im Report. Befund: `ground-without-reason`.
+3. **Theme weglassen** → `exemptThemes` braucht eine nicht-leere Begründung, genau
+   wie `exempt` bei einem Token.
+4. **Tweak weglassen** → **jeder** Tweak aus `manifest.tweaks` muss eingeordnet sein:
+   als messbare Achse (`tweakAxes`), als farbneutral (`neutralTweaks`, mit Grund) oder
+   als farbwirksam-aber-hier-nicht-erfassbar (`unmeasuredTweaks`, mit Grund).
+   Ein **eingeräumtes** Loch senkt `checkedTweakExtremes` auf **false**, aber nicht das
+   Urteil: der Skin kann weiterhin `pass` sein, und die Lücke steht sichtbar im Report
+   (das Gate schreibt sie zusätzlich auf stderr). Der Grund ist, dass es für einen Skin
+   mit attributgeschalteter Farbwirkung — ionic schaltet `stil`/`accentStyle` über
+   `data-*` ein anderes Regelwerk frei, nicht über eine CSS-Variable — sonst **keinen
+   ehrlichen Weg** zu voller Deckung gäbe; eine Latte, die darauf besteht, bestraft
+   genau die Deklaration, die das einräumt (openbridgeserver#181).
+   Ein **verschwiegenes** Loch fällt weiter durch: ein Tweak, der nirgends eingeordnet
+   ist, behauptet Deckung, die es nicht gibt. Befund: `undeclared-tweak`. Ebenso eine
+   Einräumung ohne Begründung (`exempt-without-reason`) — eine Auslassung muss eine
+   Aussage sein. Und `gate.spec.ts` schreibt fest, welcher Skin was einräumen darf:
+   ein neuer Eintrag bricht das Spec und muss dort begründet nachgetragen werden.
+5. **Theme gar nicht nennen** → jedes Theme aus `manifest.themes` muss in `a11y.themes`
+   stehen oder mit Begründung in `exemptThemes`. Wer `light` und `dark` anbietet und nur
+   `dark` deklariert, lässt die halbe Palette ungemessen. Befund: `selector-missing`.
+6. **Rolle vertippen** → `role` wird gegen `contract.schema.json → a11y.roles` geprüft.
+   `"role": "tetx"` fiel sonst durch jede Schleife, galt Riegel 1 aber als
+   klassifiziert: der Token war unsichtbar, nicht ausgenommen. Befund: `unclassified`.
+7. **`"on": []`** → ein leerer Grund-Satz erzeugt null Paarungen. Er wird gemeldet und
+   fällt auf die strengere Lesart zurück (gegen alle Gründe). Lass `on` weg, wenn du
+   nicht einschränken willst; nimm `exempt` mit Begründung, wenn nicht gemessen werden
+   soll. Befund: `unclassified`.
+8. **Farbe an den Token vorbei** → in einem deklarierten Blatt kommt JEDE Farbe aus
+   einem Token mit Rolle. Eine Farbe direkt in einer gewöhnlichen Deklaration
+   (`outline: 2px solid #d6a800`, `color: #fff`) hat keinen Namen, keine Rolle und
+   keinen erklärten Grund und ist damit nicht messbar. Schreib sie als `var(--…)` auf
+   einen deklarierten Token. Befund: `unclassified`.
+
+Dazu:
+
+- **`on` ist eine Einschränkung, kein Muss.** Lässt du es weg, misst der Generator gegen
+  JEDEN Grund — die strengere Lesart. Einschränken musst du hinschreiben (und dann steht
+  im Report, worauf du dich festgelegt hast).
+- **Tweak-Extreme (CO5).** Jede Achse wird an beiden Enden angefahren (`slider` →
+  `min`/`max`, `select` → jede Option). Ein Kontrast, der nur in der Werkseinstellung
+  hält, ist kein Bestehen. Hat dein Skin gar keine Tweaks, zeigt der Report
+  `tweakStops: ["default"]` — die Aussage bleibt nachlesbar.
+- **`undeclared` ≠ `pass`.** Ohne `a11y`-Block steht im Report ausdrücklich
+  `"status": "undeclared"` — unterscheidbar von einem Skin, der deklariert und besteht
+  (Goldene Regel 3).
+- **Themes borgen sich nichts.** Gemessen wird je Theme mit den Blöcken, die in DIESES
+  Theme kaskadieren. Ein gemeinsamer Block (`.mein-root { … }`) zählt in jedem Theme,
+  der Block eines anderen Themes in keinem. Fehlt ein Token im dunklen Block, ist das
+  ein Befund — kein stiller Griff in die helle Palette.
+
+Was der Lauf **nicht** misst (und auch nicht behauptet zu messen): ob ein Token wirklich
+dort steht, wo dein `on` es hinsetzt; Deckkräfte, die du nicht in `alphas` nennst;
+Schriftgrössen (jeder Text wird an 4.5:1 gemessen, nie an den 3:1 für grossen Text);
+Verläufe und Schatten. Der Kopf von `packages/tooling/conformance/a11y.ts` führt das
+vollständig aus.
+
+Der `a11y`-Block landet in `support.json`:
+
+```jsonc
+"a11y": {
+  "status": "pass", "aa": true, "checkedTweakExtremes": true,
+  "thresholds": { "text": 4.5, "graphic": 3 },
+  "themes": ["dark", "light"], "tweakStops": ["default"],
+  "combinations": 88,
+  "worst": { "text": { "token": "--t-acc-amber", "ratio": 4.58, … } },
+  "violationCount": 0,
+  "violationBreakdown": { "atDefault": 0, "atTweakExtreme": 0, "whenDimmed": 0 },
+  "violations": [], "findingCount": 0, "findings": [],
+  "unmeasuredGrounds": { "--t-line": "Zeilentrenner … kein Vordergrund" }
+}
+```
+
+`worst` ist die knappste Messung je Rolle — bei `pass` dein Abstand zur Schwelle, bei
+`fail` derselbe Wert wie `violations[0]`, also der schlimmste Verstoss.
+
+`violationBreakdown` teilt die Verstösse disjunkt auf, weil eine Gesamtzahl irreführt:
+
+| Feld             | bedeutet                                                  |
+| ---------------- | --------------------------------------------------------- |
+| `atDefault`      | volle Deckkraft **und** Werkseinstellung — der harte Kern |
+| `atTweakExtreme` | volle Deckkraft, aber erst am Regler-Anschlag sichtbar    |
+| `whenDimmed`     | nur bei gedimmter Deckkraft (gesperrt/inert)              |
+
+WCAG 1.4.3 und 1.4.11 nehmen „inactive user interface components" ausdrücklich aus,
+und diese Fläche nimmt die Ausnahme **in Anspruch — aber nur für genau das**: für den
+Zustand, in dem ein Bedienelement wirklich inaktiv ist (`disabled`, `aria-disabled`).
+Praktisch heisst das: du lässt die Deckkraft dieses Zustands aus `alphas` weg und
+begründest es im `reason` des Tokens. ionic und edomi tun das für ihre `0.55` der
+inerten Bedienelemente.
+
+Was **nicht** ausgenommen ist, ist alles, was weiterhin gelesen werden soll. Eine
+gesperrte oder `readonly` Kachel zeigt ihre Werte noch — ihre `0.7` steht deshalb in
+`alphas` und wird gemessen. Wer eine Deckkraft weglässt, sagt damit „dieser Zustand ist
+inaktiv"; stimmt das nicht, ist es eine Lücke, die niemand mehr sieht.
+
+`whenDimmed` zählt also die Verstösse der GEMESSENEN gedimmten Zustände, nicht aller
+gedimmten. Wenn du eine Zahl zitierst, zitiere `atDefault`.
 
 Trage dein Skin ins CI-Gate ein und fahre es:
 
@@ -123,8 +298,19 @@ Fixture-Wand rendert jede Vertrags-Fixture (jeder Typ × jeder Zustand) durch di
 eines gewählten Skins — eine visuelle Vollständigkeits-Wand. Oben schaltest du **Skin** und
 **Theme** um; die Kopfzeile zählt `ok · unsupported · gap · broken`. Rote Zellen (`gap`,
 `broken`) sind deine To-do-Liste; bewusst abgewählte Typen erscheinen neutral gestrichelt.
-Ein neuer Skin wird in `packages/tooling/fixture-wand/src/main.ts` in die `SKINS`-Registry
-eingetragen (Manifest, `tiles`, Stylesheet, Wurzel-Element/Theme-Attribute).
+Ein neuer Skin braucht in der Wand **drei** Handgriffe, nicht einen:
+
+1. `packages/tooling/fixture-wand/package.json` → `dependencies` um
+   `"@obs-visu-skins/<name>": "workspace:*"` ergänzen, dann `pnpm install`.
+2. `packages/tooling/fixture-wand/src/stubs.ts` → einen `Tokens`-Stub exportieren, der
+   auf DEINE Akzent-Variablen zeigt:
+   `export const <name>Tokens = tokensFor("--s-acc-", "--s-accent-ink", "system-ui");`
+   Ohne ihn löst `t.accent(d.accent)` ins Leere auf und die Wand zeigt Fallback statt
+   deiner Optik.
+3. `packages/tooling/fixture-wand/src/main.ts` → Importe (`* as <name>`,
+   `<name>/manifest.json`, `<name>/<name>.css?raw`) plus einen `SKINS`-Eintrag mit
+   `manifest`, `tiles`, `tokens`, `css` und `root(theme)` (Wurzelklasse +
+   `data-theme`-Attribut).
 
 ## 5. Tests + Gates
 
@@ -142,12 +328,21 @@ Form-Tests gegen die Vertrags-Fixtures, sobald du die Platzhalter ersetzt
 
 Im App-Repo (`openbridgeserver`, Visu-Integration):
 
-1. **Dev-Link** in `apps/visu/package.json` ergänzen:
-   `"@obs-visu-skins/<name>": "link:../../../obs-visu-skins/packages/skins/<name>"`,
+1. **Dev-Link** in `apps/visu/package.json` ergänzen. Der Pfad ist **absolut** und
+   zeigt auf DEINEN Checkout — er steht so auch bei den bestehenden Einträgen, ist aber
+   maschinenspezifisch: kopierst du ihn wörtlich, findet `pnpm install` das Ziel nicht.
+   `"@obs-visu-skins/<name>": "link:<dein-checkout>/obs-visu-skins/packages/skins/<name>"`,
    dann `pnpm install`.
-2. **Host-Registry** `apps/visu/src/skin-host/skins.ts` um den Skin erweitern (Import von
-   `tiles`/`details` + `manifest.json`, eingetragen unter dem Skin-Key `<name>`).
-3. **Seite** mit `skin: "<name>"` im Seiten-Key anlegen/zuordnen — der Host adressiert den
+2. **Stylesheet importieren** — sonst rendert die Seite unformatiertes Markup, während
+   die jsdom-Tests grün bleiben (Struktur sind keine Pixel):
+   `import '@obs-visu-skins/<name>/<name>.css';` in `apps/visu/src/main.ts` (so machen es
+   ionic/terminal) oder in `apps/visu/src/pages/SkinPage.vue`.
+3. **Host-Registry** `apps/visu/src/skin-host/skins.ts` um den Skin erweitern: Import von
+   `tiles`/`details` (+ optional `presets`, `page`) und `manifest.json`, eingetragen unter
+   dem Skin-Key `<name>`. **`rootClass` ist Pflicht** und muss exakt die Klasse sein, auf
+   die dein Stylesheet gescoped ist (`.<name>-root` beim Scaffold) — sie ist der zweite
+   Teil desselben Problems wie Punkt 2.
+4. **Seite** mit `skin: "<name>"` im Seiten-Key anlegen/zuordnen — der Host adressiert den
    Renderer nach Typ über die Registry.
 
 Damit rendert die App deine Optik, ohne dass Skin und App je voneinander wissen — beide
