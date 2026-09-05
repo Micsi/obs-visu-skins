@@ -446,3 +446,97 @@ describe("die neutrale Text-Leiter bleibt eine Leiter", () => {
     expect(Math.sign(ls[2]!.L - ls[1]!.L), `${theme}: die Leiter kehrt um`).toBe(dir);
   });
 });
+
+/* ═══════════════════ Die Ratsche zur zweiten Rolle des Akzents ═══════════════════
+ *
+ * Der Akzent trägt ZWEI Verwendungen: Balkenfüllung, LED und Ring (grafisch) und —
+ * über `--acc: var(--vz-accent)` — echten Text in `.vz-climate-soll` (12px/600),
+ * `.vz-climate-mode` und `.vz-dialog-val` (15px/700). Das Messmodell kennt aber nur
+ * EINE Rolle je Token, und die strengere gewinnt: `text`, 4.5:1.
+ *
+ * Damit fiel die Deckkraft 0.7 aus der Deklaration — die Sperr-Dämpfung
+ * `.vz-tile.locked .vz-tile-body { opacity: 0.7 }`. Sie gegen 4.5:1 zu messen wäre
+ * falsch streng: gedämpft ist die Kachel gesperrt, dort zeigt der Akzent Balken und
+ * Ring, nicht Fliesstext. Sie GAR NICHT zu messen wäre aber eine stille Lücke —
+ * 270 Paarungen, die vorher liefen. Also stehen sie hier, gegen die Schwelle, die
+ * für sie gilt: 3:1.
+ *
+ * Gegenprobe gefahren: `--vz-acc-blue` in `:root` von `#5a93dd` auf `#3a6ba8`
+ * abgedunkelt → rot über alle drei Reglerstellungen, u. a.
+ *   dark/min auf --vz-tile-bg-strong bei alpha=0.7: 2.02:1 < 3:1
+ *   dark/min auf --vz-bg             bei alpha=0.7: 2.30:1 < 3:1
+ */
+
+/**
+ * Die Sperr-Deckkraft — aus dem Blatt gelesen, nicht als Zahl hier hingeschrieben.
+ * Wer `opacity: 0.7` an der gesperrten Kachel ändert, ändert damit auch das, wogegen
+ * diese Ratsche misst; ein Literal hier würde die Verbindung kappen.
+ */
+const LOCKED_ALPHA = (() => {
+  const rule = /\.vz-tile\.locked\s+\.vz-tile-body[^{]*\{([^}]*)\}/.exec(CSS);
+  expect(rule, "Regel `.vz-tile.locked .vz-tile-body` fehlt in ionic.css").not.toBeNull();
+  const opacity = /opacity\s*:\s*([0-9.]+)/.exec(rule![1]!);
+  expect(opacity, "die gesperrte Kachel dämpft nicht mehr per opacity").not.toBeNull();
+  return Number(opacity![1]);
+})();
+
+/**
+ * Genau die Token, deren 0.7 aus der Deklaration gefallen ist: die Akzente, die
+ * SELBST Fläche sein können (sie stehen in `a11y.grounds`, weil die Ink auf ihnen
+ * liegt) und die zugleich Text tragen. `--vz-accent-ink` fällt damit heraus — es ist
+ * Tinte AUF dem Akzent, nie Fläche, und hatte nie eine 0.7 abzugeben.
+ */
+const GROUND_TOKENS = new Set(a11y.grounds.map((g) => g.token));
+const DUAL_ROLE = Object.entries(a11y.tokens)
+  .filter(([name, e]) => e.role === "text" && GROUND_TOKENS.has(name))
+  .map(([name]) => name)
+  .sort();
+
+/** Dieselben Fälle wie oben, nur mit der Sperr-Deckkraft und der Grafikschwelle. */
+const DIMMED: Case[] = [];
+for (const theme of MEASURED) {
+  for (const { label, value } of STOPS) {
+    for (const token of DUAL_ROLE) {
+      const raw = tokenValue(theme, token);
+      if (raw === undefined) continue;
+      const fg = color(theme, raw, value);
+      if (fg === null) continue;
+      const entry = a11y.tokens[token]!;
+      const targets = entry.on && entry.on.length > 0 ? entry.on : a11y.grounds.map((g) => g.token);
+      for (const target of targets) {
+        const bg = ground(theme, target, value);
+        if (bg === null) continue;
+        DIMMED.push({
+          theme,
+          stop: label,
+          token,
+          on: target,
+          alpha: LOCKED_ALPHA,
+          threshold: THRESHOLDS.graphic!,
+          ratio: contrast(over(fg, bg, LOCKED_ALPHA), bg),
+        });
+      }
+    }
+  }
+}
+
+describe("der Akzent hält als gesperrte Grafik seine eigene Schwelle", () => {
+  it("die gedämpften Fälle sind überhaupt zusammengekommen", () => {
+    // Ohne diese Zeile wäre die Ratsche mit einer leeren Liste grün — und die 270
+    // Paarungen, für die sie einspringt, wären lautlos verschwunden.
+    expect(DUAL_ROLE.length).toBe(9);
+    expect(DIMMED.length).toBeGreaterThan(200);
+    // Und: die Deklaration hat die 0.7 wirklich abgegeben. Holt jemand sie zurück,
+    // misst der Generator wieder selbst und diese Ratsche wird überflüssig — dann
+    // soll sie brechen, statt still doppelt zu prüfen.
+    for (const token of DUAL_ROLE) expect(a11y.tokens[token]!.alphas).toEqual([1]);
+  });
+
+  it.each(DUAL_ROLE)("%s bei gesperrter Kachel", (token) => {
+    const broken = DIMMED.filter((c) => c.token === token && c.ratio < c.threshold).map(
+      (c) =>
+        `${c.theme}/${c.stop} auf ${c.on} bei alpha=${c.alpha}: ${c.ratio.toFixed(2)}:1 < ${c.threshold}:1`,
+    );
+    expect(broken, `${token} reisst gedämpft:\n  ${broken.join("\n  ")}`).toEqual([]);
+  });
+});

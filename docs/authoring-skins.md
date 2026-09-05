@@ -91,11 +91,14 @@ pnpm install        # neues Paket verlinken
   erlaubt — dann darf `link` aber auch nicht dastehen (Goldene Regel 3). Zeichnest du ihn,
   dann ausschliesslich über die Host-Dienste `resolveLink` / `followLink` / `isLinkActive` /
   `linkLabel` am `PageHost`; ein eigener Abstieg durch den `navTree` ist ein Regelbruch
-  (Goldene Regel 4). Der Lauf MISST das: er fährt deinen Page-Renderer über einen
-  protokollierenden Host, ruft jeden gefundenen Klick-Handler mit einem
-  Stellvertreter-Ereignis auf (auch in Komponenten, auch hinter einem `await`) und
-  verlangt, dass einer davon `host.followLink` ruft. Fällt die Probe, steht der Befund
-  als `layout.honorsFindings` **in** `support.json` — nicht nur im Exit-Code des Laufs.
+  (Goldene Regel 4). Der Lauf MISST das, und zwar am echten DOM: er montiert deinen
+  Page-Renderer mit Vue in ein jsdom-Dokument, klickt jedes **erreichbare** Element mit
+  einem nativen `MouseEvent` an (deaktivierte und `inert` gestellte Elemente bleiben
+  aussen vor, wie im Browser) und verlangt, dass **jede** angebotene Link-Form ihr Ziel
+  über `host.followLink` erreicht — nicht bloss irgendein Aufruf. Fällt die Probe, steht
+  der Befund als `layout.honorsFindings` **in** `support.json`, nicht nur im Exit-Code.
+  Kann der Lauf gar nicht montieren (kein DOM verfügbar), sagt er `unmeasured` statt
+  stillschweigend zu bestehen.
 - `renderers.ts` → ersetze `placeholderTile` Stück für Stück durch echte Renderer. Lagere
   pro Typ in `src/tiles/<type>.ts` aus (vgl. `packages/skins/terminal/src/tiles/`). Jede
   Funktion hat die Signatur `(d, t, ctx) => VNode` (Vue `h()`).
@@ -306,9 +309,10 @@ Form-Tests gegen die Vertrags-Fixtures, sobald du die Platzhalter ersetzt
 
 Im App-Repo (`openbridgeserver`, Visu-Integration):
 
-1. **Dev-Link** in `apps/visu/package.json` ergänzen. Der Pfad ist **absolut**, wie bei
-   den bestehenden Einträgen:
-   `"@obs-visu-skins/<name>": "link:/Volumes/Daten/Projekte/openbridge/obs-visu-skins/packages/skins/<name>"`,
+1. **Dev-Link** in `apps/visu/package.json` ergänzen. Der Pfad ist **absolut** und
+   zeigt auf DEINEN Checkout — er steht so auch bei den bestehenden Einträgen, ist aber
+   maschinenspezifisch: kopierst du ihn wörtlich, findet `pnpm install` das Ziel nicht.
+   `"@obs-visu-skins/<name>": "link:<dein-checkout>/obs-visu-skins/packages/skins/<name>"`,
    dann `pnpm install`.
 2. **Stylesheet importieren** — sonst rendert die Seite unformatiertes Markup, während
    die jsdom-Tests grün bleiben (Struktur sind keine Pixel):
