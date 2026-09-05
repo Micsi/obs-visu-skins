@@ -1600,3 +1600,60 @@ describe("honors-Achse — nicht messen ist kein Bestehen, und ein Wurf ist ein 
     expect(findings.map((f) => f.problem)).toEqual(["undelivered"]);
   });
 });
+
+describe("Riegel 10 — Farbe aus dem Renderer, nicht aus dem Blatt", () => {
+  const SHEET_PATH = "./probe.css";
+  const PASSING = '.p{--bg:#ffffff;--fg:#000000}';
+  const A11Y = {
+    stylesheet: SHEET_PATH,
+    themes: { dark: ".p" },
+    grounds: [{ token: "--bg" }],
+    tokens: { "--bg": { role: "ground" }, "--fg": { role: "text" } },
+  };
+
+  function skinWith(tile: Renderer) {
+    return {
+      manifest: {
+        name: "probe",
+        targetsContract: contractVersion,
+        unsupported: CORE_WIDGET_TYPES.filter((t) => t !== "switch"),
+        widgets: { switch: {} },
+        layout: { model: "grid", honors: [] },
+        a11y: A11Y,
+      } as unknown as SkinManifest,
+      tiles: { switch: tile },
+      styles: { [SHEET_PATH]: PASSING },
+    };
+  }
+
+  it("ein Farbliteral im `style`-Prop ist ein Befund", async () => {
+    // Die Farb-Achse sieht sonst nur Stylesheets: ein Renderer konnte eine
+    // unbeteiligte, bestandene Palette deklarieren und trotzdem `#777` ueber eine
+    // helle Flaeche legen.
+    const tile: Renderer = () => vh("div", { style: { color: "#777777" } }) as never;
+    const { report } = await generateSupport(skinWith(tile));
+    expect(report.a11y?.findings.map((f) => f.detail).join(" ")).toContain("Renderer-Inline-Stil");
+    expect(report.a11y?.status).toBe("fail");
+  });
+
+  it("dieselbe Farbe in rohem Markup ebenso", async () => {
+    const tile: Renderer = () => vh("div", { innerHTML: '<b style="color:#777">x</b>' }) as never;
+    const { report } = await generateSupport(skinWith(tile));
+    expect(report.a11y?.findings.map((f) => f.detail).join(" ")).toContain("Renderer-Inline-Stil");
+  });
+
+  it("ein `var()` auf einen deklarierten Token ist in Ordnung", async () => {
+    // Die Gegenprobe: der Riegel darf nicht jeden Inline-Stil verbieten — genau so
+    // soll ein Renderer die Palette benutzen.
+    const tile: Renderer = () => vh("div", { style: { color: "var(--fg)" } }) as never;
+    const { report } = await generateSupport(skinWith(tile));
+    expect(report.a11y?.findings).toEqual([]);
+    expect(report.a11y?.status).toBe("pass");
+  });
+
+  it("ein Inline-Stil ohne Farbe ist keiner", async () => {
+    const tile: Renderer = () => vh("div", { style: { fontWeight: 600, gap: "4px" } }) as never;
+    const { report } = await generateSupport(skinWith(tile));
+    expect(report.a11y?.findings).toEqual([]);
+  });
+});

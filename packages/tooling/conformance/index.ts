@@ -881,6 +881,70 @@ export function collectActions(
   return out;
 }
 
+/**
+ * Die INLINE-Stile, die ein gerenderter Baum trägt — `style`-Props und `style="…"` in
+ * rohem Markup.
+ *
+ * Die Farb-Achse sieht sonst nur die Stylesheets. Ein Renderer, der
+ * `style: { color: "#777" }` über eine helle Fläche legt, konnte damit eine
+ * unbeteiligte, bestandene Palette deklarieren und trotzdem `a11y.status: "pass"`
+ * bekommen — die Farbe stand in keinem Blatt, also sah niemand sie.
+ *
+ * Gesammelt wird die Deklaration in derselben Form, in der auch ein Blatt sie führt
+ * (`prop: value`), damit die Farb-Achse sie mit demselben eigenschaftsbewussten Scan
+ * beurteilt: was eine Farbe an einer Farb-Eigenschaft ist, ist ein Befund; ein
+ * `var(--token)` auf einen klassifizierten Token ist in Ordnung.
+ */
+export function collectInlineStyles(
+  node: unknown,
+  out: Set<string> = new Set(),
+  depth = 0,
+): Set<string> {
+  if (depth > 64 || node === null || node === undefined) return out;
+
+  if (typeof node === "string") {
+    // Rohes Markup: `style="…"` mit den drei gültigen Quotierungen.
+    const ATTR = /style\s*=\s*(?:"([^"]*)"|'([^']*)')/g;
+    for (const m of node.matchAll(ATTR)) {
+      const decls = m[1] ?? m[2] ?? "";
+      for (const part of decls.split(";")) if (part.includes(":")) out.add(part.trim());
+    }
+    return out;
+  }
+  if (Array.isArray(node)) {
+    for (const child of node) collectInlineStyles(child, out, depth + 1);
+    return out;
+  }
+  if (typeof node !== "object") return out;
+
+  const vnode = node as { props?: Record<string, unknown> | null; children?: unknown };
+
+  // Rohes Markup steht bei Vue in einem String-PROP (`innerHTML`), nicht in den
+  // Kindern — dort escapt Vue es. Jeder String-Prop wird deshalb mitgelesen; der
+  // Regex greift nur auf `style="…"`, ein Fehlalarm ist also nicht zu befürchten.
+  for (const [name, value] of Object.entries(vnode.props ?? {})) {
+    if (name === "style" || typeof value !== "string") continue;
+    collectInlineStyles(value, out, depth + 1);
+  }
+
+  const style = vnode.props?.["style"];
+  if (typeof style === "string") {
+    for (const part of style.split(";")) if (part.includes(":")) out.add(part.trim());
+  } else if (style !== null && typeof style === "object") {
+    for (const [prop, value] of Object.entries(style as Record<string, unknown>)) {
+      if (value === null || value === undefined) continue;
+      // Vue erlaubt camelCase; das Blatt kennt nur die Bindestrich-Form.
+      const dashed = prop.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`);
+      out.add(`${dashed}: ${String(value)}`);
+    }
+  }
+
+  const expanded = expandComponent(vnode as never);
+  if (expanded !== undefined) collectInlineStyles(expanded, out, depth + 1);
+  if (vnode.children !== undefined) collectInlineStyles(vnode.children, out, depth + 1);
+  return out;
+}
+
 /** Name einer Renderer-Funktion für die Herkunftsangabe im Report. */
 function implName(render: Renderer): string {
   const name = (render as { name?: string }).name;
@@ -902,7 +966,11 @@ interface SurfaceRun {
  * Reine Funktionsaufrufe — Vue-`h()` braucht kein DOM. Wirft ein Renderer, ist der Typ
  * `broken` (Fehler, kein stilles Überspringen).
  */
-function renderAll(type: CoreWidgetType, surfaces: readonly [string, Renderer][]): SurfaceRun {
+function renderAll(
+  type: CoreWidgetType,
+  surfaces: readonly [string, Renderer][],
+  inlineStyles?: Set<string>,
+): SurfaceRun {
   const states = FIXTURES[type] ?? {};
   const ctx = ctxStub();
   const marked = new Set<string>();
@@ -913,7 +981,9 @@ function renderAll(type: CoreWidgetType, surfaces: readonly [string, Renderer][]
     for (const state of Object.keys(states)) {
       const device = { type, id: `${type}.${state}`, ...states[state] } as never;
       try {
-        collectActions(fn(device, tokensStub, ctx), marked);
+        const tree = fn(device, tokensStub, ctx);
+        collectActions(tree, marked);
+        if (inlineStyles) collectInlineStyles(tree, inlineStyles);
         done.add(state);
       } catch (err: unknown) {
         return {
@@ -934,6 +1004,7 @@ function classify(
   type: CoreWidgetType,
   manifest: SkinManifest,
   skin: SkinInput,
+  inlineStyles?: Set<string>,
 ): SupportWidgetEntry {
   const declaredUnsupported = manifest.unsupported.includes(type);
   const entry = manifest.widgets[type];
@@ -960,7 +1031,7 @@ function classify(
   const preset = skin.presets?.[type];
   if (typeof preset === "function") surfaces.push(["preset", preset]);
 
-  const run = renderAll(type, surfaces);
+  const run = renderAll(type, surfaces, inlineStyles);
   const canonical = canonicalActions(type);
   const declared = new Set<string>(entry.actions);
   const tolerated = toleratedActions(type);
@@ -1050,8 +1121,16 @@ export async function generateSupport(
     broken: 0,
   };
 
+  /**
+   * Die Inline-Stile ALLER Renderer-Flächen — sie entstehen beim ohnehin laufenden
+   * Render-Durchgang und gehen unten in die Farb-Achse. Ohne sie sähe die Achse nur
+   * die Stylesheets, und `style: { color: "#777" }` über einer hellen Fläche käme an
+   * ihr vorbei.
+   */
+  const inlineStyles = new Set<string>();
+
   for (const type of CORE_WIDGET_TYPES) {
-    const entry = classify(type, manifest, skin);
+    const entry = classify(type, manifest, skin, inlineStyles);
     widgets[type] = entry;
     summary[entry.level] += 1;
   }
@@ -1083,7 +1162,7 @@ export async function generateSupport(
     // Skin nichts deklariert: dann als `undeclared`, ausdruecklich unterscheidbar
     // von `pass` (Goldene Regel 3). AA ist Pflicht (Regel 6), deshalb zaehlt alles
     // ausser `pass` unten als harter Fehler.
-    a11y: measureA11y({ manifest, styles: skin.styles }),
+    a11y: measureA11y({ manifest, styles: skin.styles, inlineStyles: [...inlineStyles] }),
   };
 
   const a11yFailed = report.a11y?.status !== "pass";

@@ -1179,6 +1179,13 @@ export interface A11yInput {
    * und ein fehlendes Stylesheet ein BEFUND wird statt einer Ausnahme.
    */
   readonly styles?: Readonly<Record<string, string>>;
+  /**
+   * INLINE-Deklarationen aus den gerenderten Bäumen (`prop: value`), eingesammelt vom
+   * Render-Durchgang. Sie stehen in keinem Blatt und wären sonst unsichtbar: ein
+   * Renderer mit `style: { color: "#777" }` über einer hellen Fläche konnte eine
+   * unbeteiligte, bestandene Palette deklarieren und trotzdem `pass` bekommen.
+   */
+  readonly inlineStyles?: readonly string[];
 }
 
 const UNDECLARED: SupportA11y = {
@@ -1749,6 +1756,41 @@ export function measureA11y(input: A11yInput): SupportA11y {
         findings.push({
           problem: "unclassified",
           detail: `${selector}: ${name} = "${value}" trägt Farbe, ist aber keine flache Farbe — als exempt mit Begründung führen`,
+        });
+      }
+    }
+
+    // Riegel 10 — Farbe aus dem RENDERER, nicht aus dem Blatt.
+    //
+    // Dieselbe Regel wie oben, nur für die Inline-Stile der gerenderten Bäume: eine
+    // Farbe muss über einen deklarierten Token laufen. Ein Renderer, der
+    // `style: { color: "#777" }` über eine helle Fläche legt, kam der Farb-Achse
+    // sonst gar nicht unter — sie sieht Stylesheets, und dort steht diese Farbe nie.
+    for (const declaration of input.inlineStyles ?? []) {
+      const cut = declaration.indexOf(":");
+      if (cut <= 0) continue;
+      const prop = declaration.slice(0, cut).trim();
+      const value = declaration.slice(cut + 1).trim();
+      if (value.length === 0 || !colorProperty(prop)) continue;
+      if (TEXT_COLOR_PROPERTIES.has(prop.toLowerCase()) && /\btransparent\b/i.test(value)) {
+        findings.push({
+          problem: "unclassified",
+          detail: `Renderer-Inline-Stil ${prop}: ${value} — unsichtbarer Text.`,
+        });
+        continue;
+      }
+      if (bearsColor(value)) {
+        findings.push({
+          problem: "unclassified",
+          detail: `Renderer-Inline-Stil ${prop}: ${value} — eine Farbe aus dem Renderer, an a11y.tokens vorbei. Führe sie über einen deklarierten Token (var(--…)).`,
+        });
+        continue;
+      }
+      for (const name of varNamesIn(value)) {
+        if (name in decl.tokens) continue;
+        findings.push({
+          problem: "unclassified",
+          detail: `Renderer-Inline-Stil ${prop}: ${value} — ${name} steht nicht in a11y.tokens, ist also ungemessen`,
         });
       }
     }
