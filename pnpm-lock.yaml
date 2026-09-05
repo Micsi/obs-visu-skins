@@ -154,6 +154,12 @@ importers:
         specifier: ^3.5.0
         version: 3.5.35(typescript@5.9.3)
 
+  packages/tooling/docs-guard:
+    devDependencies:
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.19.20)(jsdom@25.0.1)
+
   packages/tooling/fixture-wand:
     dependencies:
       '@obs-visu-skins/conformance':

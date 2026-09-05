@@ -6,25 +6,42 @@ ein `renderers.ts` (eine reine Renderer-Funktion je Kern-Typ, adressiert über
 Vertrag `@obs/visu-contract`. Dieser Guide ist der End-to-End-Workflow vom leeren Ordner
 bis zum in der App registrierten Skin.
 
-## Goldene Regeln (immer)
+## Goldene Regeln (Wiedergabe — verbindlich ist das README)
 
-1. **Kein State.** Renderer sind reine Funktionen über schreibgeschützte Daten; nie
-   `d.x = …`. Gesten markierst du nur als `data-action="<kanonische Aktion>"` — der Host
-   besitzt allein den State und übersetzt Gesten.
-2. **Adressierung über den Typ-Schlüssel** (`tiles[type]`) — niemals ein `switch` mit
-   stillem Default. Fehlt ein Eintrag und ist der Typ nicht `unsupported`, ist das eine
-   `gap`.
-3. **`unsupported` ist Pflicht.** Was dein Skin nicht rendert, deklarierst du ehrlich
-   (z. B. `"unsupported": ["camera", "media"]`). Wähle nur ab, was wirklich nicht zu
-   deinem Modell passt — eine pauschale Abwahl stellt den Typ still und nimmt dir die
-   `gap`-Meldung, wenn der Vertrag ihn später erweitert. Rendert dein Skin alles, bleibt
-   die Angabe als leeres Array stehen.
-4. **AA-Pflicht — und sie wird GEMESSEN.** Farben im Renderer nur über die
-   `Tokens`-Helfer (`t.accent`, `t.accentInk`); die eigentliche Palette lebt in deinem
-   Stylesheet und wird in `manifest.json → a11y` deklariert. Der Konformitätslauf liest
-   dein Blatt und rechnet WCAG darauf — auch an den Extremen jedes farbwirksamen Tweaks.
-   Ohne `a11y`-Block meldet er `undeclared` und wird rot: AA ist Pflicht, und
-   „ungemessen" ist nicht dasselbe wie „bestanden" (Schritt 3a).
+Verbindlich sind die **Goldenen Regeln** in `README.md`; dort stehen sie vollständig und
+durchnummeriert. Diese Liste gibt die wieder, die dich beim Bauen unmittelbar treffen —
+im Wortlaut des README, unter dessen Nummer, ergänzt um die Praxis. Weicht sie ab, gilt
+das README, und die Abweichung ist ein Fehler in diesem Guide.
+
+Die Form ist deshalb vorgeschrieben und wird von `packages/tooling/docs-guard` gemessen:
+jeder Punkt beginnt mit `**Regel <n>** · ` und danach wörtlich mit dem Satz aus dem
+README, die eigene Erläuterung folgt erst dahinter. Jeder Verweis weiter unten lautet
+`(Goldene Regel <n>: **<Wortlaut aus dem README>**)` — die Nummer allein wäre nach einer
+Umnummerierung still falsch, ohne dass es jemandem auffällt.
+
+- **Regel 2** · Renderer werden **nach Typ adressiert**, nicht erraten (kein `switch` mit
+  stillem Default). Der Schlüssel ist `tiles[type]`. Fehlt ein Eintrag und ist der Typ
+  nicht `unsupported`, ist das eine `gap`.
+- **Regel 3** · **„Nicht unterstützt" ist eine Pflichtangabe** (`unsupported`), kein
+  Zufall. Was dein Skin nicht rendert, deklarierst du ehrlich (z. B.
+  `"unsupported": ["camera", "media"]`). Wähle nur ab, was wirklich nicht zu deinem
+  Modell passt — eine pauschale Abwahl stellt den Typ still und nimmt dir die
+  `gap`-Meldung, wenn der Vertrag ihn später erweitert. Rendert dein Skin alles, bleibt
+  die Angabe als leeres Array stehen.
+- **Regel 4** · **Der Skin besitzt nie State.** Renderer sind reine Funktionen über
+  schreibgeschützte Daten; nie `d.x = …`. Gesten markierst du nur als
+  `data-action="<kanonische Aktion>"` — der Host besitzt allein den State und übersetzt
+  Gesten.
+- **Regel 5** · **Reihenfolge + Gruppierung sind der unverhandelbare Layout-Boden**;
+  Rollen/Spans sind additiv und ignorierbar. Was dein Layout darüber hinaus wirklich
+  beherrscht, deklarierst du in `manifest.json → layoutHonors` (Schritt 2) — und der Lauf
+  misst es am echten DOM (Schritt 3).
+- **Regel 6** · **AA-Kontrast ist Pflicht**, auch an den Tweak-Extremen. Farben im
+  Renderer nur über die `Tokens`-Helfer (`t.accent`, `t.accentInk`); die eigentliche
+  Palette lebt in deinem Stylesheet und wird in `manifest.json → a11y` deklariert. Der
+  Konformitätslauf liest dein Blatt und rechnet WCAG darauf — auch an den Extremen jedes
+  farbwirksamen Tweaks. Ohne `a11y`-Block meldet er `undeclared` und wird rot: AA ist
+  Pflicht, und „ungemessen" ist nicht dasselbe wie „bestanden" (Schritt 3a).
 
 ## 0. Setup
 
@@ -88,15 +105,17 @@ pnpm install        # neues Paket verlinken
   `nav` erst mit eigener Navigation, `link` (ab Vertrag 1.12) erst, wenn du das Sprungziel
   eines platzierten Elements (`LayerItem.link`) auch wirklich als Affordanz zeichnest.
   `link` steckt **nicht** in `layers`: Layer zu rendern und den Link fallenzulassen ist
-  erlaubt — dann darf `link` aber auch nicht dastehen (Goldene Regel 3). Zeichnest du ihn,
+  erlaubt — dann darf `link` aber auch nicht dastehen
+  (Goldene Regel 3: **„Nicht unterstützt" ist eine Pflichtangabe**). Zeichnest du ihn,
   dann ausschliesslich über die Host-Dienste `resolveLink` / `followLink` / `isLinkActive` /
   `linkLabel` am `PageHost`; ein eigener Abstieg durch den `navTree` ist ein Regelbruch
-  (Goldene Regel 4). Der Lauf MISST das, und zwar am echten DOM: er montiert deinen
-  Page-Renderer mit Vue in ein jsdom-Dokument, klickt jedes **erreichbare** Element mit
-  einem nativen `MouseEvent` an (deaktivierte und `inert` gestellte Elemente bleiben
-  aussen vor, wie im Browser) und verlangt, dass **jede** angebotene Link-Form ihr Ziel
-  über `host.followLink` erreicht — nicht bloss irgendein Aufruf. Fällt die Probe, steht
-  der Befund als `layout.honorsFindings` **in** `support.json`, nicht nur im Exit-Code.
+  (Goldene Regel 4: **Der Skin besitzt nie State**). Der Lauf MISST das, und zwar am echten
+  DOM: er montiert deinen Page-Renderer mit Vue in ein jsdom-Dokument, klickt jedes
+  **erreichbare** Element mit einem nativen `MouseEvent` an (deaktivierte und `inert`
+  gestellte Elemente bleiben aussen vor, wie im Browser) und verlangt, dass **jede**
+  angebotene Link-Form ihr Ziel über `host.followLink` erreicht — nicht bloss irgendein
+  Aufruf. Fällt die Probe, steht der Befund als `layout.honorsFindings` **in**
+  `support.json`, nicht nur im Exit-Code.
   Kann der Lauf gar nicht montieren (kein DOM verfügbar), sagt er `unmeasured` statt
   stillschweigend zu bestehen.
 - `renderers.ts` → ersetze `placeholderTile` Stück für Stück durch echte Renderer. Lagere
@@ -220,7 +239,7 @@ Dazu:
   `tweakStops: ["default"]` — die Aussage bleibt nachlesbar.
 - **`undeclared` ≠ `pass`.** Ohne `a11y`-Block steht im Report ausdrücklich
   `"status": "undeclared"` — unterscheidbar von einem Skin, der deklariert und besteht
-  (Goldene Regel 3).
+  (Goldene Regel 3: **„Nicht unterstützt" ist eine Pflichtangabe**).
 - **Themes borgen sich nichts.** Gemessen wird je Theme mit den Blöcken, die in DIESES
   Theme kaskadieren. Ein gemeinsamer Block (`.mein-root { … }`) zählt in jedem Theme,
   der Block eines anderen Themes in keinem. Fehlt ein Token im dunklen Block, ist das
