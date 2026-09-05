@@ -1343,3 +1343,56 @@ describe("die Kaskade entscheidet ein echtes Element, keine Zeichenkette", () =>
     expect(r.status).toBe("pass");
   });
 });
+
+describe("der Scan gewöhnlicher Deklarationen kennt die Eigenschaft, nicht nur den Wert", () => {
+  function scan(css: string) {
+    const decl = {
+      stylesheet: SHEET,
+      themes: { dark: ".p" },
+      grounds: [{ token: "--bg" }],
+      tokens: { "--bg": { role: "ground" }, "--fg": { role: "text" } },
+    };
+    return measure(decl, `.p{--bg:#ffffff;--fg:#000000}\n${css}`);
+  }
+
+  it("ein Farbliteral an einer Farb-Eigenschaft ist ein Befund", () => {
+    expect(scan(".x{color:#d6a800}").findings.map((f) => f.problem)).toContain("unclassified");
+    expect(scan(".x{outline:2px solid #d6a800}").findings.map((f) => f.problem)).toContain(
+      "unclassified",
+    );
+  });
+
+  it("ein Farbwort an einer NICHT-Farb-Eigenschaft ist keiner", () => {
+    // `animation: red 1s` mit `@keyframes red` ist ein Bezeichner, keine Farbe. Die
+    // wertratende Prüfung meldete ihn und kippte damit einen konformen Skin.
+    expect(scan("@keyframes red{from{opacity:0}}\n.x{animation:red 1s}").findings).toEqual([]);
+    expect(scan(".x{grid-area:tomato}").findings).toEqual([]);
+    expect(scan(".x{font-weight:600}").findings).toEqual([]);
+  });
+
+  it("`transparent` an `color` ist unsichtbarer Text — an einem Grund nicht", () => {
+    expect(scan(".x{color:transparent}").findings.map((f) => f.problem)).toContain("unclassified");
+    expect(scan(".x{background:transparent}").findings).toEqual([]);
+  });
+
+  it("ein `var()` OHNE Rückfall muss auf einen deklarierten Token zeigen", () => {
+    // `color: var(--inkx)` mit unbekanntem `--inkx` ist im Browser ungültig und ERBT
+    // — auf schwarzem Grund Schwarz auf Schwarz, während eine unbeteiligte, bestandene
+    // Palette den Lauf grün hielt. Das Wort-Prädikat sah hier gar keine Farbe.
+    const r = scan(".x{color:var(--inkx)}");
+    expect(r.findings.map((f) => f.detail).join(" ")).toContain("--inkx");
+    expect(r.status).toBe("fail");
+  });
+
+  it("ein `var()` MIT Rückfall ist gedeckt", () => {
+    // `var(--acc-bar, var(--fg))` heisst "der Host darf überschreiben, sonst gilt
+    // --fg". Genau dieses Muster steht in allen drei Skins.
+    expect(scan(".x{color:var(--acc-bar, var(--fg))}").findings).toEqual([]);
+  });
+
+  it("der Rückfall selbst wird mitgeprüft", () => {
+    // Sonst wäre der Rückfall das neue Versteck.
+    const r = scan(".x{color:var(--acc-bar, var(--unbekannt))}");
+    expect(r.findings.map((f) => f.detail).join(" ")).toContain("--unbekannt");
+  });
+});

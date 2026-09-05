@@ -544,6 +544,111 @@ export const COLOR_SHAPED =
  * `border` (enthält „red") nicht anschlägt.
  */
 /**
+ * Die Eigenschaften, an denen CSS eine Farbe erwartet — der Ort, an dem gesucht wird.
+ *
+ * Eine Liste statt einer Werte-Heuristik, weil die Menge dieser Eigenschaften endlich
+ * und bekannt ist, die Menge der Werte aber nicht: `red` ist an `color` eine Farbe und
+ * an `animation` ein Bezeichner (`@keyframes red`), und kein Blick auf den Wert allein
+ * kann die beiden auseinanderhalten.
+ *
+ * Die Grenze der Liste ist zugleich die Grenze des Scans: eine Farbe an einer hier
+ * nicht genannten Eigenschaft bliebe ungesehen. Deshalb stehen auch die Kurzformen
+ * (`border`, `outline`, `background`) und die Zeichen-Eigenschaften (`fill`, `stroke`)
+ * drin, nicht nur die `-color`-Langformen.
+ */
+const COLOR_PROPERTIES = new Set([
+  "color",
+  "background",
+  "background-color",
+  "background-image",
+  "border",
+  "border-color",
+  "border-top",
+  "border-right",
+  "border-bottom",
+  "border-left",
+  "border-top-color",
+  "border-right-color",
+  "border-bottom-color",
+  "border-left-color",
+  "border-block-color",
+  "border-inline-color",
+  "border-image",
+  "border-image-source",
+  "outline",
+  "outline-color",
+  "text-decoration",
+  "text-decoration-color",
+  "text-emphasis-color",
+  "text-shadow",
+  "box-shadow",
+  "caret-color",
+  "accent-color",
+  "column-rule",
+  "column-rule-color",
+  "fill",
+  "stroke",
+  "stop-color",
+  "flood-color",
+  "lighting-color",
+  "scrollbar-color",
+  "mask",
+  "mask-image",
+  "-webkit-text-fill-color",
+  "-webkit-text-stroke-color",
+  "-webkit-text-stroke",
+]);
+
+/**
+ * Die Teilmenge, an der Farbe TEXT sichtbar macht. Nur dort ist `transparent` ein
+ * Befund (unsichtbarer Text); an einem Hintergrund ist Farblosigkeit normal.
+ */
+const TEXT_COLOR_PROPERTIES = new Set([
+  "color",
+  "-webkit-text-fill-color",
+  "-webkit-text-stroke-color",
+  "-webkit-text-stroke",
+]);
+
+function colorProperty(prop: string): boolean {
+  return COLOR_PROPERTIES.has(prop.toLowerCase());
+}
+
+/**
+ * Die `var()`-Namen in diesem Wert, auf die sich die Deklaration WIRKLICH verlässt —
+ * also die ohne Rückfall.
+ *
+ * Ein Verweis mit Rückfall ist gedeckt: `var(--acc-bar, var(--acc))` heisst "der Host
+ * darf überschreiben, sonst gilt `--acc`", und was gemessen werden muss, ist `--acc`.
+ * Genau dieses Muster steht in ionic, edomi und terminal, und es als Lücke zu melden
+ * wäre falsch. Ohne Rückfall ist der Verweis dagegen im Browser ungültig, sobald der
+ * Name fehlt — `color: var(--inkx)` ERBT dann, auf schwarzem Grund also Schwarz auf
+ * Schwarz, während eine unbeteiligte, bestandene Palette den Lauf grün hält.
+ *
+ * (Dass ein Host-Override selbst ungemessen bleibt, ist eine eigene Frage und steht
+ * als eigener Befund — sie gehört nicht hierher.)
+ */
+function varNamesIn(value: string): string[] {
+  const names: string[] = [];
+  let parsed;
+  try {
+    parsed = valueParser(value);
+  } catch {
+    return names;
+  }
+  parsed.walk((node) => {
+    if (node.type !== "function" || node.value.toLowerCase() !== "var") return undefined;
+    const first = node.nodes[0];
+    const divider = node.nodes.findIndex((n) => n.type === "div" && n.value === ",");
+    if (divider < 0 && first?.type === "word" && first.value.startsWith("--")) {
+      names.push(first.value);
+    }
+    return undefined; // in den Rückfall absteigen: dort gilt dieselbe Regel
+  });
+  return names;
+}
+
+/**
  * Trägt dieser Wert IRGENDWO eine Farbe?
  *
  * Die Frage ist eine andere als „ist das eine Farbe" ({@link resolveColor}): hier
@@ -1516,14 +1621,46 @@ export function measureA11y(input: A11yInput): SupportA11y {
     // und keinen erklärten Grund, und ein stilles Überspringen wäre wieder genau
     // der Ausweg, den diese Datei sonst überall zumauert.
     for (const [selector, prop, value] of allPlainDeclarations(sources)) {
-      // Strings und `url()` überspringt `bearsColor` selbst — sie können `#…`
-      // enthalten (`url(#gradient)`, `content: "#1"`), ohne Farbe zu tragen, und ein
-      // falsch anschlagender Wächter wird ignoriert.
-      if (!bearsColor(value)) continue;
-      findings.push({
-        problem: "unclassified",
-        detail: `${selector}: ${prop}: ${value} — eine Farbe an a11y.tokens vorbei. Führe sie über einen deklarierten Token (var(--…)), sonst ist sie ungemessen.`,
-      });
+      // Der Scan ist EIGENSCHAFTSBEWUSST, nicht wertratend. Vorher lief jeder Wert
+      // durch `bearsColor`, und das erzeugte Fehlalarm in beide Richtungen:
+      //  - `animation: red 1s` mit `@keyframes red` ist ein Bezeichner, keine Farbe,
+      //    wurde aber als `unclassified` gemeldet und kippte den Lauf;
+      //  - `color: var(--inkx)` enthielt gar kein Farbwort, wurde deshalb
+      //    übersprungen — und ein fehlender oder unklassifizierter Token blieb
+      //    unbemerkt, obwohl `color` dann erbt (Schwarz auf Schwarz).
+      // Wo Farbe stehen KANN, sagt die Eigenschaft; was dort steht, sagt der Wert.
+      if (!colorProperty(prop)) continue;
+
+      // 1a) `transparent` ist keine Farbe im Sinne von `bearsColor` (an einem Grund
+      //     ist Farblosigkeit normal und harmlos) — an einer TEXT-Eigenschaft ist sie
+      //     unsichtbarer Text und damit sehr wohl ein Befund.
+      if (TEXT_COLOR_PROPERTIES.has(prop.toLowerCase()) && /\btransparent\b/i.test(value)) {
+        findings.push({
+          problem: "unclassified",
+          detail: `${selector}: ${prop}: ${value} — unsichtbarer Text. Ein Vordergrund ohne Deckkraft ist nicht messbar und für den Leser nicht da.`,
+        });
+        continue;
+      }
+
+      // 1b) Eine Farbe direkt im Wert: nicht messbar, weil ohne Namen, Rolle und
+      //     erklärten Grund.
+      if (bearsColor(value)) {
+        findings.push({
+          problem: "unclassified",
+          detail: `${selector}: ${prop}: ${value} — eine Farbe an a11y.tokens vorbei. Führe sie über einen deklarierten Token (var(--…)), sonst ist sie ungemessen.`,
+        });
+        continue;
+      }
+
+      // 2) Ein Verweis auf einen Token, den die Deklaration nicht kennt: `color:
+      //    var(--inkx)` mit unbekanntem `--inkx` ist im Browser ungültig und ERBT.
+      for (const name of varNamesIn(value)) {
+        if (name in decl.tokens) continue;
+        findings.push({
+          problem: "unclassified",
+          detail: `${selector}: ${prop}: ${value} — ${name} steht nicht in a11y.tokens, ist also ungemessen`,
+        });
+      }
     }
   }
 
