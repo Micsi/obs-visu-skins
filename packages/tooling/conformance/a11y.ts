@@ -114,6 +114,12 @@ interface Rule {
    */
   readonly conditional: boolean;
   /**
+   * WOMIT der Block ausserhalb der gemessenen Standard-Umgebung steht — leer, wenn
+   * er drin ist. Der Name wandert in den Befund, damit der Autor weiss, wo zu
+   * suchen ist: `@media (…)`, `@keyframes puls`, `@scope (.preview)`.
+   */
+  readonly outside: string;
+  /**
    * Die `@layer`, in der der Block steht — leer für unlayered. Die Kaskade wertet
    * Schichten VOR Spezifität, und unlayered gewinnt gegen jede Schicht.
    */
@@ -164,7 +170,7 @@ export function parseRules(css: string): Rule[] {
   } catch {
     return out; // unlesbares Blatt -> die Messung meldet es als `stylesheet-unreadable`
   }
-  const walk = (container: postcss.Container, conditional: boolean, layer: string): void => {
+  const walk = (container: postcss.Container, outside: string, layer: string): void => {
     for (const node of container.nodes ?? []) {
       if (node.type === "rule") {
         // `list.comma` splittet klammer- UND zeichenkettenbewusst: `:is(a, b)` bleibt
@@ -174,25 +180,39 @@ export function parseRules(css: string): Rule[] {
           .map((sel) => sel.trim())
           .filter((sel) => sel.length > 0);
         if (selectors.length === 0) continue;
-        out.push({ selectors, decls: declarationsOf(node), conditional, layer });
+        out.push({
+          selectors,
+          decls: declarationsOf(node),
+          conditional: outside.length > 0,
+          outside,
+          layer,
+        });
         // Verschachtelte Regeln (CSS Nesting) sind eigene Blöcke.
-        walk(node, conditional, layer);
+        walk(node, outside, layer);
       } else if (node.type === "atrule") {
         const name = node.name.toLowerCase();
+        const head = `@${node.name}${node.params ? ` ${node.params.trim()}` : ""}`;
         if (name === "layer") {
           // `@layer a, b;` ordnet nur an und hat keinen Rumpf.
           const inner = node.params.trim();
-          walk(node, conditional, layer.length > 0 ? `${layer}.${inner}` : inner);
+          walk(node, outside, layer.length > 0 ? `${layer}.${inner}` : inner);
         } else if (name === "media" || name === "supports" || name === "container") {
-          walk(node, true, layer);
+          walk(node, head, layer);
+        } else if (/keyframes$/.test(name) || name === "scope" || name === "starting-style") {
+          // Alle drei stehen ausserhalb der Standard-Umgebung, aber aus verschiedenen
+          // Gründen: ein Keyframe-Stopp gilt nur während der Animation, ein `@scope`
+          // nur innerhalb seiner Wurzel, `@starting-style` nur im ersten Bild. Ein
+          // Block, der dort einen klassifizierten Token verschiebt, wird deshalb
+          // gemeldet statt stillschweigend übernommen — oder stillschweigend
+          // ignoriert, was er vorher wurde.
+          walk(node, head, layer);
         } else if (node.nodes) {
-          // `@scope`, `@starting-style`, Hersteller-Blöcke: Inhalt sehen, Bedingung erben.
-          walk(node, conditional, layer);
+          walk(node, outside, layer);
         }
       }
     }
   };
-  walk(root, false, "");
+  walk(root, "", "");
   return out;
 }
 
@@ -295,30 +315,69 @@ export function allDeclarations(sources: readonly string[]): [string, string, st
  * Element selbst.
  */
 function synthesizeContext(selector: string, doc: Document): Element | null {
-  let compound: selectorParser.Node[] = [];
+  let parsed: selectorParser.Selector | undefined;
   try {
     selectorParser((root) => {
-      const first = root.nodes[0];
-      if (!first) return;
-      // Bei `a b .c` zählt das LETZTE Compound — das ist das Element, auf dem die
-      // Deklarationen landen.
-      const nodes = first.nodes;
-      let start = 0;
-      nodes.forEach((n, i) => {
-        if (n.type === "combinator") start = i + 1;
-      });
-      compound = nodes.slice(start);
+      parsed = root.nodes[0];
     }).processSync(selector);
   } catch {
     return null;
   }
-  if (compound.length === 0) return null;
+  if (parsed === undefined) return null;
 
+  // In COMPOUNDS zerlegen, getrennt durch Kombinatoren. Vorher wurde nur das letzte
+  // Compound gebaut und direkt an `body` gehängt: ein gültiger Nachfahren-Selektor
+  // wie `.shell .p[data-theme="dark"]` traf sein eigenes Element dann nie, und die
+  // Messung zertifizierte die `:root`-Palette, während das echte Element unter
+  // `.shell` eine andere bekommt.
+  const groups: { nodes: selectorParser.Node[]; combinator: string }[] = [];
+  let current: selectorParser.Node[] = [];
+  let pendingCombinator = " ";
+  for (const node of parsed.nodes) {
+    if (node.type === "combinator") {
+      groups.push({ nodes: current, combinator: pendingCombinator });
+      pendingCombinator = node.value.trim().length === 0 ? " " : node.value.trim();
+      current = [];
+      continue;
+    }
+    current.push(node);
+  }
+  groups.push({ nodes: current, combinator: pendingCombinator });
+  if (groups.length === 0 || groups[groups.length - 1]!.nodes.length === 0) return null;
+
+  let parent: Element = doc.body;
+  let built: Element | null = null;
+  for (const [index, group] of groups.entries()) {
+    const el = elementFor(group.nodes, doc);
+    if (el === null) {
+      // `:root` als eigenes Compound: das IST das Wurzelelement, es lässt sich nicht
+      // als Kind bauen. Steht es am Ende, ist der Messpunkt `<html>`.
+      if (group.nodes.some((n) => n.type === "pseudo" && a11yRootPseudo(n.value))) {
+        if (index === groups.length - 1) return doc.documentElement;
+        parent = doc.documentElement;
+        continue;
+      }
+      return null; // nicht darstellbar — wird als Befund gemeldet
+    }
+    if (index > 0 && (group.combinator === "+" || group.combinator === "~")) {
+      // Geschwister: neben den zuletzt gebauten Knoten, nicht hinein.
+      (built?.parentElement ?? parent).appendChild(el);
+    } else {
+      parent.appendChild(el);
+      parent = el;
+    }
+    built = el;
+  }
+  return built;
+}
+
+/** Ein Element aus EINEM Compound (Tag, Klassen, ID, Attribute). */
+function elementFor(nodes: readonly selectorParser.Node[], doc: Document): Element | null {
   let tag = "div";
   const classes: string[] = [];
   const attrs: [string, string][] = [];
   let id = "";
-  for (const node of compound) {
+  for (const node of nodes) {
     if (node.type === "tag") tag = node.value;
     else if (node.type === "class") classes.push(node.value);
     else if (node.type === "id") id = node.value;
@@ -326,15 +385,13 @@ function synthesizeContext(selector: string, doc: Document): Element | null {
       const a = node as selectorParser.Attribute;
       attrs.push([a.attribute, a.value ?? ""]);
     } else if (node.type === "pseudo" && a11yRootPseudo(node.value)) {
-      // `:root` ist kein Element, das man bauen kann — es IST das Wurzelelement.
-      return doc.documentElement;
+      return null; // vom Aufrufer behandelt
     }
   }
   const el = doc.createElement(tag === "*" ? "div" : tag);
   for (const c of classes) el.classList.add(c);
   if (id.length > 0) el.id = id;
   for (const [name, value] of attrs) el.setAttribute(name, value);
-  doc.body.appendChild(el);
   return el;
 }
 
@@ -379,6 +436,30 @@ function cascadeEnv(
   element: Element,
   layerOrder: readonly string[],
 ): Map<string, string> {
+  // JE ELEMENT eine eigene Kaskade, dann die Vererbung von aussen nach innen.
+  //
+  // Das ist kein Detail: CSS kaskadiert PRO ELEMENT, und ein geerbter Wert nimmt an
+  // der Kaskade des Kindes gar nicht teil. Wer beides zusammen ranked, lässt
+  // `!important` und Spezifität über Elementgrenzen hinweg wirken, wo sie es nicht
+  // tun — `:root { --fg: #000 !important }` gegen `.p { --fg: #777 }` misst dann
+  // Schwarz, während der Browser am `.p`-Element das gewöhnliche `#777` malt.
+  const chain: Element[] = [];
+  for (let node: Element | null = element; node !== null; node = node.parentElement) {
+    chain.unshift(node);
+  }
+  const out = new Map<string, string>();
+  for (const node of chain) {
+    for (const [name, value] of winningOn(sources, node, layerOrder)) out.set(name, value);
+  }
+  return out;
+}
+
+/** Die Deklarationen, die die Kaskade AUF DIESEM EINEN Element gewinnen lässt. */
+function winningOn(
+  sources: readonly string[],
+  element: Element,
+  layerOrder: readonly string[],
+): Map<string, string> {
   const ranked = new Map<string, Ranked>();
   let order = 0;
   for (const css of sources) {
@@ -387,7 +468,7 @@ function cascadeEnv(
       // sie als immer aktiv zu behandeln liesse eine kontrastschwache Darstellung
       // mit einem Wert bestehen, den nur der Sonderfall zeigt.
       if (rule.conditional) continue;
-      const hit = bestMatch(rule.selectors, element);
+      const hit = matchesHere(rule.selectors, element);
       if (hit === null) continue;
       for (const d of rule.decls) {
         order += 1;
@@ -409,34 +490,37 @@ function cascadeEnv(
 }
 
 /**
- * Die höchste Spezifität, mit der einer der Selektoren dieses Blocks am Messpunkt
- * greift — oder `null`, wenn keiner greift. Der Messpunkt selbst zählt ebenso wie
- * jeder seiner Vorfahren, weil Custom Properties erben.
+ * Die höchste Spezifität, mit der einer der Selektoren dieses Blocks GENAU DIESES
+ * Element trifft — oder `null`, wenn keiner es trifft. Vorfahren zählen hier nicht:
+ * sie führen ihre eigene Kaskade, und was von dort kommt, kommt über Vererbung
+ * ({@link cascadeEnv}).
  */
-function bestMatch(
+function matchesHere(
   selectors: readonly string[],
   element: Element,
 ): [number, number, number] | null {
   let best: [number, number, number] | null = null;
   for (const sel of selectors) {
-    let matched = false;
-    for (let node: Element | null = element; node !== null; node = node.parentElement) {
-      try {
-        if (node.matches(sel)) {
-          matched = true;
-          break;
-        }
-      } catch {
-        // Ein Selektor, den die Laufzeit nicht kennt (neue Pseudoklasse), gilt als
-        // nicht passend — raten wäre hier gefährlicher als übersehen.
-      }
+    try {
+      if (!element.matches(sel)) continue;
+    } catch {
+      // Ein Selektor, den die Laufzeit nicht kennt (neue Pseudoklasse), gilt als
+      // nicht passend — raten wäre hier gefährlicher als übersehen.
+      continue;
     }
-    if (!matched) continue;
     const s = specificity(selectorParser().astSync(sel));
     const here: [number, number, number] = [s.a, s.b, s.c];
     if (best === null || compareRank(here, best) > 0) best = here;
   }
   return best;
+}
+
+/** Trifft einer der Selektoren das Element ODER einen seiner Vorfahren? */
+function matchesChain(selectors: readonly string[], element: Element): boolean {
+  for (let node: Element | null = element; node !== null; node = node.parentElement) {
+    if (matchesHere(selectors, node) !== null) return true;
+  }
+  return false;
 }
 
 /**
@@ -504,7 +588,7 @@ export function hasSelector(sources: readonly string[], selector: string): boole
   for (const css of sources) {
     for (const rule of parseRules(css)) {
       if (rule.decls.length === 0) continue;
-      if (bestMatch(rule.selectors, point) !== null) return true;
+      if (matchesChain(rule.selectors, point)) return true;
     }
   }
   return false;
@@ -571,8 +655,18 @@ const COLOR_PROPERTIES = new Set([
   "border-right-color",
   "border-bottom-color",
   "border-left-color",
+  "border-block",
   "border-block-color",
+  "border-block-start",
+  "border-block-start-color",
+  "border-block-end",
+  "border-block-end-color",
+  "border-inline",
   "border-inline-color",
+  "border-inline-start",
+  "border-inline-start-color",
+  "border-inline-end",
+  "border-inline-end-color",
   "border-image",
   "border-image-source",
   "outline",
@@ -1035,6 +1129,32 @@ interface TweakStop {
 }
 
 /**
+ * Die WERKSEINSTELLUNGEN unter den Stopps — die Zustände, die ein Benutzer sieht,
+ * ohne einen Regler angefasst zu haben. Das sind zwei: der Blatt-Rückfall (gar kein
+ * Override) und die Stellung, die der Host aus `manifest.tweaks[*].default` setzt.
+ *
+ * Die Unterscheidung zählt für `violationBreakdown`: ein Verstoss an der echten
+ * Startstellung wurde als `atTweakExtreme` ausgewiesen — als beträfe er nur den
+ * Regler-Anschlag —, während der Blatt-Rückfall als `atDefault` galt, obwohl der Host
+ * ihn beim Start gar nicht zeigt. Wer die Zahl zitiert (die Anleitung sagt: zitiere
+ * `atDefault`), zitierte damit die falsche.
+ */
+function factoryLabels(
+  axisValues: readonly { readonly axis: { readonly tweak: string }; readonly values: readonly string[] }[],
+  tweaks: Readonly<Record<string, SkinTweak>>,
+): Set<string> {
+  const labels = new Set<string>(["default"]);
+  const parts: string[] = [];
+  for (const { axis } of axisValues) {
+    const value = tweaks[axis.tweak]?.default;
+    if (value === undefined || value === null) return labels; // keine volle Startstellung
+    parts.push(`${axis.tweak}=${String(value)}`);
+  }
+  if (parts.length > 0) labels.add(parts.join(" "));
+  return labels;
+}
+
+/**
  * Die Extreme einer Tweak-Achse: bei `slider` `min` und `max`, bei `select` jede
  * Option. Der Default wird NICHT mitgezählt — er ist der eigene Stopp `default`.
  */
@@ -1357,6 +1477,7 @@ export function measureA11y(input: A11yInput): SupportA11y {
   }
   const uniqueStops = new Map(stops.map((s) => [s.label, s]));
   stops = [...uniqueStops.values()];
+  const factoryStops = factoryLabels(axisValues, tweaks);
   // Riegel 4: JEDER Tweak des Manifests muss eingeordnet sein. Ohne diesen Abgleich
   // stand `checkedTweakExtremes: true` im Report, während ein unbenannter Tweak die
   // Farbe verschob — eine ungedeckte positive Aussage, und damit genau der Fehler,
@@ -1632,6 +1753,44 @@ export function measureA11y(input: A11yInput): SupportA11y {
       }
     }
 
+    // Riegel 9 — ein klassifizierter Token, der AUSSERHALB der gemessenen Umgebung
+    // verschoben wird.
+    //
+    // `@media`, `@supports`, `@container`, `@keyframes`, `@scope` und
+    // `@starting-style` gelten nur unter ihrer jeweiligen Bedingung. Diese Fläche
+    // misst sie nicht — und der Vollständigkeits-Scan schwieg dazu, weil er nur
+    // fragt, ob der NAME klassifiziert ist. Ein Token konnte damit im Normalfall
+    // bestehen und unter der Bedingung kontrastschwach werden, während der Report
+    // `pass` sagt: `@media (forced-colors: active) { --fg: #777 }`, ein Keyframe, das
+    // `--fg` auf halbem Weg umsetzt, oder ein `@scope (.preview)`, das die halbe
+    // Palette austauscht.
+    //
+    // Gemeldet wird nur, was WIRKLICH abweicht: derselbe Wert unter einer Bedingung
+    // ist eine Wiederholung, keine Lücke. Was gemeldet wird, ist kein Vorwurf, sondern
+    // eine Aussage über die Grenze dieser Messung — der Autor kann den Zustand
+    // auflösen oder den Token mit Begründung ausnehmen.
+    for (const css of sources) {
+      for (const rule of parseRules(css)) {
+        if (rule.outside.length === 0) continue;
+        for (const d of rule.decls) {
+          if (!(d.prop in decl.tokens)) continue;
+          const entry = decl.tokens[d.prop]!;
+          if (entry.role === "exempt") continue;
+          // Gegen JEDE gemessene Umgebung: weicht der bedingte Wert überall ab, ist
+          // er ein Zustand, den niemand gemessen hat.
+          const differsEverywhere = [...context.values()].every((point) => {
+            const env = cascadeEnv(sources, point, layerOrder);
+            return env.get(d.prop) !== d.value;
+          });
+          if (!differsEverywhere) continue;
+          findings.push({
+            problem: "unresolvable",
+            detail: `${rule.outside}: ${d.prop} wird auf "${d.value}" gesetzt — dieser Zustand wird NICHT gemessen. Löse ihn auf (eigener Token, gemessene Achse) oder nimm ihn mit Begründung aus.`,
+          });
+        }
+      }
+    }
+
     // Riegel 8 — Farbe an den Token VORBEI. Der Scan oben erkennt ausschliesslich
     // `--name`; `outline: 2px solid #d6a800` und ein hartcodiertes `color: #fff`
     // wurden deshalb WEDER klassifiziert NOCH gemessen. Ein Skin konnte
@@ -1718,8 +1877,11 @@ export function measureA11y(input: A11yInput): SupportA11y {
     worst,
     violationCount: violations.length,
     violationBreakdown: {
-      atDefault: violations.filter((v) => v.alpha === 1 && v.tweaks === "default").length,
-      atTweakExtreme: violations.filter((v) => v.alpha === 1 && v.tweaks !== "default").length,
+      // `atDefault` meint die WERKSEINSTELLUNG, nicht bloss den Stopp namens
+      // "default": auch die Stellung, die der Host aus den Manifest-Defaults setzt,
+      // gehört dazu (siehe `factoryLabels`).
+      atDefault: violations.filter((v) => v.alpha === 1 && factoryStops.has(v.tweaks)).length,
+      atTweakExtreme: violations.filter((v) => v.alpha === 1 && !factoryStops.has(v.tweaks)).length,
       whenDimmed: violations.filter((v) => v.alpha < 1).length,
     },
     violations: violations.sort((a, b) => a.ratio - b.ratio).slice(0, 40),

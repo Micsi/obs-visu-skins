@@ -1330,7 +1330,7 @@ describe("die Kaskade entscheidet ein echtes Element, keine Zeichenkette", () =>
     expect(r.combinations).toBeGreaterThan(0);
   });
 
-  it("ein `@media`-Block bleibt aus der Standard-Umgebung heraus", () => {
+  it("ein `@media`-Block kommt NICHT in die Standard-Umgebung", () => {
     const r = measure(
       {
         stylesheet: SHEET,
@@ -1340,7 +1340,11 @@ describe("die Kaskade entscheidet ein echtes Element, keine Zeichenkette", () =>
       },
       ".p{--bg:#ffffff;--fg:#000000}\n@media (forced-colors:active){.p{--fg:#fefefe}}",
     );
-    expect(r.status).toBe("pass");
+    // Gemessen wird der Standardwert (schwarz), nicht das Fast-Weiss der Bedingung —
+    // sonst bestünde eine Darstellung mit einem Wert, den sie nie zeigt.
+    expect(r.violations).toEqual([]);
+    // Aber der Zustand wird auch nicht verschwiegen (Riegel 9, siehe unten).
+    expect(r.findings.map((f) => f.detail).join(" ")).toContain("forced-colors");
   });
 });
 
@@ -1435,5 +1439,150 @@ describe("importierte Blätter werden mitgemessen, nicht nur mitgeladen", () => 
       styles: { [SHEET]: ".p{--bg:#ffffff;--fg:#000000}", [`${SHEET} → ./fehlt.css`]: "" },
     });
     expect(r.findings.map((f) => f.problem)).toContain("stylesheet-unreadable");
+  });
+});
+
+describe("die Kaskade läuft je Element, und der Messpunkt hat Vorfahren", () => {
+  it("ein `!important` auf dem Vorfahren schlägt das Kind NICHT", () => {
+    // CSS kaskadiert PRO ELEMENT, und ein geerbter Wert nimmt an der Kaskade des
+    // Kindes gar nicht teil. Wer beides zusammen ranked, lässt `!important` über
+    // Elementgrenzen wirken, wo es das nicht tut: der Browser malt hier `#777`.
+    const decl = {
+      stylesheet: SHEET,
+      themes: { dark: ".p" },
+      grounds: [{ token: "--bg" }],
+      tokens: { "--bg": { role: "ground" }, "--fg": { role: "text" } },
+    };
+    const r = measure(decl, ":root{--bg:#ffffff;--fg:#000000 !important}\n.p{--fg:#777777}");
+    // `#777` auf Weiss sind 4.48:1 — knapp unter der Textschwelle.
+    expect(r.status).toBe("fail");
+    expect(r.violations.some((v) => v.token === "--fg")).toBe(true);
+  });
+
+  it("geerbt wird trotzdem, wenn das Kind nichts sagt", () => {
+    // Die Gegenprobe: die Trennung darf die Vererbung nicht kappen.
+    const decl = {
+      stylesheet: SHEET,
+      themes: { dark: ".p" },
+      grounds: [{ token: "--bg" }],
+      tokens: { "--bg": { role: "ground" }, "--fg": { role: "text" } },
+    };
+    const r = measure(decl, ":root{--bg:#ffffff;--fg:#000000}\n.p{--other:1}");
+    expect(r.findings).toEqual([]);
+    expect(r.status).toBe("pass");
+  });
+
+  it("ein Nachfahren-Theme-Selektor bekommt seine ganze Kette", () => {
+    // `.shell .p[data-theme="dark"]` ist ein gültiger Theme-Selektor. Vorher wurde
+    // nur das letzte Compound gebaut und an `body` gehängt — der Theme-Block traf
+    // sein eigenes Element nie, und gemessen wurde die `:root`-Palette.
+    const decl = {
+      stylesheet: SHEET,
+      themes: { dark: '.shell .p[data-theme="dark"]' },
+      grounds: [{ token: "--bg" }],
+      tokens: { "--bg": { role: "ground" }, "--fg": { role: "text" } },
+    };
+    const r = measure(
+      decl,
+      ':root{--bg:#ffffff;--fg:#000000}\n.shell .p[data-theme="dark"]{--fg:#777777}',
+    );
+    expect(r.status).toBe("fail"); // der Theme-Wert gewinnt, und er reisst
+  });
+
+  it("logische Rahmen-Kurzformen zählen als Farb-Eigenschaften", () => {
+    const decl = {
+      stylesheet: SHEET,
+      themes: { dark: ".p" },
+      grounds: [{ token: "--bg" }],
+      tokens: { "--bg": { role: "ground" }, "--fg": { role: "text" } },
+    };
+    const r = measure(decl, ".p{--bg:#ffffff;--fg:#000000}\n.c{border-block:2px solid #777777}");
+    expect(r.findings.map((f) => f.problem)).toContain("unclassified");
+  });
+});
+
+describe("Riegel 9 — ein Zustand, den niemand misst, wird benannt", () => {
+  const DECL = {
+    stylesheet: SHEET,
+    themes: { dark: ".p" },
+    grounds: [{ token: "--bg" }],
+    tokens: { "--bg": { role: "ground" }, "--fg": { role: "text" } },
+  };
+  const BASE = ".p{--bg:#ffffff;--fg:#000000}";
+
+  it("`@media` verschiebt einen klassifizierten Token", () => {
+    // Der Vollständigkeits-Scan schwieg dazu: er fragt nur, ob der NAME klassifiziert
+    // ist. Ein Token konnte im Normalfall bestehen und unter der Bedingung
+    // kontrastschwach werden, während der Report `pass` sagt.
+    const r = measure(DECL, `${BASE}\n@media (forced-colors:active){.p{--fg:#777777}}`);
+    expect(r.findings.map((f) => f.detail).join(" ")).toContain("@media (forced-colors:active)");
+    expect(r.status).toBe("fail");
+  });
+
+  it("ein Keyframe-Stopp verschiebt ihn", () => {
+    const r = measure(DECL, `${BASE}\n@keyframes puls{to{--fg:#777777}}`);
+    expect(r.findings.map((f) => f.detail).join(" ")).toContain("@keyframes puls");
+  });
+
+  it("`@scope` verschiebt ihn", () => {
+    const r = measure(DECL, `${BASE}\n@scope (.preview){.p{--fg:#777777}}`);
+    expect(r.findings.map((f) => f.detail).join(" ")).toContain("@scope (.preview)");
+  });
+
+  it("derselbe Wert unter einer Bedingung ist eine Wiederholung, keine Lücke", () => {
+    // Die Gegenprobe: ein Skin, der seine Farbe unter `prefers-reduced-motion`
+    // schlicht wiederholt, darf nicht durchfallen.
+    const r = measure(DECL, `${BASE}\n@media (prefers-reduced-motion){.p{--fg:#000000}}`);
+    expect(r.findings).toEqual([]);
+    expect(r.status).toBe("pass");
+  });
+
+  it("ein ausgenommener Token darf auch bedingt verschoben werden", () => {
+    const decl = {
+      ...DECL,
+      tokens: {
+        ...DECL.tokens,
+        "--deko": { role: "exempt", reason: "Zierlinie, kein Vordergrund." },
+      },
+    };
+    const r = measure(decl, `${BASE}\n.p{--deko:#111111}\n@media (print){.p{--deko:#777777}}`);
+    expect(r.findings).toEqual([]);
+  });
+});
+
+describe("`atDefault` meint die Werkseinstellung, nicht nur den Stopp-Namen", () => {
+  it("ein Verstoss an der Manifest-Startstellung zählt als atDefault", () => {
+    // Der Host setzt beim Start den Manifest-`default`. Ein Verstoss dort wurde als
+    // `atTweakExtreme` ausgewiesen — als beträfe er nur den Regler-Anschlag —, und
+    // die Anleitung sagt "wenn du eine Zahl zitierst, zitiere atDefault". Damit
+    // zitierte man die falsche.
+    const css = '.p[data-theme="dark"]{--lvl:1;--bg:#ffffff;--fg:rgba(0,0,0,var(--lvl))}';
+    const decl = {
+      stylesheet: SHEET,
+      themes: { dark: '.p[data-theme="dark"]' },
+      grounds: [{ token: "--bg" }],
+      tokens: { "--bg": { role: "ground" }, "--fg": { role: "text" } },
+      tweakAxes: [{ tweak: "lvl", cssVar: "--lvl" }],
+    };
+    // Bei lvl=0.1 ist der Text fast durchsichtig und reisst; min/max bestehen.
+    const r = measure(decl, css, { lvl: { type: "slider", min: 1, max: 1, default: 0.1 } });
+    expect(r.violationCount).toBeGreaterThan(0);
+    expect(r.violationBreakdown.atDefault).toBeGreaterThan(0);
+    expect(r.violationBreakdown.atTweakExtreme).toBe(0);
+  });
+
+  it("ein Verstoss am echten Anschlag bleibt atTweakExtreme", () => {
+    // Die Gegenprobe: der Riegel darf nicht alles zur Werkseinstellung erklären.
+    const css = '.p[data-theme="dark"]{--lvl:1;--bg:#ffffff;--fg:rgba(0,0,0,var(--lvl))}';
+    const decl = {
+      stylesheet: SHEET,
+      themes: { dark: '.p[data-theme="dark"]' },
+      grounds: [{ token: "--bg" }],
+      tokens: { "--bg": { role: "ground" }, "--fg": { role: "text" } },
+      tweakAxes: [{ tweak: "lvl", cssVar: "--lvl" }],
+    };
+    const r = measure(decl, css, { lvl: { type: "slider", min: 0.1, max: 1, default: 1 } });
+    expect(r.violationBreakdown.atTweakExtreme).toBeGreaterThan(0);
+    expect(r.violationBreakdown.atDefault).toBe(0);
   });
 });
