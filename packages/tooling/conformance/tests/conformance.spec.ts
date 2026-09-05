@@ -1503,6 +1503,62 @@ describe("Aktions-Achse — die Komponente sieht ihre Props so, wie Vue sie lief
     const { report } = await generateSupport(actionSkin({ switch: tile }));
     expect(report.widgets.switch?.actions).toBe("1/1");
   });
+
+  it("aber NICHT, wenn `String` in der Union vor `Boolean` steht", async () => {
+    // Vues `shouldCastTrue` haengt an der REIHENFOLGE: bei `[String, Boolean]` bleibt
+    // der leere String ein leerer String. Ohne diese Regel meldete die Achse eine
+    // Aktion, die die montierte Anwendung nicht zeichnet — die Komponente hier gibt
+    // `data-action` nur bei striktem `true` aus.
+    const Action = {
+      props: { enabled: { type: [String, Boolean] } },
+      setup(props: { enabled: string | boolean }) {
+        return () =>
+          props.enabled === true ? vh("button", { "data-action": "toggle" }) : vh("span");
+      },
+    };
+    const tile: Renderer = () => vh(Action as never, { enabled: "" }) as never;
+    const { report } = await generateSupport(actionSkin({ switch: tile }));
+    expect(report.widgets.switch?.actions).toBe("0/1");
+  });
+
+  it("und doch, wenn `Boolean` vorne steht", async () => {
+    // Die Gegenprobe zur Reihenfolge — sonst waere die Regel bloss ein pauschales
+    // "Union mit String castet nie".
+    const Action = {
+      props: { enabled: { type: [Boolean, String] } },
+      setup(props: { enabled: string | boolean }) {
+        return () =>
+          props.enabled === true ? vh("button", { "data-action": "toggle" }) : vh("span");
+      },
+    };
+    const tile: Renderer = () => vh(Action as never, { enabled: "" }) as never;
+    const { report } = await generateSupport(actionSkin({ switch: tile }));
+    expect(report.widgets.switch?.actions).toBe("1/1");
+  });
+
+  it("eine `default`-Fabrik bekommt die rohen Props", async () => {
+    // Vue reicht der Fabrik die rohen Props (`default(rawProps) { … }`). Ohne
+    // Argument warf sie, und `renderAll` hielt das Widget fuer `broken` — oder sie
+    // rechnete einen anderen Default und die Achse erfand ein `data-action`, das die
+    // montierte Anwendung nicht zeichnet.
+    const Action = {
+      props: {
+        kind: { type: String },
+        enabled: {
+          type: Boolean,
+          default(rawProps: { kind?: string }) {
+            return rawProps.kind === "switch";
+          },
+        },
+      },
+      setup(props: { enabled: boolean }) {
+        return () => (props.enabled ? vh("button", { "data-action": "toggle" }) : vh("span"));
+      },
+    };
+    const tile: Renderer = () => vh(Action as never, { kind: "switch" }) as never;
+    const { report } = await generateSupport(actionSkin({ switch: tile }));
+    expect(report.widgets.switch?.actions).toBe("1/1");
+  });
 });
 
 describe("honors-Achse — nicht messen ist kein Bestehen, und ein Wurf ist ein Befund", () => {

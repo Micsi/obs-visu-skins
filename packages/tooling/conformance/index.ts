@@ -639,8 +639,20 @@ async function domRuntime(): Promise<{ createApp: typeof import("vue").createApp
  *
  * Bewusst nur die Deklaration, kein Mount: die Aktions-Achse jagt Hunderte Fixtures
  * durch die Renderer, ein Mount je Fixture wäre zu teuer (siehe den Doc-Block oben).
- * Was Vue darüber hinaus tut — `attrs`-Trennung, Validatoren — verschiebt das
- * gezeichnete Markup nicht und bleibt deshalb aussen vor.
+ *
+ * ══ Und damit ist dies ein NACHBAU, mit allem, was daran hängt
+ *
+ * Dieselbe Bauart, die der `honors`-Probelauf hinter sich hat: dort wurde aus dem
+ * Auflösen von Hand eine Kette von Abweichungen gegenüber dem Original, und erst
+ * `createApp().mount()` hat sie beendet. Hier ist die Fläche kleiner — es geht nur um
+ * die Prop-Auflösung —, aber sie ist nicht endlich: `validator`, `required`, `mixins`,
+ * `extends`, Symbol-Typen und die `attrs`-Trennung stehen alle noch draussen.
+ *
+ * Was hier nachgebildet ist, ist deshalb ausdrücklich benannt: Defaults (inklusive
+ * Fabrik MIT rohen Props), `Boolean`-Auflösung inklusive Vues reihenfolgeabhängiger
+ * `shouldCastTrue`-Regel. Alles andere fehlt, und wenn diese Fläche noch einmal
+ * Befunde derselben Klasse sammelt, ist die Antwort nicht die nächste Regel, sondern
+ * der Umbau auf einen echten Mount (obs-visu-skins#48).
  */
 function normalizeProps(
   raw: Record<string, unknown>,
@@ -653,19 +665,37 @@ function normalizeProps(
   for (const [name, spec] of Object.entries(declared as Record<string, unknown>)) {
     const given = out[name];
     const type = spec && typeof spec === "object" ? (spec as { type?: unknown }).type : spec;
-    const isBoolean = type === Boolean || (Array.isArray(type) && type.includes(Boolean));
+    const types = Array.isArray(type) ? type : [type];
+    const booleanAt = types.indexOf(Boolean);
+    const stringAt = types.indexOf(String);
+    const isBoolean = booleanAt >= 0;
+    /**
+     * Vues `shouldCastTrue` — und es hängt an der REIHENFOLGE der Union.
+     *
+     * Bei `{ type: [String, Boolean] }` bleibt ein leerer String ein leerer String,
+     * weil `String` vorne steht; erst bei `[Boolean, String]` wird er zu `true`.
+     * Ohne diese Regel meldete die Aktions-Achse eine Aktion, die die montierte
+     * Anwendung nicht zeichnet: eine Komponente, die `data-action` nur bei striktem
+     * `true` ausgibt, bekam hier ein erfundenes `true`.
+     */
+    const castsEmptyToTrue = isBoolean && (stringAt < 0 || booleanAt < stringAt);
     if (given === undefined) {
       const def =
         spec && typeof spec === "object" ? (spec as { default?: unknown }).default : undefined;
       if (def !== undefined) {
         // Objekt-/Array-Defaults liefert Vue über eine Fabrik, damit Instanzen sie
-        // nicht teilen.
-        out[name] = typeof def === "function" && type !== Function ? (def as () => unknown)() : def;
+        // nicht teilen — und die Fabrik bekommt die ROHEN Props als Argument
+        // (`default(rawProps) { return rawProps.kind === "switch" }`). Ohne das warf
+        // eine solche Fabrik, und `renderAll` hielt das Widget für `broken`.
+        out[name] =
+          typeof def === "function" && type !== Function
+            ? (def as (props: Record<string, unknown>) => unknown)(raw)
+            : def;
       } else if (isBoolean) {
         // Ein deklariertes Boolean ohne Wert ist `false`, nicht `undefined`.
         out[name] = false;
       }
-    } else if (isBoolean && given === "") {
+    } else if (castsEmptyToTrue && given === "") {
       // `<C enabled>` kommt als leerer String an und bedeutet `true`.
       out[name] = true;
     }
