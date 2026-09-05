@@ -34,8 +34,9 @@ Umnummerierung still falsch, ohne dass es jemandem auffällt.
   Gesten.
 - **Regel 5** · **Reihenfolge + Gruppierung sind der unverhandelbare Layout-Boden**;
   Rollen/Spans sind additiv und ignorierbar. Was dein Layout darüber hinaus wirklich
-  beherrscht, deklarierst du in `manifest.json → layoutHonors` (Schritt 2) — und der Lauf
-  misst es am echten DOM (Schritt 3).
+  beherrscht, deklarierst du in `manifest.json → layoutHonors` (Schritt 2). Am echten DOM
+  gemessen wird davon nur `link`; die übrigen Token prüft der Lauf allein gegen das
+  Vertrags-Vokabular (Schritt 3). Für sie ist der Nachweis Sache deiner eigenen Specs.
 - **Regel 6** · **AA-Kontrast ist Pflicht**, auch an den Tweak-Extremen. Farben im
   Renderer nur über die `Tokens`-Helfer (`t.accent`, `t.accentInk`); die eigentliche
   Palette lebt in deinem Stylesheet und wird in `manifest.json → a11y` deklariert. Der

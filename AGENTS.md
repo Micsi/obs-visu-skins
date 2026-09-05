@@ -22,7 +22,8 @@ Die Grenze verläuft anders, als sie oft gelesen wird:
   einander nicht; beide hängen nur am Vertrag.
 - **Der Vertrag dagegen ist eine echte Code-Abhängigkeit.** Die Skin- und Tooling-Pakete
   führen `@obs/visu-contract` in ihren `dependencies` und importieren seine Typen und
-  Fixtures direkt. Aufgelöst wird sie derzeit über einen Dev-Link (pnpm `link:`, siehe
+  Fixtures direkt — die Skins und die Tooling-Pakete, die ihn wirklich verbrauchen
+  (heute sechs; `contract-ref` und `docs-guard` etwa nicht). Aufgelöst wird sie derzeit über einen Dev-Link (pnpm `link:`, siehe
   `scripts/contract-link.sh`) statt über eine Registry — das ist der Bezugsweg, nicht ihr
   Ersatz.
 
@@ -69,9 +70,11 @@ Eigenschaft dieses Repos, und sie ist mehrfach hart erarbeitet:
 ## Contract-Bump: eine rote CI ist hier zeitweise normal
 
 Zieht der Vertrag einen Minor weiter, ist die CI dieses Repos **zweimal nacheinander
-rot** — rot wird dabei jeder neu ausgeführte Lauf, auf `main` wie in jedem neu
-geöffneten PR, auch in einem reinen Doku-PR. Ein bereits eingetragener grüner Check bleibt
-grün, bis er neu läuft.
+rot**, und die beiden Phasen treffen verschieden weit. Vor dem Contract-Merge betrifft es
+nur Branches, die die ausstehende Vertragsfläche schon importieren — unverändertes `main`
+und unbeteiligte PRs kompilieren weiter gegen den alten Vertrag. Erst nach dem Merge trifft
+es **jeden** neu ausgeführten Lauf, auf `main` wie in jedem neu geöffneten PR, auch in
+einem reinen Doku-PR. Ein bereits eingetragener grüner Check bleibt grün, bis er neu läuft.
 Vor dem Contract-Merge fehlt der Vertrags-Export; tsc meldet englisch
 `has no exported member 'X'`. Danach tragen die Manifeste noch die alte Version:
 `expected '<alt>' to be '<neu>'` in der Vertragsversions-Assertion, die pro Skin anders
