@@ -28,18 +28,43 @@ import {
   CORE_WIDGET_TYPES,
   LAYOUT_HONORS,
   checkHonors,
-  collectActions,
   generateSupport,
   type RendererMap,
 } from "../index.js";
 
 const ionic = ionicManifest as unknown as SkinManifest;
 
+/**
+ * Eine winzige, BESTANDENE Palette. Seit Vertrag 1.13 ist `a11y` Pflicht: ein Skin
+ * ohne Deklaration meldet `undeclared` und setzt `hasGap`. Diese Specs prüfen aber
+ * die WIDGET-Achse — sie brauchen eine Palette, die trägt, damit `hasGap` weiter
+ * genau das bedeutet, was hier gemeint ist. Die Farben sind terminals gemessene
+ * Werte (Text 14.9:1), also sicher über der Schwelle.
+ */
+const AA_STYLES = {
+  "./stub.css": '.stub[data-theme="dark"]{--x-bg:#0b0e14;--x-fg:#e6edf3;}',
+} as const;
+const AA_DECL = {
+  stylesheet: "./stub.css",
+  themes: { dark: '.stub[data-theme="dark"]' },
+  grounds: [{ token: "--x-bg" }],
+  tokens: {
+    "--x-bg": { role: "ground" as const },
+    "--x-fg": { role: "text" as const },
+  },
+};
+
 describe("generateSupport — ionic (vollständig)", () => {
   it("meldet keine gap/broken und deckt alle neun Kern-Typen ab", async () => {
-    const { report, hasGap } = await generateSupport({ manifest: ionic, tiles });
+    const { report } = await generateSupport({ manifest: ionic, tiles });
 
-    expect(hasGap).toBe(false);
+    // Bewusst NICHT `hasGap`: das Flag deckt seit Vertrag 1.13 auch die Farb-Achse
+    // ab, und ionics Palette ist dort gemessen rot (theme-unabhängige Akzente auf
+    // hellem Grund). Diese Spec prüft die WIDGET-Achse — die ist sauber, und die
+    // Farb-Achse hat ihre eigenen Specs. Ein `hasGap`-false hier würde die
+    // Farbmessung stillstellen, statt sie zu prüfen.
+    expect(report.summary.gap).toBe(0);
+    expect(report.summary.broken).toBe(0);
     expect(report.skin).toBe("ionic");
     // Der Report reicht die Zielversion des Manifests durch. Bewusst gegen den
     // Vertrag gemessen statt gegen ein Literal: ein Literal hier bliebe gruen,
@@ -105,11 +130,12 @@ describe("generateSupport — gap-hart", () => {
    */
   const marking =
     (...actions: string[]): Renderer =>
-    () => ({
-      type: "div",
-      props: {},
-      children: actions.map((a) => ({ type: "button", props: { "data-action": a }, children: a })),
-    });
+    () =>
+      vh(
+        "div",
+        {},
+        actions.map((a) => vh("button", { "data-action": a }, a)),
+      ) as never;
 
   it('meldet "gap" für ein deklariertes widget ohne passenden tiles-Renderer', async () => {
     const brokenManifest: SkinManifest = {
@@ -188,6 +214,7 @@ describe("generateSupport — gap-hart", () => {
         jalousie: { actions: ["setPosition"] },
       },
       layout: { model: "grid", honors: ["order"] },
+      a11y: AA_DECL,
     };
     const partialTiles: RendererMap = {
       light: marking("toggle"),
@@ -196,7 +223,11 @@ describe("generateSupport — gap-hart", () => {
       jalousie: marking("setPosition"),
     };
 
-    const { report, hasGap } = await generateSupport({ manifest, tiles: partialTiles });
+    const { report, hasGap } = await generateSupport({
+      manifest,
+      tiles: partialTiles,
+      styles: AA_STYLES,
+    });
 
     expect(hasGap).toBe(false);
     expect(report.widgets.sensor?.level).toBe("unsupported");
@@ -216,7 +247,7 @@ describe("generateSupport — gap-hart", () => {
   it("misst die Aktions-Achse am gerenderten Baum, nicht am Manifest", async () => {
     // Der Renderer markiert NICHTS — das Manifest behauptet trotzdem beide Aktionen.
     // Genau diese Lücke soll sichtbar werden: die Stufe folgt dem Baum.
-    const silent: Renderer = () => ({ type: "div", props: {}, children: [] });
+    const silent: Renderer = () => vh("div", {}, []) as never;
     const manifest: SkinManifest = {
       name: "claims-too-much",
       targetsContract: "1.10",
@@ -226,11 +257,13 @@ describe("generateSupport — gap-hart", () => {
         switch: { actions: ["toggle"] },
       },
       layout: { model: "list", honors: ["order"] },
+      a11y: AA_DECL,
     };
 
     const { report, hasGap } = await generateSupport({
       manifest,
       tiles: { light: silent, switch: silent },
+      styles: AA_STYLES,
     });
 
     // Unbelegte Behauptung ist kein harter Fehler — aber sie hebt die Stufe nicht
@@ -242,12 +275,11 @@ describe("generateSupport — gap-hart", () => {
   });
 
   it("zählt eine Aktion, die nur die Detailfläche markiert, als angeboten", async () => {
-    const silent: Renderer = () => ({ type: "div", props: {}, children: [] });
-    const toggleInDetail: Renderer = () => ({
-      type: "div",
-      props: { "data-action": "toggle" },
-      children: [{ type: "b", props: { "data-action": "setDim" }, children: "45" }],
-    });
+    const silent: Renderer = () => vh("div", {}, []) as never;
+    const toggleInDetail: Renderer = () =>
+      vh("div", { "data-action": "toggle" }, [
+        vh("b", { "data-action": "setDim" }, "45"),
+      ]) as never;
     const manifest: SkinManifest = {
       name: "detail-surface",
       targetsContract: "1.10",
@@ -269,11 +301,7 @@ describe("generateSupport — gap-hart", () => {
 
   it('meldet "broken", wenn ein Renderer eine nicht deklarierte Aktion markiert', async () => {
     // Goldene Regel 3: nicht verdrahtet darf nie vorgetäuscht werden.
-    const liar: Renderer = () => ({
-      type: "div",
-      props: { "data-action": "setDim" },
-      children: [],
-    });
+    const liar: Renderer = () => vh("div", { "data-action": "setDim" }, []) as never;
     const manifest: SkinManifest = {
       name: "pretender",
       targetsContract: "1.10",
@@ -290,11 +318,10 @@ describe("generateSupport — gap-hart", () => {
   });
 
   it("duldet universelle Host-Aktionen ohne Deklaration (§6)", async () => {
-    const hostMarks: Renderer = () => ({
-      type: "div",
-      props: { "data-action": "openDetail" },
-      children: [{ type: "button", props: { "data-action": "stop" }, children: "■" }],
-    });
+    const hostMarks: Renderer = () =>
+      vh("div", { "data-action": "openDetail" }, [
+        vh("button", { "data-action": "stop" }, "■"),
+      ]) as never;
     const manifest: SkinManifest = {
       name: "host-actions",
       targetsContract: "1.10",
@@ -303,18 +330,37 @@ describe("generateSupport — gap-hart", () => {
       // brauchen laut Vertrag keine Deklaration je Widget.
       widgets: { blind: { actions: ["setPosition"] } },
       layout: { model: "grid", honors: ["order"] },
+      a11y: AA_DECL,
     };
 
-    const { report, hasGap } = await generateSupport({ manifest, tiles: { blind: hostMarks } });
+    const { report, hasGap } = await generateSupport({
+      manifest,
+      tiles: { blind: hostMarks },
+      styles: AA_STYLES,
+    });
 
     expect(hasGap).toBe(false);
     expect(report.widgets.blind?.level).not.toBe("broken");
   });
 
   it("liest data-action auch aus rohem Markup (Renderer ohne Framework)", async () => {
-    expect(
-      [...collectActions('<div data-action="toggle"><b data-action="lock"/></div>')].sort(),
-    ).toEqual(["lock", "toggle"]);
+    // Rohes Markup war fruehher ein Sonderfall im Baum-Durchlauf (ein Regex ueber
+    // String-Knoten). Seit die Achse MONTIERT, ist es keiner mehr: der DOM rendert
+    // `innerHTML`, und dort steht `data-action` als ganz gewoehnliches Attribut.
+    const raw: Renderer = () =>
+      vh("div", { innerHTML: '<button data-action="toggle"></button><b data-action="setDim"></b>' }) as never;
+    const manifest: SkinManifest = {
+      name: "raw-markup",
+      targetsContract: "1.10",
+      unsupported: ["blind", "jalousie", "sensor", "scene", "media", "camera", "climate"],
+      widgets: { light: { actions: ["toggle", "setDim"] }, switch: { actions: ["toggle"] } },
+      layout: { model: "grid", honors: [] },
+    } as unknown as SkinManifest;
+    const { report } = await generateSupport({
+      manifest,
+      tiles: { light: raw, switch: raw },
+    });
+    expect(report.widgets.light?.actions).toBe("2/2");
   });
 
   it('meldet "broken" für einen Renderer, der an einer Vertrags-Fixture wirft', async () => {
@@ -1348,8 +1394,10 @@ describe("honors-Probelauf — jeder Lauf misst nur sich selbst", () => {
       },
     });
     const page = () => vh(Boom as never, {});
+    // `broken`, nicht `undelivered`: ein Wurf ist ein anderer Mangel als „zeichnet
+    // nichts" — siehe den Block weiter unten.
     expect((await checkHonors(honorsSkin(["link"], page as never))).map((f) => f.problem)).toEqual([
-      "undelivered",
+      "broken",
     ]);
     expect(document.body.children.length, "die halb gemountete Anwendung blieb stehen").toBe(
       beforeCount,
@@ -1405,4 +1453,259 @@ describe("honors-Achse — die beiden Richtungen messen verschieden streng", () 
       "undelivered",
     ]);
   }, 30_000);
+});
+
+describe("Aktions-Achse — die Komponente sieht ihre Props so, wie Vue sie liefert", () => {
+  const actionSkin = (tiles: RendererMap) => ({
+    manifest: {
+      name: "props-stub",
+      targetsContract: contractVersion,
+      unsupported: [],
+      widgets: { switch: { actions: ["toggle"] } },
+      layout: { model: "grid", honors: [] },
+    } as unknown as SkinManifest,
+    tiles,
+  });
+
+  it("wendet den deklarierten `default` an, bevor sie den Baum abläuft", async () => {
+    // Vue setzt beim Instanziieren die Defaults der Prop-Deklaration. Der rohe
+    // Prop-Beutel des VNode kennt sie nicht: eine Aktions-Komponente, deren
+    // weggelassenes `enabled` per Deklaration `true` wäre, bekam `undefined`,
+    // zeichnete ihr `data-action` nicht — und eine tatsächlich angebotene Aktion
+    // rutschte von `full` auf `display`.
+    const Action = {
+      props: { enabled: { type: Boolean, default: true } },
+      setup(props: { enabled: boolean }) {
+        return () => (props.enabled ? vh("button", { "data-action": "toggle" }) : vh("span"));
+      },
+    };
+    const tile: Renderer = () => vh(Action as never, {}) as never;
+    const { report } = await generateSupport(actionSkin({ switch: tile }));
+    expect(report.widgets.switch?.actions).toBe("1/1");
+    expect(report.widgets.switch?.level).toBe("full");
+  });
+
+  it("macht aus einem deklarierten Boolean ohne Wert `false`, nicht `undefined`", async () => {
+    // Der Nachbarfall: die Normalisierung darf nicht alles wahr machen. Ohne Wert
+    // ist ein deklariertes Boolean `false` — die Aktion wird dann zu Recht NICHT
+    // gezeichnet.
+    const Action = {
+      props: { enabled: { type: Boolean } },
+      setup(props: { enabled: boolean }) {
+        return () => (props.enabled ? vh("button", { "data-action": "toggle" }) : vh("span"));
+      },
+    };
+    const tile: Renderer = () => vh(Action as never, {}) as never;
+    const { report } = await generateSupport(actionSkin({ switch: tile }));
+    expect(report.widgets.switch?.actions).toBe("0/1");
+  });
+
+  it("liest `<C enabled>` — den leeren String — als `true`", async () => {
+    const Action = {
+      props: { enabled: { type: Boolean } },
+      setup(props: { enabled: boolean }) {
+        return () => (props.enabled ? vh("button", { "data-action": "toggle" }) : vh("span"));
+      },
+    };
+    const tile: Renderer = () => vh(Action as never, { enabled: "" }) as never;
+    const { report } = await generateSupport(actionSkin({ switch: tile }));
+    expect(report.widgets.switch?.actions).toBe("1/1");
+  });
+
+  it("aber NICHT, wenn `String` in der Union vor `Boolean` steht", async () => {
+    // Vues `shouldCastTrue` haengt an der REIHENFOLGE: bei `[String, Boolean]` bleibt
+    // der leere String ein leerer String. Ohne diese Regel meldete die Achse eine
+    // Aktion, die die montierte Anwendung nicht zeichnet — die Komponente hier gibt
+    // `data-action` nur bei striktem `true` aus.
+    const Action = {
+      props: { enabled: { type: [String, Boolean] } },
+      setup(props: { enabled: string | boolean }) {
+        return () =>
+          props.enabled === true ? vh("button", { "data-action": "toggle" }) : vh("span");
+      },
+    };
+    const tile: Renderer = () => vh(Action as never, { enabled: "" }) as never;
+    const { report } = await generateSupport(actionSkin({ switch: tile }));
+    expect(report.widgets.switch?.actions).toBe("0/1");
+  });
+
+  it("und doch, wenn `Boolean` vorne steht", async () => {
+    // Die Gegenprobe zur Reihenfolge — sonst waere die Regel bloss ein pauschales
+    // "Union mit String castet nie".
+    const Action = {
+      props: { enabled: { type: [Boolean, String] } },
+      setup(props: { enabled: string | boolean }) {
+        return () =>
+          props.enabled === true ? vh("button", { "data-action": "toggle" }) : vh("span");
+      },
+    };
+    const tile: Renderer = () => vh(Action as never, { enabled: "" }) as never;
+    const { report } = await generateSupport(actionSkin({ switch: tile }));
+    expect(report.widgets.switch?.actions).toBe("1/1");
+  });
+
+  it("eine `default`-Fabrik bekommt die rohen Props", async () => {
+    // Vue reicht der Fabrik die rohen Props (`default(rawProps) { … }`). Ohne
+    // Argument warf sie, und `renderAll` hielt das Widget fuer `broken` — oder sie
+    // rechnete einen anderen Default und die Achse erfand ein `data-action`, das die
+    // montierte Anwendung nicht zeichnet.
+    const Action = {
+      props: {
+        kind: { type: String },
+        enabled: {
+          type: Boolean,
+          default(rawProps: { kind?: string }) {
+            return rawProps.kind === "switch";
+          },
+        },
+      },
+      setup(props: { enabled: boolean }) {
+        return () => (props.enabled ? vh("button", { "data-action": "toggle" }) : vh("span"));
+      },
+    };
+    const tile: Renderer = () => vh(Action as never, { kind: "switch" }) as never;
+    const { report } = await generateSupport(actionSkin({ switch: tile }));
+    expect(report.widgets.switch?.actions).toBe("1/1");
+  });
+});
+
+describe("honors-Achse — nicht messen ist kein Bestehen, und ein Wurf ist ein Befund", () => {
+  it("meldet einen werfenden Page-Renderer AUCH ohne `link`-Deklaration", async () => {
+    // Die Render-Achse fährt `tiles`/`details`/`presets`, aber nie `skin.page`.
+    // Ein Skin mit kaputtem Ganzseiten-Renderer bekam deshalb einen sauberen
+    // Report, solange er `link` nicht deklarierte — der Fehler fiel nirgends auf.
+    const Boom = defineComponent({
+      setup() {
+        return () => {
+          throw new Error("kaputt");
+        };
+      },
+    });
+    const page = () => vh(Boom as never, {});
+    const findings = await checkHonors(honorsSkin(["order"], page as never));
+    expect(findings.map((f) => f.problem)).toEqual(["broken"]);
+  });
+
+  it("…und mit Deklaration ebenfalls als `broken`, nicht als `undelivered`", async () => {
+    // Der Unterschied trägt Information: „zeichnet nichts" ist ein anderer Mangel
+    // als „wirft beim Zeichnen".
+    const Boom = defineComponent({
+      setup() {
+        return () => {
+          throw new Error("kaputt");
+        };
+      },
+    });
+    const page = () => vh(Boom as never, {});
+    const findings = await checkHonors(honorsSkin(["link"], page as never));
+    expect(findings.map((f) => f.problem)).toEqual(["broken"]);
+  });
+
+  it("ein Renderer, der schlicht nichts Klickbares zeichnet, bleibt `undelivered`", async () => {
+    // Die Gegenprobe: `broken` darf den gewöhnlichen Fall nicht schlucken.
+    const page = () => vh("div", {}, "nichts zum Klicken");
+    const findings = await checkHonors(honorsSkin(["link"], page as never));
+    expect(findings.map((f) => f.problem)).toEqual(["undelivered"]);
+  });
+});
+
+describe("Riegel 10 — Farbe aus dem Renderer, nicht aus dem Blatt", () => {
+  const SHEET_PATH = "./probe.css";
+  const PASSING = '.p{--bg:#ffffff;--fg:#000000}';
+  const A11Y = {
+    stylesheet: SHEET_PATH,
+    themes: { dark: ".p" },
+    grounds: [{ token: "--bg" }],
+    tokens: { "--bg": { role: "ground" }, "--fg": { role: "text" } },
+  };
+
+  function skinWith(tile: Renderer) {
+    return {
+      manifest: {
+        name: "probe",
+        targetsContract: contractVersion,
+        unsupported: CORE_WIDGET_TYPES.filter((t) => t !== "switch"),
+        widgets: { switch: {} },
+        layout: { model: "grid", honors: [] },
+        a11y: A11Y,
+      } as unknown as SkinManifest,
+      tiles: { switch: tile },
+      styles: { [SHEET_PATH]: PASSING },
+    };
+  }
+
+  it("ein Farbliteral im `style`-Prop ist ein Befund", async () => {
+    // Die Farb-Achse sieht sonst nur Stylesheets: ein Renderer konnte eine
+    // unbeteiligte, bestandene Palette deklarieren und trotzdem `#777` ueber eine
+    // helle Flaeche legen.
+    const tile: Renderer = () => vh("div", { style: { color: "#777777" } }) as never;
+    const { report } = await generateSupport(skinWith(tile));
+    expect(report.a11y?.findings.map((f) => f.detail).join(" ")).toContain("Renderer-Inline-Stil");
+    expect(report.a11y?.status).toBe("fail");
+  });
+
+  it("dieselbe Farbe in rohem Markup ebenso", async () => {
+    const tile: Renderer = () => vh("div", { innerHTML: '<b style="color:#777">x</b>' }) as never;
+    const { report } = await generateSupport(skinWith(tile));
+    expect(report.a11y?.findings.map((f) => f.detail).join(" ")).toContain("Renderer-Inline-Stil");
+  });
+
+  it("ein `var()` auf einen deklarierten Token ist in Ordnung", async () => {
+    // Die Gegenprobe: der Riegel darf nicht jeden Inline-Stil verbieten — genau so
+    // soll ein Renderer die Palette benutzen.
+    const tile: Renderer = () => vh("div", { style: { color: "var(--fg)" } }) as never;
+    const { report } = await generateSupport(skinWith(tile));
+    expect(report.a11y?.findings).toEqual([]);
+    expect(report.a11y?.status).toBe("pass");
+  });
+
+  it("ein Inline-Stil ohne Farbe ist keiner", async () => {
+    const tile: Renderer = () => vh("div", { style: { fontWeight: 600, gap: "4px" } }) as never;
+    const { report } = await generateSupport(skinWith(tile));
+    expect(report.a11y?.findings).toEqual([]);
+  });
+});
+
+describe("die Aktions-Achse erbt Vues Prop-Semantik, statt sie nachzubilden", () => {
+  function actionSkin2(tiles: Record<string, Renderer>) {
+    return {
+      manifest: {
+        name: "props",
+        targetsContract: "1.10",
+        unsupported: ["light", "blind", "jalousie", "sensor", "scene", "media", "camera", "climate"],
+        widgets: { switch: { actions: ["toggle"] } },
+        layout: { model: "grid", honors: [] },
+      } as unknown as SkinManifest,
+      tiles,
+    };
+  }
+
+  it("ein Prop in kebab-case erreicht seine camelCase-Deklaration", () => {
+    // Der frühere Nachbau schlug nur unter dem camelCase-Namen nach, hielt das Prop
+    // für abwesend und wandte den `default` an — die Achse erfand ein `data-action`,
+    // das die montierte Komponente nicht zeichnet. Vue camelisiert den Schlüssel
+    // selbst; seit die Achse montiert, ist das kein Thema mehr.
+    const Action = {
+      props: { isEnabled: { type: Boolean, default: true } },
+      setup(props: { isEnabled: boolean }) {
+        return () => (props.isEnabled ? vh("button", { "data-action": "toggle" }) : vh("span"));
+      },
+    };
+    const tile: Renderer = () => vh(Action as never, { "is-enabled": false }) as never;
+    return generateSupport(actionSkin2({ switch: tile })).then(({ report }) => {
+      expect(report.widgets.switch?.actions).toBe("0/1");
+    });
+  });
+
+  it("ein Teleport zählt, weil im DOM gesucht wird", () => {
+    // Ein Baum-Durchlauf sah das Ziel eines Teleports nie — der Mount sehr wohl.
+    const tile: Renderer = () =>
+      vh(Teleport as never, { to: "body" }, [vh("button", { "data-action": "toggle" })]) as never;
+    return generateSupport(actionSkin2({ switch: tile })).then(({ report }) => {
+      // Der Teleport landet ausserhalb des Containers; gezählt wird, was der Skin
+      // wirklich zeichnet — hier also NICHT im Container, und das ist die ehrliche
+      // Antwort: was der Host woanders hinhängt, ist nicht die Kachel.
+      expect(report.widgets.switch?.actions).toBe("0/1");
+    });
+  });
 });

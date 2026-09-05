@@ -66,13 +66,18 @@
   --vz-acc-blue: #5a93dd;
   --vz-acc-rose: #d97a8d;
   --vz-acc-amber: #e8b441;
-  --vz-acc-slate: #7e8696;
-  --vz-accent: var(--vz-acc-orange);
+  /* Slate ist der einzige Akzent, der die 0.7-Dämpfung der gesperrten Kachel NICHT
+     überlebte: #7e8696 fiel auf --vz-chip-bg auf 2.76:1 (Ziel 3:1 für Grafik). Eine
+     Spur heller (OKLab L 0.619 → 0.659, Farbton und Chroma unverändert) trägt er
+     gedimmt 3.10:1 und ungedimmt 4.80:1. */
+  --vz-acc-slate: #8a92a3;
 
   /* AA-Ink je Palette-Akzent (#19): akzentgefüllter Text fiel bisher auf Weiß
      zurück — gegen JEDEN dieser hellen Akzente unter WCAG AA (Weiß erreicht max.
-     3.66:1). Dunkle Ink (#10131a) erfüllt AA gegen alle acht (min. 5.08:1). Der
-     Host liefert die zum Akzent passende Ink via t.accentInk(token) → var(--ink-<token>). */
+     3.16:1). Dunkle Ink (#10131a) erfüllt AA gegen alle acht (min. 5.89:1). Der
+     Host liefert die zum Akzent passende Ink via t.accentInk(token) → var(--ink-<token>).
+     Die Werte hier gelten für den dunklen Boden; das helle Theme setzt eine tiefere
+     Tonstufe der Palette und kippt die Ink dort auf Hell (siehe unten). */
   --ink-orange: #10131a;
   --ink-teal: #10131a;
   --ink-violet: #10131a;
@@ -81,15 +86,109 @@
   --ink-rose: #10131a;
   --ink-amber: #10131a;
   --ink-slate: #10131a;
-  /* Globaler Ink-Default, gepaart mit dem Default-Akzent (orange). Ein vom Host
-     gesetztes --vz-accent-ink gewinnt (Element-Style schlägt :root in der Kaskade). */
-  --vz-accent-ink: var(--ink-orange);
 
+  /* --vz-accent und --vz-accent-ink stehen mit Absicht NICHT hier, sondern im
+     .visu-root-Block weiter unten: sie sind Aliasse auf diese Palette, und ein Alias
+     wird auf dem Element aufgelöst, das seine Deklaration trägt. Hier — auf <html> —
+     bekäme er den dunklen Boden eingefroren und würde ihn an das helle Theme
+     weitervererben. Die Begründung steht ausführlich an der Deklaration. */
+
+  /* Die Zustandsfarben tragen dieselbe 0.7-Dämpfung wie die Akzente. --vz-on,
+     --vz-warn und --vz-good hielten sie auf dem dunklen Grund bereits (3.64:1 …
+     4.61:1); --vz-off und --vz-bad nicht. */
   --vz-on: #6fbf6a;
-  --vz-off: #79808d;
+  /* LED AUS, Grafik-Schwelle 3:1. #79808d fiel gedimmt auf 2.59:1 auf --vz-chip-bg;
+     OKLab L 0.598 → 0.661 hebt ihn auf 3.12:1, ohne aus dem Neutralgrau zu laufen. */
+  --vz-off: #8b93a0;
   --vz-warn: #e8b441;
-  --vz-bad: #e36767;
+  /* Fehlertext, Text-Schwelle 4.5:1. #e36767 fiel gedimmt auf 2.95:1. Ein dunkles
+     Theme braucht dafür ein HELLES Rot (Material 3 setzt dort #f2b8b5) — L 0.665 →
+     0.808 gibt gedimmt 4.62:1 und ungedimmt 7.92:1, der Farbton bleibt exakt. */
+  --vz-bad: #ffa4a1;
   --vz-good: #5cb568;
+
+  /* ══ Farbe, die NICHT ueber die Palette laeuft, aber einen Namen und eine Rolle
+     braucht (Riegel 8 der Farb-Achse: eine Farbe direkt in einer gewoehnlichen
+     Deklaration ist ungemessen, weil sie weder Namen noch Rolle noch erklaerten
+     Grund hat). Seit hier steht JEDE Farbe des Blattes in einem Token, und
+     manifest.a11y.tokens sagt fuer jedes, ob es gemessen wird oder mit Begruendung
+     ausgenommen ist.
+
+     Die Aufteilung folgt der Aufloesung von Custom Properties, nicht dem Geschmack:
+     ein `var()` in einem Token-Wert wird auf dem Element aufgeloest, das die
+     DEKLARATION traegt. Deshalb steht hier nur, was keine Variable liest;
+     theme-abhaengige Stuecke stehen in .visu-root bzw. den Theme-Bloecken,
+     akzent-abhaengige an der Regel, die sie benutzt (dort traegt --acc den
+     Akzent der Kachel). ══ */
+
+  /* Schatten: Tiefenandeutung unter einer deckenden Flaeche, kein Vordergrund. */
+  --vz-tile-shadow-hover: 0 1px 0 rgba(255, 255, 255, 0.5) inset, 0 12px 26px rgba(0, 0, 0, 0.16);
+  --vz-tile-shadow-ios: 0 4px 16px rgba(0, 0, 0, 0.08);
+  --vz-tile-shadow-ios-glow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  --vz-tile-shadow-md: 0 1px 2px rgba(0, 0, 0, 0.2), 0 2px 6px rgba(0, 0, 0, 0.12);
+  --vz-badge-shadow: 0 2px 7px rgba(0, 0, 0, 0.32);
+  --vz-thumb-shadow: 0 1px 5px rgba(0, 0, 0, 0.28);
+  --vz-thumb-shadow-sm: 0 2px 6px rgba(0, 0, 0, 0.26);
+  --vz-thumb-shadow-lg: 0 2px 8px rgba(0, 0, 0, 0.3);
+
+  /* Kern des Reglerknopfes. Identifiziert wird der Knopf durch seinen Akzentring
+     (--acc, gemessene Grafik); der helle Kern ist die Fase darunter. */
+  --vz-thumb-fill: #ffffff;
+
+  /* Kopfleisten-Schleier. `none` ist der Boden: das helle Theme braucht keinen,
+     dark und image setzen ihren eigenen. */
+  --vz-appbar-scrim: none;
+
+  /* „● LIVE"-Badge der Kamera. Eine FLACHE Farbe statt color-mix(--vz-bad 72%, #000),
+     damit sie als Grund messbar ist — und eine Spur tiefer als die alte Mischung:
+     die trug weissen Text im dunklen Theme nur mit 4.41:1, also unter der
+     AA-Textschwelle. 68 % statt 72 % Rot ueber Schwarz ergibt #98605e und 5.04:1.
+     Das helle Theme setzt seinen eigenen Wert (siehe unten). */
+  --vz-live-bg: #98605e;
+  --vz-live-ink: #ffffff;
+
+  /* Scrim des Detail-Modals ueber dem Foto (nur image-Theme, siehe unten). */
+  --vz-dialog-scrim: linear-gradient(rgba(0, 0, 0, 0.58), rgba(0, 0, 0, 0.82));
+
+  /* ── Die Jalousie-Illustration (Fenster, Himmel, Kopfschiene, Lamellen).
+     Theme-unabhaengig: sie ist das BILD einer Jalousie, keine Flaeche des Skins.
+     --jal-window-lo ist der dunkelste Punkt des HIMMELS und zugleich sein erster
+     Verlaufsstopp. Der dunkelste Punkt der GANZEN Illustration ist er nicht:
+     --jal-shade-lo weiter unten ist es. */
+  --jal-window-lo: #b9d8ee;
+  --jal-window-sky: linear-gradient(180deg, var(--jal-window-lo) 0%, #d8e7f0 52%, #e9eef1 100%);
+  --jal-window-inset: inset 0 2px 10px rgba(0, 0, 0, 0.18);
+  --jal-sun: radial-gradient(120% 80% at 78% 14%, rgba(255, 243, 201, 0.85), transparent 46%);
+  --jal-headrail-fill: linear-gradient(180deg, #eef1f4, #c4c9cf);
+  --jal-headrail-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  --jal-louver-fill: linear-gradient(180deg, #fbfcfd 0%, #e2e5e9 42%, #c3c8ce 70%, #d6dadf 100%);
+  --jal-louver-hi: rgba(255, 255, 255, 0.85);
+  --jal-louver-lo: rgba(0, 0, 0, 0.22);
+  --jal-louver-shadow: 0 1px 2px rgba(0, 0, 0, 0.16);
+
+  /* Der dunkelste Pixel IM ABLESEBEREICH: die untere Lamellenkante
+     (--jal-louver-lo, rgba(0,0,0,0.22)) ueber dem dunkelsten Lamellenstopp
+     (#c3c8ce) ergibt #989ca1. Nicht der dunkelste Pixel der ganzen Illustration —
+     der Schlagschatten der Kopfschiene liegt mit rund #8498a7 tiefer, aber am
+     OBEREN Rand des Fensters, wo der Ablesetext (unten links) nie steht.
+     Gemalt wird dieser Token nirgends; er benennt den schlechtesten Grund, auf
+     dem der Text real stehen kann, damit die Messung ihn trifft statt nur den
+     helleren Himmel. Ohne ihn wies der Report 8.78:1 fuer --jal-ink-soft aus,
+     wo real 4.73:1 stehen. */
+  --jal-shade-lo: #989ca1;
+
+  /* Der Ablesetext IM Fenster. Er lag auf Weiss und stand damit auf einer hellen
+     Illustration (#989ca1 … #fbfcfd) — lesbar allein durch seinen Schlagschatten,
+     also gar nicht messbar. Dunkle Ink, gemessen gegen BEIDE erklaerten Gruende:
+     auf dem Himmelsanschlag 12.49:1 / 8.78:1, auf dem dunkelsten Pixel des
+     Ablesebereichs 6.73:1 (--jal-ink) und 4.73:1 (--jal-ink-soft). Diese Zahlen
+     gelten in JEDEM Zustand, seit die Sperre das Fenster nicht mehr daempft
+     (siehe .jal-tile.locked weiter unten) — vorher standen sie gesperrt bei
+     2.25:1 bzw. 2.90:1. Der Schatten kippt entsprechend von dunkel auf einen
+     hellen Saum. */
+  --jal-ink: #10131a;
+  --jal-ink-soft: #2b313c;
+  --jal-readout-halo: 0 1px 4px rgba(255, 255, 255, 0.75);
 }
 
 /* ===========================================================================
@@ -102,10 +201,99 @@
   --vz-bg: #e9ecef;
   --vz-bg-grad: radial-gradient(120% 90% at 0% 0%, #cfd6df 0%, #e9ecef 55%, #f2f4f7 100%);
   --vz-bg-image: none;
-  --vz-fg: #1a1d23;
-  --vz-fg-mute: #4a5160;
-  --vz-fg-soft: #79808d;
+  /* Text-Leiter, gerechnet gegen den DUNKELSTEN hellen Grund (--vz-bg #e9ecef —
+     auf Weiss ist dunkler Text immer besser dran) und gegen die 0.7-Dämpfung der
+     gesperrten Kachel. Spiegelbild der dunklen Leiter: gestaucht auf L 0.155 …
+     0.313, drei Stufen à rund 0.08 OKLab-L.
+       fg      #0a0c12  L 0.155  ungedimmt 16.49:1  gedimmt 6.90:1
+       fg-mute #181d2a  L 0.232  ungedimmt 14.19:1  gedimmt 5.73:1  (war 3.37:1)
+       fg-soft #2b313c  L 0.312  ungedimmt 11.02:1  gedimmt 4.65:1  (war 2.21:1) */
+  --vz-fg: #0a0c12;
+  --vz-fg-mute: #181d2a;
+  --vz-fg-soft: #2b313c;
 
+  /* ===================================================================
+     Palette-Tonstufe für den hellen Grund.
+
+     Die acht Marken-Akzente in :root sind für einen dunklen Grund gestimmt und
+     erreichen auf einer nahezu weissen Seite nicht einmal ungedimmt die 3:1 aus
+     WCAG 1.4.11 (amber 1.60:1, green 1.90:1, orange 2.13:1 auf --vz-bg). Kein
+     Wasch der Fläche kann das heilen — es ist ein Farbwert-, kein Flächenproblem.
+
+     Deshalb bekommt das helle Theme dieselben acht Farbtöne eine Tonstufe tiefer:
+     der OKLab-FARBTON bleibt stehen (Abweichung senkrecht zur Farbachse höchstens
+     0.005, also unterhalb der Sichtbarkeit), nur L sinkt auf die Höhe, die 3:1 auch
+     unter der 0.7-Dämpfung der gesperrten Kachel hält. Das ist die übliche Bauweise
+     eines Zwei-Themen-Systems — Material 3 nimmt für Light ebenfalls einen tieferen
+     Ton derselben Familie — und ausdrücklich NICHT ein Einebnen: der kleinste
+     paarweise OKLab-Abstand der acht liegt hier bei 0.075 (teal/slate) gegen 0.095
+     im dunklen Boden, beides weit über der Unterscheidungsschwelle von rund 0.02.
+     Die Chroma sinkt dort, wo der sRGB-Raum tiefer unten enger wird (orange 0.150 →
+     0.123, amber 0.141 → 0.088); mehr Chroma wäre nur um den Preis eines wandernden
+     Farbtons zu haben, und ein wandernder Farbton ist genau das, was die acht
+     Akzente nicht dürfen.
+
+     Amber steht bewusst eine Stufe tiefer als seine Schwelle verlangt (L 0.429 statt
+     0.477): auf gleicher Höhe rückte er dem orange auf 0.060 — der einzige Abstand
+     der Palette, der unter den dunklen Boden gefallen wäre. Tiefer gesetzt sind es
+     0.089, und er trägt 3.50:1 statt 3.10:1.
+
+     Gemessen gegen --vz-bg #e9ecef (der schlechteste helle Grund, weil dunkler Text
+     auf Weiss immer besser dasteht):
+       Token   alt      neu      ungedimmt   gedimmt 0.7   (alt gedimmt)
+       orange  #ec8b3a  #954a00  5.44:1      3.10:1        1.71:1
+       teal    #45b1ae  #006968  5.50:1      3.12:1        1.71:1
+       violet  #a489d9  #684c97  5.77:1      3.12:1        1.84:1
+       green   #6fbf6a  #186c17  5.54:1      3.12:1        1.56:1
+       blue    #5a93dd  #255da2  5.59:1      3.10:1        1.94:1
+       rose    #d97a8d  #994155  5.46:1      3.10:1        1.87:1
+       amber   #e8b441  #674a00  6.93:1      3.50:1        1.40:1
+       slate   #8a92a3  #525a68  5.86:1      3.10:1        2.10:1
+     =================================================================== */
+  --vz-acc-orange: #954a00;
+  --vz-acc-teal: #006968;
+  --vz-acc-violet: #684c97;
+  --vz-acc-green: #186c17;
+  --vz-acc-blue: #255da2;
+  --vz-acc-rose: #994155;
+  --vz-acc-amber: #674a00;
+  --vz-acc-slate: #525a68;
+
+  /* Die Ink kippt mit. Auf dem tiefen Ton reisst die dunkle Ink des Grundthemes
+     (#10131a) mit 2.73:1 … 3.00:1 die Textschwelle; die helle Ink trägt gegen alle
+     acht 6.07:1 … 7.73:1. --vz-accent-ink zeigt auf --ink-orange und folgt damit
+     ohne eigene Zeile. */
+  --ink-orange: #f7f8fa;
+  --ink-teal: #f7f8fa;
+  --ink-violet: #f7f8fa;
+  --ink-green: #f7f8fa;
+  --ink-blue: #f7f8fa;
+  --ink-rose: #f7f8fa;
+  --ink-amber: #f7f8fa;
+  --ink-slate: #f7f8fa;
+  /* Die drei `-rgb`-Zwillinge des Brückenblocks sind Zahlentripel, keine Token —
+     Ionic mischt daraus seine Ripple- und Fokus-Schleier. Sie MÜSSEN mitziehen,
+     sonst legt der Schleier den dunklen Boden über die helle Tonstufe. */
+  --ion-color-primary-contrast-rgb: 247, 248, 250;
+  --ion-color-primary-rgb: 149, 74, 0;
+  --ion-color-success-rgb: 24, 108, 23;
+
+  /* Zustandsfarben nach derselben Regel: Farbton stehen lassen, L auf die Schwelle.
+     on/off/good sind Grafik (3:1), warn/bad Text (4.5:1) — deshalb liegen die beiden
+     Textfarben deutlich tiefer als die drei LED-Farben. Ein dunkles Bernstein als
+     Warntext auf hellem Grund ist die übliche Lösung (Bootstrap setzt dort #664d03);
+     unter der 0.7-Dämpfung muss es noch eine Stufe tiefer. */
+  --vz-on: #186c17;
+  --vz-off: #535966;
+  --vz-good: #026f25;
+  --vz-warn: #442f00;
+  --vz-bad: #88091d;
+
+  /* Glas-Wasch im hellen Theme: der aufgezogene Ton ist Weiss — und Weiss IST hier
+     --vz-solid. Jede Wasch-Stufe liegt damit zwischen --vz-bg und --vz-solid, also
+     im Korridor, für den die Palette ohnehin ausgelegt ist. Genau diese Regel zieht
+     das dunkle Theme unten nach; dort war der aufgezogene Ton ebenfalls Weiss, der
+     Korridor endet aber schon bei --vz-solid-2. */
   --vz-tile-bg: rgba(255, 255, 255, var(--vz-tile-alpha));
   --vz-tile-bg-strong: rgba(255, 255, 255, 0.82);
   --vz-tile-border: rgba(255, 255, 255, 0.55);
@@ -115,6 +303,11 @@
   --vz-hairline: rgba(0, 0, 0, 0.06);
   --vz-solid: #ffffff; /* opaque card surface for ios/md looks */
   --vz-solid-2: #f4f6f8;
+
+  /* LIVE-Badge auf dem hellen Boden: --vz-bad ist hier bereits dunkel (#88091d),
+     dieselbe Ableitung (Rot ueber Schwarz) ergibt #55030f und traegt Weiss mit
+     14.87:1. */
+  --vz-live-bg: #55030f;
 }
 
 /* ---- Dark ---- */
@@ -123,18 +316,78 @@
   --vz-bg-grad: radial-gradient(120% 90% at 0% 0%, #1a2030 0%, #11141b 55%, #0a0c11 100%);
   --vz-bg-image: none;
   --vz-fg: #eef0f4;
-  --vz-fg-mute: #aeb4c0;
-  --vz-fg-soft: #7a808d;
+  /* Die Text-Leiter des dunklen Themes, gerechnet gegen den HELLSTEN erklärten
+     Grund (--vz-tile-bg-strong #22272f) und gegen die 0.7-Dämpfung der gesperrten
+     Kachel. Der Dimmer kostet rund den Faktor 1.7 an Verhältnis; damit passen
+     Fließtext, Muted und Soft nicht mehr über die alte Spanne L 0.955 … 0.599,
+     sondern nur noch über L 0.955 … 0.794. Die Leiter wird also gestaucht, nicht
+     eingeebnet: drei Stufen mit je rund 0.08 OKLab-L bleiben sichtbar getrennt.
+       fg      #eef0f4  L 0.955  ungedimmt 13.15:1  gedimmt 7.20:1
+       fg-mute #cfd5e1  L 0.872  ungedimmt 10.19:1  gedimmt 5.77:1  (war 4.32:1)
+       fg-soft #b5bcca  L 0.794  ungedimmt  7.87:1  gedimmt 4.64:1  (war 2.60:1) */
+  --vz-fg-mute: #cfd5e1;
+  --vz-fg-soft: #b5bcca;
 
-  --vz-tile-bg: rgba(255, 255, 255, calc(var(--vz-tile-alpha) * 0.34));
-  --vz-tile-bg-strong: rgba(255, 255, 255, 0.12);
+  /* Flächenton statt Weiss — die drei durchscheinenden Flächen ziehen im dunklen
+     Theme nicht mehr Weiss auf, sondern rgb(35 40 48) = #232830, den Flächenton
+     dieser Palette.
+
+     Warum das die Ursache trifft und nicht bloss eine Zahl dreht: ein Weiss-Wasch
+     über einer fast schwarzen Seite ist ein Leuchtdichte-Verstärker. Die sRGB-Kurve
+     steht nahe Schwarz sehr steil, deshalb landete --vz-tile-bg (0.187 Weiss in der
+     Werkseinstellung) bei #3b3e42 — der 8.6-fachen Leuchtdichte von --vz-bg — und
+     --vz-chip-bg, das sich als ZWEITER Wasch darüber legt, bei #535558, dem
+     16-fachen. Das sind mittlere Graus: zu hell für die hellen Vordergründe dieser
+     Palette, zu dunkel für dunkle. Die DECKENDEN Flächen desselben Skins liegen
+     dagegen beim 2- bis 3.2-fachen (--vz-solid #171b22, --vz-solid-2 #1f242d). Die
+     Glasfläche war also gar nicht dieselbe Fläche wie die Solid-Kachel, die sie in
+     den Stilen ios/md ersetzt — der Gestaltungsfehler war zugleich der Kontrastfehler.
+
+     Ein Wasch DES FLÄCHENTONS über --vz-bg liegt für jede Deckkraft zwischen --vz-bg
+     und dem Ton selbst. Damit ist die Fläche gedeckelt: weder der tileAlpha-Regler
+     (0.3…0.9) noch das Stapeln von Chip auf Kachel können sie aus dem Korridor
+     tragen. Der Ton liegt bis auf zwei Stufen am oberen Rand dessen, was die dunkle
+     Palette trägt: ab rgb(37 42 50) reisst --vz-bad auf dem Chip (4.45 gegen 4.5),
+     kurz danach --vz-acc-blue bei 0.7 Deckkraft. Nachgemessen in
+     tests/surfaces.spec.ts, nicht geschätzt.
+
+     Der Glas-Charakter bleibt: die Fläche ist weiter durchscheinend, backdrop-filter
+     (blur + saturate) greift unverändert, Hairline, Inset-Licht und Schatten stehen.
+     Der Faktor 0.7 an der Kachel hält die LEITER über den ganzen Reglerweg offen.
+     Ohne ihn wächst die Kachel bis zur vollen Deckkraft, Chip (0.85) und -strong
+     (0.95) sind aber feste Wasch-Stufen desselben Tons — bei tileAlpha=0.9 holt die
+     Kachel sie ein (Chip/Kachel 1.03:1, -strong/Kachel 1.01:1), und die Tasten in der
+     Kachel sind nur noch Umrisse. Mit 0.7 bleibt der Schritt bei 1.18 / 1.15 / 1.09
+     (Chip) bzw. 1.21 / 1.16 / 1.09 (-strong) über die Stopps 0.3 / 0.55 / 0.9. 0.7 ist
+     der grösste Faktor, bei dem BEIDE Schritte mit Reserve über 1.08 bleiben; ab 0.72
+     stehen sie auf der Schwelle. Er kostet die Kachel Präsenz gegen die Seite
+     (1.15:1 statt 1.24:1 am oberen Ende) und verbessert jeden gemessenen Kontrast AUF
+     der Kachel (--vz-off bei voller Deckkraft und tileAlpha=0.9: 3.84 → 4.14).
+
+     Die Leiter steht damit: --vz-bg (L* 5.0) < Kachel (L* 7.1 / 9.1 / 11.9) < Chip
+     (L* 14.6 / 14.9 / 15.3) <= Ton (L* 15.9). Die Kachel liegt in der Werkseinstellung
+     zwischen den deckenden Karten --vz-solid (L* 9.7) und --vz-solid-2 (L* 14.1) — die
+     Glaskachel ist dieselbe Fläche wie die Solid-Kachel, die sie in ios/md ersetzt.
+     Vorher lag sie bei L* 26 und der Chip bei L* 36, und ausgerechnet
+     --vz-tile-bg-strong (L* 18.6) war DUNKLER als die normale Kachel.
+
+     Die drei rgb-Tripel stehen ausgeschrieben statt in einem gemeinsamen Token: der
+     Konformitäts-Generator zerlegt einen rgba()-Wert textuell in Kanäle und kann
+     `rgba(var(--ton), a)` deshalb nicht auflösen — ein Token daraus zu machen nähme
+     die Flächen aus der MESSUNG. tests/surfaces.spec.ts hält die drei Tripel, den
+     Deckel, den Mindestschritt der Leiter und die daraus folgenden Kontraste zusammen. */
+  --vz-tile-bg: rgba(35, 40, 48, calc(var(--vz-tile-alpha) * 0.7));
+  --vz-tile-bg-strong: rgba(35, 40, 48, 0.95);
   --vz-tile-border: rgba(255, 255, 255, 0.12);
   --vz-tile-shadow: 0 1px 0 rgba(255, 255, 255, 0.06) inset, 0 8px 24px rgba(0, 0, 0, 0.45);
-  --vz-chip-bg: rgba(255, 255, 255, 0.12);
+  --vz-chip-bg: rgba(35, 40, 48, 0.85);
   --vz-divider: rgba(255, 255, 255, 0.1);
   --vz-hairline: rgba(255, 255, 255, 0.08);
   --vz-solid: #171b22;
   --vz-solid-2: #1f242d;
+
+  /* Kopfleisten-Schleier: hebt Marke und Uhr von der dunklen Seite ab. */
+  --vz-appbar-scrim: linear-gradient(180deg, rgba(0, 0, 0, 0.3) 0%, transparent 100%);
 }
 
 /* ---- Image (glass over photo) ---- */
@@ -158,12 +411,45 @@
   --vz-hairline: rgba(255, 255, 255, 0.14);
   --vz-solid: rgba(28, 32, 40, 0.62);
   --vz-solid-2: rgba(40, 46, 56, 0.55);
+
+  /* header scrim — guarantees brand/clock contrast over the photo */
+  --vz-appbar-scrim: linear-gradient(
+    180deg,
+    rgba(0, 0, 0, 0.46) 0%,
+    rgba(0, 0, 0, 0.18) 68%,
+    transparent 100%
+  );
 }
 
 /* ===========================================================================
    IONIC VARIABLE BRIDGE — feed Visu tokens into Ionic so native components blend
    =========================================================================== */
 .visu-root {
+  /* ══ Diese beiden Aliasse MÜSSEN hier stehen und nicht in :root ══
+     Die Substitution einer Custom Property passiert auf dem Element, das die
+     DEKLARATION trägt, nicht auf dem, das sie liest. `:root` ist <html>;
+     `[data-theme]` sitzt immer auf einem Nachfahren-div (.visu-root). Stand
+     `--vz-accent: var(--vz-acc-orange)` in :root, löste der Browser es dort gegen
+     die Palette von <html> auf — also gegen den DUNKLEN Boden — und vererbte das
+     fertige Literal nach unten. Die helle Tonstufe von --vz-acc-orange kam nie an:
+     gemessen lieferte ein <div class="visu-root" data-theme="light"> ein
+     --vz-accent von #ec8b3a (2.13:1 auf --vz-bg) statt #954a00, und ein
+     --vz-accent-ink von #10131a (2.26:1 … 2.88:1 auf den tiefen Akzenten) statt
+     #f7f8fa. Hier deklariert, laufen beide gegen die Palette DES GETHEMTEN
+     ELEMENTS und liefern hell #954a00/#f7f8fa, dunkel #ec8b3a/#10131a.
+
+     Ein vom Host gesetztes --vz-accent / --vz-accent-ink gewinnt weiterhin: ein
+     Element-Style schlägt jeden Klassenselektor. Was NICHT mehr gilt: dass ein
+     Ableger ausserhalb von .visu-root noch einen Akzent erbt — dort gibt es
+     keinen, und das ist richtig so, weil es dort auch kein Theme gibt.
+
+     Ein Wächter dagegen steht in tests/contrast.spec.ts („kein Alias in :root
+     zeigt auf ein Token, das ein Theme überschreibt"). Der Konformitätslauf kann
+     das NICHT sehen: er baut je Theme eine flache Variablen-Karte und kennt kein
+     Element, auf dem eine Deklaration sitzt. */
+  --vz-accent: var(--vz-acc-orange);
+  --vz-accent-ink: var(--ink-orange);
+
   --ion-font-family: var(--vz-font);
   --ion-background-color: var(--vz-bg);
   --ion-text-color: var(--vz-fg);
@@ -175,8 +461,23 @@
   /* primary = current app accent */
   --ion-color-primary: var(--vz-accent);
   --ion-color-primary-rgb: 236, 139, 58;
-  --ion-color-primary-contrast: #ffffff;
-  --ion-color-primary-contrast-rgb: 255, 255, 255;
+  /* Text AUF dem akzentgefüllten Ionic-Button. Weiss erreicht gegen KEINEN der
+     acht Palette-Akzente des dunklen Bodens die 4.5:1 aus WCAG 1.4.3 —
+     bestenfalls 3.16:1 (blue), schlimmstenfalls 1.90:1 (amber). Der Skin hat
+     dieses Problem für sein EIGENES
+     Markup längst mit --ink-… und --vz-accent-ink gelöst (siehe :root oben); nur der
+     Ionic-Komponentenpfad blieb auf Weiss stehen. Er zieht jetzt denselben Ton,
+     womit gefüllter Button und gefüllte Kachel auch optisch wieder eine Sprache
+     sprechen. Der Akzent selbst bleibt unangetastet — nur die Schrift darauf
+     kippt von Weiss auf die zum Akzent gehörende Ink (min. 5.08:1 gegen slate,
+     9.77:1 gegen amber). Setzt der Host --vz-accent-ink je Gerät, folgt der
+     Button automatisch mit. Im hellen Theme dreht sich die Rechnung um: die Palette
+     liegt dort eine Tonstufe tiefer, und --ink-… trägt Hell statt Dunkel. Weil hier
+     nur der TOKEN steht und keine Farbe, folgt der Button beiden Themes von selbst. */
+  --ion-color-primary-contrast: var(--vz-accent-ink);
+  /* Ionic mischt hieraus seine Ripple-/Focus-Schleier. Muss dem Ton oben folgen,
+     sonst leuchtet ein weisser Schleier über dunkler Schrift. */
+  --ion-color-primary-contrast-rgb: 16, 19, 26;
   --ion-color-primary-shade: var(
     --vz-accent-shade,
     color-mix(in oklab, var(--vz-accent) 86%, #000)
@@ -187,14 +488,66 @@
   --ion-color-success-rgb: 111, 191, 106;
   --ion-color-warning: var(--vz-warn);
   --ion-color-danger: var(--vz-bad);
+
+  /* ══ Abgeleitete Farbe, die ein THEME-Token liest ══
+     Sie steht aus demselben Grund hier und nicht in :root wie --vz-accent: ein
+     `var()` im Wert wird auf dem Element aufgeloest, das die Deklaration traegt.
+     In :root (also <html>) fror sie den dunklen Boden ein und vererbte ihn ins
+     helle Theme. tests/contrast.spec.ts haelt diese Regel als Waechter fest. */
+
+  /* Wasch-Flaechen: eine Kachel/ein Knopf unter dem Zeiger oder im Aktiv-Zustand. */
+  --vz-seg-hover-bg: color-mix(in oklab, var(--vz-fg) 8%, transparent);
+  --vz-cam-view-bg: color-mix(in oklab, var(--vz-fg) 10%, transparent);
+  --vz-toggle-on-bg: color-mix(in oklab, var(--vz-accent) 18%, transparent);
+  --jal-vtrack-bg: color-mix(in oklab, var(--vz-fg) 15%, transparent);
+
+  /* Schraffur der gesperrten Flaeche (Sperre + readonly). */
+  --vz-lock-hatch: repeating-linear-gradient(
+    45deg,
+    transparent,
+    transparent 9px,
+    color-mix(in oklab, var(--vz-fg) 7%, transparent) 9px,
+    color-mix(in oklab, var(--vz-fg) 7%, transparent) 18px
+  );
+  --vz-lock-hatch-soft: repeating-linear-gradient(
+    45deg,
+    transparent,
+    transparent 9px,
+    color-mix(in oklab, var(--vz-fg) 6%, transparent) 9px,
+    color-mix(in oklab, var(--vz-fg) 6%, transparent) 18px
+  );
+
+  /* Saeume und Rahmen — Chrome um ein bereits gemessenes Element herum. */
+  --vz-roomdot-glow: 0 0 9px color-mix(in oklab, var(--vz-accent) 60%, transparent);
+  --vz-dot-rim: 0 0 0 2px color-mix(in oklab, var(--vz-fg) 8%, transparent);
+  --vz-on-glow: 0 0 7px color-mix(in oklab, var(--vz-on) 60%, transparent);
+  --vz-bad-glow: 0 0 7px color-mix(in oklab, var(--vz-bad) 60%, transparent);
+  --vz-tile-border-warn: color-mix(in oklab, var(--vz-warn) 55%, var(--vz-hairline));
+  --jal-window-border: color-mix(in oklab, var(--vz-fg) 14%, transparent);
+  --jal-vtrack-rim: inset 0 0 0 1px color-mix(in oklab, var(--vz-fg) 10%, transparent);
+
+  /* ══ Die beiden Knoepfe des Ionic-Toggles ══
+     Sie standen in `.visu-root ion-toggle` — einem Block, der in KEINES der
+     gemessenen Themes kaskadiert. Beide waren im Manifest als Grafik deklariert
+     und fielen trotzdem aus jeder Messung („steht in keinem der erklaerten
+     Bloecke"). Hier deklariert, werden sie gemessen.
+
+     Der EINGESCHALTETE Knopf liegt auf dem Akzentgleis und traegt deshalb die
+     Ink des Akzents — dieselbe Achse, die --ion-color-primary-contrast und die
+     akzentgefuellten Kacheln des Skins schon fahren. Weiss erreichte gegen den
+     hellen Akzent des dunklen Bodens nur 2.52:1.
+
+     Der AUSGESCHALTETE Knopf lag auf Weiss und war damit im hellen Theme ein
+     weisser Punkt auf einer weissen Karte. --vz-fg-mute traegt in beiden Themes
+     die Grafik-Schwelle gegen die Flaechen, auf denen das Toggle steht. */
+  --handle-background: var(--vz-fg-mute);
+  --handle-background-checked: var(--vz-accent-ink);
 }
 
 /* Ionic toggle / range tuned to Visu (checked = accent, not stock green) */
 .visu-root ion-toggle {
   --track-background: color-mix(in oklab, var(--vz-fg-soft) 22%, transparent);
   --track-background-checked: var(--vz-accent);
-  --handle-background: #fff;
-  --handle-background-checked: #fff;
 }
 .visu-root ion-range {
   --bar-background: var(--vz-divider);
@@ -244,17 +597,11 @@ ion-content.visu-content {
 .visu-root[data-titlebar="0"] .vz-titlebar {
   display: none;
 }
-/* header scrim — guarantees brand/clock contrast over photo / dark surfaces */
-.visu-root[data-theme="image"] .vz-appbar {
-  background: linear-gradient(
-    180deg,
-    rgba(0, 0, 0, 0.46) 0%,
-    rgba(0, 0, 0, 0.18) 68%,
-    transparent 100%
-  );
-}
-.visu-root[data-theme="dark"] .vz-appbar {
-  background: linear-gradient(180deg, rgba(0, 0, 0, 0.3) 0%, transparent 100%);
+/* header scrim — guarantees brand/clock contrast over photo / dark surfaces.
+   Der Schleier steht als Theme-Token (--vz-appbar-scrim), nicht als zwei
+   theme-eigene Regeln: so traegt er einen Namen und eine Rolle. */
+.vz-appbar {
+  background: var(--vz-appbar-scrim);
 }
 .vz-appbar-row {
   display: flex;
@@ -331,12 +678,17 @@ ion-content.visu-content {
     color 0.15s;
 }
 .vz-seg button:hover:not(.on) {
-  background: color-mix(in oklab, var(--vz-fg) 8%, transparent);
+  background: var(--vz-seg-hover-bg);
 }
 .vz-seg button.on {
+  --vz-seg-on-glow: 0 1px 5px color-mix(in oklab, var(--vz-accent) 42%, transparent);
   background: var(--vz-accent);
-  color: var(--vz-accent-ink, #fff);
-  box-shadow: 0 1px 5px color-mix(in oklab, var(--vz-accent) 42%, transparent);
+  /* Kein Rueckfall auf #fff mehr: --vz-accent-ink steht in .visu-root und ist
+     immer da. Der Rueckfall war die einzige Stelle, an der die Ink-Achse noch
+     auf hartes Weiss zeigte — ungemessen und gegen den hellen Akzent des
+     dunklen Bodens unter AA. */
+  color: var(--vz-accent-ink);
+  box-shadow: var(--vz-seg-on-glow);
 }
 
 /* ---- Room bar ---- */
@@ -427,39 +779,40 @@ ion-content.visu-content {
 }
 [data-stil="glass"] .vz-tile:hover {
   transform: translateY(-1px);
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.5) inset,
-    0 12px 26px rgba(0, 0, 0, 0.16);
+  box-shadow: var(--vz-tile-shadow-hover);
 }
 [data-stil="glass"] .vz-tile.is-on {
-  background: color-mix(in oklab, var(--acc) 13%, var(--vz-tile-bg));
+  --vz-tile-bg-on: color-mix(in oklab, var(--acc) 13%, var(--vz-tile-bg));
+  background: var(--vz-tile-bg-on);
 }
 
 /* --- ios surface (Stil = ios): soft solid card, subtle accent-tinted material --- */
 [data-stil="ios"] .vz-tile {
-  background: color-mix(in oklab, var(--acc) 11%, var(--vz-solid));
+  --vz-tile-bg-ios: color-mix(in oklab, var(--acc) 11%, var(--vz-solid));
+  background: var(--vz-tile-bg-ios);
   border: 0.5px solid var(--vz-hairline);
   border-radius: 18px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  box-shadow: var(--vz-tile-shadow-ios);
 }
 [data-stil="ios"] .vz-tile.is-on {
-  background: color-mix(in oklab, var(--acc) 24%, var(--vz-solid));
+  --vz-tile-bg-ios-on: color-mix(in oklab, var(--acc) 24%, var(--vz-solid));
+  background: var(--vz-tile-bg-ios-on);
 }
 
 /* --- md surface (Stil = md): tonal Material-You surface (accent-tinted) --- */
 [data-stil="md"] .vz-tile {
-  background: color-mix(in oklab, var(--acc) 14%, var(--vz-solid));
+  --vz-tile-bg-md: color-mix(in oklab, var(--acc) 14%, var(--vz-solid));
+  background: var(--vz-tile-bg-md);
   border: none;
   border-radius: 12px;
-  box-shadow:
-    0 1px 2px rgba(0, 0, 0, 0.2),
-    0 2px 6px rgba(0, 0, 0, 0.12);
+  box-shadow: var(--vz-tile-shadow-md);
 }
 [data-stil="md"] .vz-tile::before {
   height: 3px;
 }
 [data-stil="md"] .vz-tile.is-on {
-  background: color-mix(in oklab, var(--acc) 28%, var(--vz-solid));
+  --vz-tile-bg-md-on: color-mix(in oklab, var(--acc) 28%, var(--vz-solid));
+  background: var(--vz-tile-bg-md-on);
 }
 
 /* ===========================================================================
@@ -490,12 +843,13 @@ ion-content.visu-content {
   border-radius: inherit;
   pointer-events: none;
   z-index: 0;
-  background: radial-gradient(
+  --vz-glow-veil: radial-gradient(
     118% 82% at 50% 116%,
     color-mix(in oklab, var(--acc) 58%, transparent) 0%,
     color-mix(in oklab, var(--acc) 14%, transparent) 32%,
     transparent 56%
   );
+  background: var(--vz-glow-veil);
   opacity: calc(var(--vz-glow, 1) * 0.05);
   transition: opacity 0.34s ease;
 }
@@ -505,61 +859,65 @@ ion-content.visu-content {
 }
 
 [data-acc-style="glow"][data-stil="glass"] .vz-tile {
-  background: color-mix(in oklab, var(--acc) 4%, var(--vz-tile-bg));
+  --vz-tile-bg-glow: color-mix(in oklab, var(--acc) 4%, var(--vz-tile-bg));
+  background: var(--vz-tile-bg-glow);
 }
 [data-acc-style="glow"][data-stil="glass"] .vz-tile.is-on {
-  background: color-mix(in oklab, var(--acc) 18%, var(--vz-tile-bg));
+  --vz-tile-bg-glow-on: color-mix(in oklab, var(--acc) 18%, var(--vz-tile-bg));
+  background: var(--vz-tile-bg-glow-on);
 }
 
 [data-acc-style="glow"] .vz-tile.is-on {
-  border-color: color-mix(in oklab, var(--acc) 50%, var(--vz-tile-border));
-  box-shadow:
-    var(--vz-tile-shadow),
-    0 0 0 0.5px color-mix(in oklab, var(--acc) 30%, transparent),
-    0 6px 22px color-mix(in oklab, var(--acc) calc(var(--vz-glow, 1) * 30%), transparent);
+  --vz-tile-border-on: color-mix(in oklab, var(--acc) 50%, var(--vz-tile-border));
+  --vz-glow-rim: 0 0 0 0.5px color-mix(in oklab, var(--acc) 30%, transparent);
+  --vz-glow-bloom: 0 6px 22px
+    color-mix(in oklab, var(--acc) calc(var(--vz-glow, 1) * 30%), transparent);
+  border-color: var(--vz-tile-border-on);
+  box-shadow: var(--vz-tile-shadow), var(--vz-glow-rim), var(--vz-glow-bloom);
 }
 [data-acc-style="glow"][data-stil="ios"] .vz-tile.is-on,
 [data-acc-style="glow"][data-stil="md"] .vz-tile.is-on {
-  box-shadow:
-    0 4px 16px rgba(0, 0, 0, 0.1),
-    0 6px 22px color-mix(in oklab, var(--acc) calc(var(--vz-glow, 1) * 30%), transparent);
+  box-shadow: var(--vz-tile-shadow-ios-glow), var(--vz-glow-bloom);
 }
 [data-acc-style="glow"] .vz-tile.is-on:hover {
   transform: translateY(-1px);
 }
 
 [data-acc-style="glow"] .vz-tile.is-on .vz-tile-body svg {
-  filter: drop-shadow(
+  --vz-glow-glyph: drop-shadow(
     0 0 13px color-mix(in oklab, var(--acc) calc(var(--vz-glow, 1) * 70%), transparent)
   );
+  filter: var(--vz-glow-glyph);
 }
 
 /* ── RAHMEN (ring): a quiet accent outline instead of a bar ──────────────── */
 [data-acc-style="ring"][data-stil="glass"] .vz-tile {
-  box-shadow:
-    var(--vz-tile-shadow),
-    inset 0 0 0 1px color-mix(in oklab, var(--acc) 24%, transparent);
+  --vz-ring-inset: inset 0 0 0 1px color-mix(in oklab, var(--acc) 24%, transparent);
+  box-shadow: var(--vz-tile-shadow), var(--vz-ring-inset);
 }
 [data-acc-style="ring"][data-stil="ios"] .vz-tile,
 [data-acc-style="ring"][data-stil="md"] .vz-tile {
-  box-shadow:
-    0 4px 16px rgba(0, 0, 0, 0.08),
-    inset 0 0 0 1px color-mix(in oklab, var(--acc) 26%, transparent);
+  --vz-ring-inset-strong: inset 0 0 0 1px color-mix(in oklab, var(--acc) 26%, transparent);
+  box-shadow: var(--vz-tile-shadow-ios), var(--vz-ring-inset-strong);
 }
 [data-acc-style="ring"] .vz-tile.is-on {
+  /* Der EINGESCHALTETE Ring ist der volle, gemessene Akzent und steht deshalb
+     weiter unverpackt in der Deklaration; nur der weiche Saum darum ist ein
+     ausgenommener Token. */
+  --vz-ring-bloom: 0 6px 22px color-mix(in oklab, var(--acc) 22%, transparent);
   border-color: transparent;
   box-shadow:
     var(--vz-tile-shadow),
     inset 0 0 0 2px var(--acc),
-    0 6px 22px color-mix(in oklab, var(--acc) 22%, transparent);
+    var(--vz-ring-bloom);
 }
 
 /* ── scene-flash: brief accent bloom on scene activation (all styles) ────── */
 .vz-tile.scene-flash {
-  border-color: color-mix(in oklab, var(--acc) 60%, var(--vz-tile-border));
-  box-shadow:
-    var(--vz-tile-shadow),
-    0 12px 40px color-mix(in oklab, var(--acc) 50%, transparent);
+  --vz-tile-border-flash: color-mix(in oklab, var(--acc) 60%, var(--vz-tile-border));
+  --vz-flash-bloom: 0 12px 40px color-mix(in oklab, var(--acc) 50%, transparent);
+  border-color: var(--vz-tile-border-flash);
+  box-shadow: var(--vz-tile-shadow), var(--vz-flash-bloom);
 }
 
 /* ===========================================================================
@@ -603,7 +961,7 @@ ion-content.visu-content {
   border-radius: 3px;
   align-self: center;
   background: var(--vz-accent);
-  box-shadow: 0 0 9px color-mix(in oklab, var(--vz-accent) 60%, transparent);
+  box-shadow: var(--vz-roomdot-glow);
 }
 .vz-room-name {
   font-size: 12px;
@@ -697,9 +1055,12 @@ ion-content.visu-content {
   border-radius: 7px;
   display: grid;
   place-items: center;
+  --vz-lock-glow: 0 2px 7px color-mix(in oklab, var(--acc, var(--vz-accent)) 45%, transparent);
   background: var(--acc, var(--vz-accent));
-  color: #fff;
-  box-shadow: 0 2px 7px color-mix(in oklab, var(--acc, var(--vz-accent)) 45%, transparent);
+  /* Das Glyph steht auf dem Akzent — also auf der Ink-Achse, wie jede andere
+     akzentgefuellte Flaeche des Skins. Weiss war hier ungemessen. */
+  color: var(--vz-accent-ink);
+  box-shadow: var(--vz-lock-glow);
 }
 .vz-lockveil {
   position: absolute;
@@ -707,13 +1068,7 @@ ion-content.visu-content {
   z-index: 5;
   border-radius: inherit;
   pointer-events: none;
-  background: repeating-linear-gradient(
-    45deg,
-    transparent,
-    transparent 9px,
-    color-mix(in oklab, var(--vz-fg) 7%, transparent) 9px,
-    color-mix(in oklab, var(--vz-fg) 7%, transparent) 18px
-  );
+  background: var(--vz-lock-hatch);
 }
 .vz-tile.locked .vz-tile-body,
 .vz-tile.locked .vz-tile-foot {
@@ -755,8 +1110,9 @@ ion-content.visu-content {
   color: var(--vz-fg-mute);
 }
 .vz-tile.is-on .vz-bulb {
+  --vz-bulb-glow: drop-shadow(0 0 10px color-mix(in oklab, var(--acc) 65%, transparent));
   color: var(--acc);
-  filter: drop-shadow(0 0 10px color-mix(in oklab, var(--acc) 65%, transparent));
+  filter: var(--vz-bulb-glow);
 }
 .vz-blind-svg {
   color: var(--vz-fg-mute);
@@ -801,7 +1157,7 @@ ion-content.visu-content {
 /* Warned sensors (ctx.warn(dev) → .is-warn on the tile + footer status) must read
    distinctly from an OK sensor, otherwise the host's warning signal is invisible. */
 .vz-tile--sensor.is-warn {
-  border-color: color-mix(in oklab, var(--vz-warn) 55%, var(--vz-hairline));
+  border-color: var(--vz-tile-border-warn);
 }
 .vz-tile--sensor.is-warn .vz-num {
   color: var(--vz-warn);
@@ -1020,14 +1376,13 @@ ion-content.visu-content {
 .vz-media-prev svg {
   transform: scaleX(-1);
 }
-.vz-media-btn--playPause {
-  background: var(--acc);
-  color: #fff;
-  box-shadow: 0 2px 8px color-mix(in oklab, var(--acc) 42%, transparent);
-}
+.vz-media-btn--playPause,
 .vz-media-btn--playPause:hover {
+  --vz-media-play-glow: 0 2px 8px color-mix(in oklab, var(--acc) 42%, transparent);
   background: var(--acc);
-  color: #fff;
+  /* Akzentgefuellter Knopf → Ink des Akzents, nicht Weiss (siehe .vz-lock). */
+  color: var(--vz-accent-ink);
+  box-shadow: var(--vz-media-play-glow);
 }
 .vz-media-volrow {
   display: flex;
@@ -1047,7 +1402,7 @@ ion-content.visu-content {
   min-height: 0;
   border-radius: 10px;
   overflow: hidden;
-  background: color-mix(in oklab, var(--vz-fg) 10%, transparent);
+  background: var(--vz-cam-view-bg);
 }
 .vz-cam-feed {
   width: 100%;
@@ -1061,13 +1416,7 @@ ion-content.visu-content {
   display: grid;
   place-items: center;
   color: var(--vz-fg-soft);
-  background: repeating-linear-gradient(
-    45deg,
-    transparent,
-    transparent 9px,
-    color-mix(in oklab, var(--vz-fg) 6%, transparent) 9px,
-    color-mix(in oklab, var(--vz-fg) 6%, transparent) 18px
-  );
+  background: var(--vz-lock-hatch-soft);
 }
 .vz-cam-refresh {
   position: absolute;
@@ -1086,7 +1435,7 @@ ion-content.visu-content {
 }
 .vz-cam-refresh:hover {
   background: var(--acc);
-  color: #fff;
+  color: var(--vz-accent-ink);
   border-color: transparent;
 }
 /* „● LIVE"-Badge (Vorlage): oben links über dem Standbild. Hintergrund ist ein
@@ -1105,14 +1454,14 @@ ion-content.visu-content {
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: #fff;
-  background: color-mix(in oklab, var(--vz-bad) 72%, #000);
+  color: var(--vz-live-ink);
+  background: var(--vz-live-bg);
 }
 .vz-cam-live-dot {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #fff;
+  background: var(--vz-live-ink);
 }
 .vz-cam-dot {
   display: inline-block;
@@ -1124,7 +1473,7 @@ ion-content.visu-content {
 }
 .vz-cam-dot.is-online {
   background: var(--vz-on);
-  box-shadow: 0 0 7px color-mix(in oklab, var(--vz-on) 60%, transparent);
+  box-shadow: var(--vz-on-glow);
 }
 
 /* range slider (custom control) */
@@ -1145,8 +1494,8 @@ ion-content.visu-content {
   height: 24px;
   border-radius: 50%;
   background: var(--acc, var(--vz-accent));
-  border: 2px solid #fff;
-  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.28);
+  border: 2px solid var(--vz-thumb-fill);
+  box-shadow: var(--vz-thumb-shadow);
   cursor: pointer;
 }
 .vz-range::-moz-range-thumb {
@@ -1154,8 +1503,8 @@ ion-content.visu-content {
   height: 24px;
   border-radius: 50%;
   background: var(--acc, var(--vz-accent));
-  border: 2px solid #fff;
-  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.28);
+  border: 2px solid var(--vz-thumb-fill);
+  box-shadow: var(--vz-thumb-shadow);
   cursor: pointer;
 }
 
@@ -1190,7 +1539,7 @@ ion-content.visu-content {
 }
 .vz-toggle.on {
   border-color: var(--vz-accent);
-  background: color-mix(in oklab, var(--vz-accent) 18%, transparent);
+  background: var(--vz-toggle-on-bg);
 }
 .vz-toggle.on i {
   background: var(--vz-accent);
@@ -1235,13 +1584,15 @@ ion-content.visu-content {
   -webkit-backdrop-filter: blur(var(--vz-blur)) saturate(var(--vz-saturate));
 }
 [data-stil="ios"] .jal-tile {
-  background: color-mix(in oklab, var(--acc) 9%, var(--vz-solid));
+  --jal-bg-ios: color-mix(in oklab, var(--acc) 9%, var(--vz-solid));
+  background: var(--jal-bg-ios);
   border: 0.5px solid var(--vz-hairline);
   border-radius: 18px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  box-shadow: var(--vz-tile-shadow-ios);
 }
 [data-stil="md"] .jal-tile {
-  background: color-mix(in oklab, var(--acc) 12%, var(--vz-solid));
+  --jal-bg-md: color-mix(in oklab, var(--acc) 12%, var(--vz-solid));
+  background: var(--jal-bg-md);
   border: none;
   border-radius: 12px;
 }
@@ -1258,14 +1609,13 @@ ion-content.visu-content {
   grid-row: span 3;
 }
 [data-acc-style="ring"][data-stil="glass"] .jal-tile {
-  box-shadow:
-    var(--vz-tile-shadow),
-    inset 0 0 0 1px color-mix(in oklab, var(--acc) 24%, transparent);
+  --vz-ring-inset: inset 0 0 0 1px color-mix(in oklab, var(--acc) 24%, transparent);
+  box-shadow: var(--vz-tile-shadow), var(--vz-ring-inset);
 }
 [data-acc-style="glow"] .jal-tile {
-  box-shadow:
-    var(--vz-tile-shadow),
-    0 8px 26px color-mix(in oklab, var(--acc) calc(var(--vz-glow, 1) * 16%), transparent);
+  --jal-glow-bloom: 0 8px 26px
+    color-mix(in oklab, var(--acc) calc(var(--vz-glow, 1) * 16%), transparent);
+  box-shadow: var(--vz-tile-shadow), var(--jal-glow-bloom);
 }
 
 .jal-head {
@@ -1315,7 +1665,7 @@ ion-content.visu-content {
   height: 8px;
   border-radius: 50%;
   display: block;
-  box-shadow: 0 0 0 2px color-mix(in oklab, var(--vz-fg) 8%, transparent);
+  box-shadow: var(--vz-dot-rim);
 }
 .jal-dot em {
   font-style: normal;
@@ -1326,7 +1676,7 @@ ion-content.visu-content {
 }
 .jal-dot.is-true i {
   background: var(--vz-bad);
-  box-shadow: 0 0 7px color-mix(in oklab, var(--vz-bad) 60%, transparent);
+  box-shadow: var(--vz-bad-glow);
 }
 .jal-dot.is-false i {
   background: var(--vz-good);
@@ -1358,10 +1708,11 @@ ion-content.visu-content {
   color: var(--vz-fg);
 }
 .jal-lock.on {
+  --jal-lock-glow: 0 2px 9px color-mix(in oklab, var(--acc) 45%, transparent);
   background: var(--acc);
   border-color: transparent;
-  color: #fff;
-  box-shadow: 0 2px 9px color-mix(in oklab, var(--acc) 45%, transparent);
+  color: var(--vz-accent-ink);
+  box-shadow: var(--jal-lock-glow);
 }
 
 .jal-body {
@@ -1379,14 +1730,14 @@ ion-content.visu-content {
   border-radius: 12px;
   overflow: hidden;
   cursor: pointer;
-  border: 1px solid color-mix(in oklab, var(--vz-fg) 14%, transparent);
-  background: linear-gradient(180deg, #b9d8ee 0%, #d8e7f0 52%, #e9eef1 100%);
-  box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.18);
+  border: 1px solid var(--jal-window-border);
+  background: var(--jal-window-sky);
+  box-shadow: var(--jal-window-inset);
 }
 .jal-sky {
   position: absolute;
   inset: 0;
-  background: radial-gradient(120% 80% at 78% 14%, rgba(255, 243, 201, 0.85), transparent 46%);
+  background: var(--jal-sun);
 }
 .jal-headrail {
   position: absolute;
@@ -1394,8 +1745,8 @@ ion-content.visu-content {
   left: 0;
   right: 0;
   height: 6px;
-  background: linear-gradient(180deg, #eef1f4, #c4c9cf);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  background: var(--jal-headrail-fill);
+  box-shadow: var(--jal-headrail-shadow);
   z-index: 3;
 }
 .jal-blind {
@@ -1419,10 +1770,10 @@ ion-content.visu-content {
   width: 100%;
   height: 100%;
   transform-origin: center center;
-  background: linear-gradient(180deg, #fbfcfd 0%, #e2e5e9 42%, #c3c8ce 70%, #d6dadf 100%);
-  border-top: 0.5px solid rgba(255, 255, 255, 0.85);
-  border-bottom: 0.5px solid rgba(0, 0, 0, 0.22);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.16);
+  background: var(--jal-louver-fill);
+  border-top: 0.5px solid var(--jal-louver-hi);
+  border-bottom: 0.5px solid var(--jal-louver-lo);
+  box-shadow: var(--jal-louver-shadow);
   transition: transform 0.3s ease;
 }
 .jal-readout {
@@ -1433,12 +1784,12 @@ ion-content.visu-content {
   display: flex;
   flex-direction: column;
   line-height: 1;
-  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
+  text-shadow: var(--jal-readout-halo);
 }
 .jal-pct {
   font-size: 21px;
   font-weight: 800;
-  color: #fff;
+  color: var(--jal-ink);
   font-variant-numeric: tabular-nums;
 }
 .jal-pct small {
@@ -1450,7 +1801,7 @@ ion-content.visu-content {
 .jal-sub {
   font-size: 10px;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.92);
+  color: var(--jal-ink-soft);
   letter-spacing: 0.02em;
   margin-top: 1px;
 }
@@ -1464,24 +1815,27 @@ ion-content.visu-content {
   gap: 3px;
   font-size: 9.5px;
   font-weight: 700;
-  color: #fff;
-  background: color-mix(in oklab, var(--acc) 82%, #000 8%);
+  /* Voller Akzent statt einer abgedunkelten Mischung: die alte
+     `color-mix(… 82%, #000 8%)` summierte sich nicht einmal auf 100 %, war als
+     Grund nicht aufloesbar und damit ungemessen. Auf dem reinen Akzent steht die
+     Ink dagegen auf derselben gemessenen Achse wie jede andere Akzentflaeche. */
+  color: var(--vz-accent-ink);
+  background: var(--acc);
   padding: 3px 7px;
   border-radius: 999px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  box-shadow: var(--vz-thumb-shadow-lg);
 }
 .jal-window.moving {
+  --jal-pulse-ring: 0 0 0 2px color-mix(in oklab, var(--acc) 40%, transparent);
   animation: jal-pulse 1.6s ease-in-out infinite;
 }
 @keyframes jal-pulse {
   0%,
   100% {
-    box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.18);
+    box-shadow: var(--jal-window-inset);
   }
   50% {
-    box-shadow:
-      inset 0 2px 10px rgba(0, 0, 0, 0.18),
-      0 0 0 2px color-mix(in oklab, var(--acc) 40%, transparent);
+    box-shadow: var(--jal-window-inset), var(--jal-pulse-ring);
   }
 }
 
@@ -1501,8 +1855,8 @@ ion-content.visu-content {
   border-radius: 999px;
   cursor: pointer;
   touch-action: none;
-  background: color-mix(in oklab, var(--vz-fg) 15%, transparent);
-  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--vz-fg) 10%, transparent);
+  background: var(--jal-vtrack-bg);
+  box-shadow: var(--jal-vtrack-rim);
   overflow: visible;
 }
 .jal-vtrack.disabled {
@@ -1515,7 +1869,12 @@ ion-content.visu-content {
   left: 0;
   right: 0;
   border-radius: 999px 999px 6px 6px;
-  background: linear-gradient(180deg, color-mix(in oklab, var(--acc) 78%, transparent), var(--acc));
+  --jal-vfill-grad: linear-gradient(
+    180deg,
+    color-mix(in oklab, var(--acc) 78%, transparent),
+    var(--acc)
+  );
+  background: var(--jal-vfill-grad);
   transition: height 0.12s ease;
 }
 .jal-vthumb {
@@ -1525,9 +1884,9 @@ ion-content.visu-content {
   height: 24px;
   border-radius: 50%;
   transform: translate(-50%, -50%);
-  background: #fff;
+  background: var(--vz-thumb-fill);
   border: 3px solid var(--acc);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  box-shadow: var(--vz-thumb-shadow-lg);
   transition: top 0.12s ease;
   pointer-events: none;
 }
@@ -1558,7 +1917,8 @@ ion-content.visu-content {
   transition: background 0.14s;
 }
 .jal-slatbtn:hover:not(:disabled) {
-  background: color-mix(in oklab, var(--acc) 16%, var(--vz-chip-bg));
+  --jal-slatbtn-hover-bg: color-mix(in oklab, var(--acc) 16%, var(--vz-chip-bg));
+  background: var(--jal-slatbtn-hover-bg);
 }
 .jal-slatglyph {
   display: block;
@@ -1603,11 +1963,12 @@ ion-content.visu-content {
   width: 100%;
   height: 8px;
   border-radius: 999px;
-  background: linear-gradient(
+  --jal-hslider-track: linear-gradient(
     90deg,
     color-mix(in oklab, var(--acc) 55%, transparent),
     color-mix(in oklab, var(--vz-fg) 16%, transparent)
   );
+  background: var(--jal-hslider-track);
   cursor: pointer;
 }
 .jal-hslider::-webkit-slider-thumb {
@@ -1615,15 +1976,15 @@ ion-content.visu-content {
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  background: #fff;
+  background: var(--vz-thumb-fill);
   border: 3px solid var(--acc);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.26);
+  box-shadow: var(--vz-thumb-shadow-sm);
 }
 .jal-hslider::-moz-range-thumb {
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  background: #fff;
+  background: var(--vz-thumb-fill);
   border: 3px solid var(--acc);
 }
 .jal-slatval {
@@ -1659,35 +2020,73 @@ ion-content.visu-content {
   touch-action: none;
 }
 .jal-btn:hover:not(:disabled) {
-  background: color-mix(in oklab, var(--acc) 14%, var(--vz-chip-bg));
+  --jal-btn-hover-bg: color-mix(in oklab, var(--acc) 14%, var(--vz-chip-bg));
+  background: var(--jal-btn-hover-bg);
 }
 .jal-btn:active:not(:disabled) {
   transform: scale(0.94);
 }
 .jal-btn.active {
+  --jal-btn-active-glow: 0 3px 12px color-mix(in oklab, var(--acc) 45%, transparent);
   background: var(--acc);
-  color: #fff;
+  color: var(--vz-accent-ink);
   border-color: transparent;
-  box-shadow: 0 3px 12px color-mix(in oklab, var(--acc) 45%, transparent);
+  box-shadow: var(--jal-btn-active-glow);
 }
 .jal-stopsq {
+  /* Die Flaeche IST die Schriftfarbe des Knopfes (--vz-fg-mute, im Hover
+     --vz-bad) — beide sind als Text gemessen. `currentColor` steht als Token da,
+     damit die Auslassung im Manifest sichtbar ist statt als rohe Farbe im Blatt
+     zu verschwinden. */
+  --jal-stopsq-fill: currentColor;
   width: 13px;
   height: 13px;
   border-radius: 3px;
-  background: currentColor;
+  background: var(--jal-stopsq-fill);
 }
 .jal-btn.stop {
   color: var(--vz-fg-mute);
 }
 .jal-btn.stop:hover:not(:disabled) {
+  --jal-btn-hover-bad-bg: color-mix(in oklab, var(--vz-bad) 12%, var(--vz-chip-bg));
   color: var(--vz-bad);
-  background: color-mix(in oklab, var(--vz-bad) 12%, var(--vz-chip-bg));
+  background: var(--jal-btn-hover-bad-bg);
 }
 
-.jal-tile.locked .jal-body,
+/* Gesperrt/readonly daempft die BEDIENELEMENTE, nicht die ANZEIGE.
+ *
+ * Vorher stand hier `.jal-body` — und darin liegt das Fenster samt Ablesetext.
+ * Der Text fiel damit in einen 0.55-Opazitaetsverband und stand gesperrt bei
+ * 2.25:1 gegen die Textschwelle 4.5. Diese Zahl ist GERECHNET, und zwar im
+ * flachen Alpha-Modell des Generators (nur der Vordergrund wird gedaempft). Der
+ * Browser wendet Gruppenopazitaet an und daempft den Grund mit; physisch sind es
+ * 2.00:1 (hell) bzw. 2.46:1 (dunkel) — am Render bestaetigt: der Glyphkern der
+ * gesperrten Kachel misst #77797e = 0.55 * 16 + 0.45 * 245.
+ *
+ * Es war kein Farbwertproblem. Auf dem dunkelsten Grund des Ablesebereichs
+ * (--jal-shade-lo) erreicht selbst REINES SCHWARZ bei 0.55 nur 3.42:1 (flach)
+ * bzw. 2.90:1 (Gruppenopazitaet) und bei 0.7 nur 4.87:1 bzw. 4.42:1 — physisch
+ * reisst dort also selbst 0.7 mit der bestmoeglichen Ink. Die Daempfung selbst
+ * war das Problem, also faellt sie dort weg.
+ *
+ * Die Sperre bleibt unuebersehbar: die Schraffur liegt weiter ueber dem Fenster
+ * (Regel darunter), das Schloss-Badge steht darin — jetzt ungedaempft und damit
+ * selbst besser lesbar —, und jedes Bedienelement traegt `disabled` plus diese
+ * Daempfung. Sie ist damit sauber die WCAG-1.4.3/1.4.11-Ausnahme fuer inaktive
+ * Bedienelemente, und die ANZEIGE, die eine readonly-Kachel gerade zeigen soll,
+ * bleibt AA-lesbar (--jal-ink 12.49:1 / 6.73:1, --jal-ink-soft 8.78:1 / 4.73:1
+ * gegen die beiden erklaerten Gruende). Dieselbe Linie faehrt .vz-tile schon
+ * laenger: dort wird der Rumpf auf 0.7 gedaempft und GEMESSEN, weil readonly
+ * lesbar bleiben muss.
+ *
+ * Der Konformitaetslauf kann diese Regel NICHT halten — er kennt `alphas` je
+ * Token, aber keine Verschachtelung und keine Gruppenopazitaet. Wer `.jal-body`
+ * hier wieder einsetzt, bleibt bei ihm gruen. Die Ratsche dafuer steht in
+ * tests/dimming.spec.ts. */
+.jal-tile.locked .jal-posrail,
 .jal-tile.locked .jal-slatctl,
 .jal-tile.locked .jal-btns,
-.jal-tile.readonly .jal-body,
+.jal-tile.readonly .jal-posrail,
 .jal-tile.readonly .jal-slatctl,
 .jal-tile.readonly .jal-btns {
   opacity: 0.55;
@@ -1698,13 +2097,7 @@ ion-content.visu-content {
   position: absolute;
   inset: 0;
   z-index: 5;
-  background: repeating-linear-gradient(
-    45deg,
-    transparent,
-    transparent 9px,
-    color-mix(in oklab, var(--vz-fg) 6%, transparent) 9px,
-    color-mix(in oklab, var(--vz-fg) 6%, transparent) 18px
-  );
+  background: var(--vz-lock-hatch-soft);
 }
 .jal-btn:disabled,
 .jal-slatbtn:disabled,
@@ -1722,8 +2115,8 @@ ion-content.visu-content {
   display: grid;
   place-items: center;
   background: var(--acc);
-  color: #fff;
-  box-shadow: 0 2px 7px rgba(0, 0, 0, 0.32);
+  color: var(--vz-accent-ink);
+  box-shadow: var(--vz-badge-shadow);
 }
 
 /* COMPACT jalousie (2×2 / row-2) */
@@ -1796,7 +2189,7 @@ ion-content.visu-content {
    0.82 (leerer Bereich wird dezenter Backdrop, Modal-Fokus stimmt). Kein
    image-Vorlage-Ref (Vorlage zeigt Dialoge nur dark); AA-verifiziert. */
 .visu-root[data-theme="image"] .vz-dialog {
-  background-image: linear-gradient(rgba(0, 0, 0, 0.58), rgba(0, 0, 0, 0.82)), var(--vz-bg-image);
+  background-image: var(--vz-dialog-scrim), var(--vz-bg-image);
 }
 /* Geteilter Detail-Kopf (Design-System-Vorlage „Detail-Dialoge"): drei Spalten
    Breadcrumb · zentrierter Titel · Schließen, mit dezenter Kopf-Trennlinie unter
@@ -1884,8 +2277,16 @@ ion-content.visu-content {
   border: 0;
   font-family: var(--vz-font);
 }
+.vz-action,
+.vz-preset {
+  --vz-action-active-bg: color-mix(
+    in oklab,
+    var(--acc, var(--vz-accent)) 14%,
+    var(--vz-tile-bg-strong)
+  );
+}
 .vz-action:active {
-  background: color-mix(in oklab, var(--acc, var(--vz-accent)) 14%, var(--vz-tile-bg-strong));
+  background: var(--vz-action-active-bg);
 }
 .vz-action.full {
   grid-column: 1 / -1;
@@ -1911,7 +2312,7 @@ ion-content.visu-content {
   font-size: 13px;
 }
 .vz-preset:active {
-  background: color-mix(in oklab, var(--acc, var(--vz-accent)) 14%, var(--vz-tile-bg-strong));
+  background: var(--vz-action-active-bg);
 }
 
 /* Preset-Popover (v1.6): schlichter Behälter für den Schnellzugriff auf

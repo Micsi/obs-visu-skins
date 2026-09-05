@@ -5,12 +5,17 @@
 // und er glaubt dem Manifest nicht: die Stufe wird an dem gemessen, was die Renderer
 // beim headless-Lauf über den Vertrags-Fixtures TATSÄCHLICH tun.
 //
-// Zwei Achsen, beide gemessen:
+// Drei Achsen, alle gemessen:
 //   • Render-Achse — jede Fixture jedes Typs wird durch jede vorhandene Renderer-
 //     Fläche (tile · detail · preset) gejagt. Wirft eine, ist der Typ `broken`.
 //   • Aktions-Achse — der zurückgegebene Baum wird nach `data-action` abgelaufen.
 //     Gezählt wird, was der Renderer MARKIERT, nicht was das Manifest behauptet.
 //     Ein Manifest-Eintrag ohne markierende Fixture hebt die Stufe daher nicht.
+//   • Farb-Achse (Vertrag 1.13, `a11y.ts`) — das echte Stylesheet des Skins wird
+//     gelesen, die Token werden aufgelöst und WCAG 2.1 darauf gerechnet, für jedes
+//     Theme UND an den Extremen jeder farbwirksamen Tweak-Achse. Der Skin
+//     deklariert nur die Semantik (Rolle · Grund · Ausnahme), die Werte misst der
+//     Generator. Ohne Deklaration: `undeclared` — nicht `pass` (Goldene Regel 3).
 //
 // Für jeden CoreWidgetType …
 //   • in manifest.unsupported                                       → "unsupported"
@@ -46,10 +51,30 @@ import {
   type SupportWidgetEntry,
 } from "@obs/visu-contract";
 import { ctxStub, pageHostProbe, tokensStub } from "./stubs.js";
+import { measureA11y } from "./a11y.js";
 
 // Die Fixture-Wand nutzt denselben Ctx-/Tokens-Stub wie dieser Lauf — Wand und
 // support.json sollen dieselbe Prüfung zeigen, nicht zwei Nachbildungen.
 export { ctxStub, tokensStub, pageHostProbe } from "./stubs.js";
+// Die Farb-Achse liegt in a11y.ts, wird aber von hier mit-exportiert: wer den
+// Generator benutzt, soll nicht wissen muessen, dass sie in einer zweiten Datei steht.
+export {
+  measureA11y,
+  THRESHOLDS,
+  A11Y_ROLES,
+  contrast,
+  composite,
+  luminance,
+  resolveColor,
+  resolveNumber,
+  tokensFor,
+  parseRules,
+  declarations,
+  plainDeclarations,
+  allPlainDeclarations,
+  type A11yInput,
+  type Rgba,
+} from "./a11y.js";
 
 /**
  * Die stabilen Kern-Typen — **aus dem Vertragsschema abgeleitet**, nicht getippt:
@@ -84,6 +109,13 @@ export interface SkinInput {
   /** Der optionale Ganzseiten-Renderer (Vertrag 1.10) - gebraucht, um die
    *  `honors`-Achse zu MESSEN statt zu glauben. */
   readonly page?: PageRenderer;
+  /**
+   * Der Quelltext jedes in `manifest.a11y.stylesheet` genannten Stylesheets,
+   * nach dem deklarierten Pfad geschluesselt (Vertrag 1.13). Das Lesen macht der
+   * Aufrufer — `generateSupport` bleibt damit rein und ohne Dateisystem testbar.
+   * Fehlt eine Quelle, ist das ein BEFUND in `a11y.findings`, kein stiller Erfolg.
+   */
+  readonly styles?: Readonly<Record<string, string>>;
 }
 
 /**
@@ -104,6 +136,14 @@ export interface SkinInput {
  *                     Affordanz mehr.
  *  - `unrenderable` - `'link'` ohne jeden Page-Renderer: nichts kann den Sprung
  *                     zeichnen, denn nur der Page-Renderer sieht `LayerItem`.
+ *  - `unmeasured`   - der Lauf konnte die Achse NICHT messen (keine DOM-fähige
+ *                     Vue-Laufzeit). Bewusst ein Befund und kein stilles Bestehen:
+ *                     sonst genügte es, den Generator falsch aufzurufen, um eine
+ *                     Deklaration ungeprüft durchzubringen.
+ *  - `broken`       - der Page-Renderer WIRFT. Das fällt sonst nirgends auf: die
+ *                     Render-Achse fährt `tiles`/`details`/`presets`, aber nie
+ *                     `skin.page`. Ein Skin mit kaputtem Ganzseiten-Renderer bekam
+ *                     einen sauberen Report, solange er `link` nicht deklarierte.
  *  - `undeclared`   - die GEGENRICHTUNG: der Page-Renderer zeichnet den Sprung,
  *                     das Manifest deklariert ihn aber nicht. Der Host tritt nur
  *                     bei deklariertem Token zurueck, also liegen dann ZWEI
@@ -114,7 +154,13 @@ export interface SkinInput {
  */
 export interface HonorsFinding {
   readonly token: string;
-  readonly problem: "unknown" | "undelivered" | "unrenderable" | "undeclared";
+  readonly problem:
+    | "unknown"
+    | "undelivered"
+    | "unrenderable"
+    | "undeclared"
+    | "unmeasured"
+    | "broken";
   readonly detail: string;
 }
 
@@ -165,7 +211,24 @@ export async function checkHonors(skin: SkinInput): Promise<HonorsFinding[]> {
       });
     } else {
       const probe = pageHostProbe();
-      if ((await probeLinkDelivery(skin.page, probe)) === "absent") {
+      const outcome = await probeLinkDelivery(skin.page, probe);
+      if (outcome === "threw") {
+        findings.push({
+          token: "link",
+          problem: "broken",
+          detail: "der Page-Renderer wirft beim Zeichnen - er kann gar keine Affordanz liefern",
+        });
+      } else if (outcome === "unmeasured") {
+        // NICHT stillschweigend bestehen lassen. Ein Lauf ohne DOM-fähige
+        // Vue-Laufzeit misst nichts; das als Erfolg zu werten hiesse, dass ein
+        // falscher Aufruf des Generators jede Deklaration ungeprüft durchbringt.
+        findings.push({
+          token: "link",
+          problem: "unmeasured",
+          detail:
+            "keine DOM-faehige Vue-Laufzeit - die Achse wurde NICHT geprueft (ensureDom() vor dem Skin-Import aufrufen)",
+        });
+      } else if (outcome === "absent") {
         findings.push({
           token: "link",
           problem: "undelivered",
@@ -181,14 +244,25 @@ export async function checkHonors(skin: SkinInput): Promise<HonorsFinding[]> {
     // zwei Fokusstopps uebereinander. Ein vergessenes Token faellt sonst nirgends
     // auf - der Lauf blieb sauber, gerade WEIL nicht gemessen wurde.
     const probe = pageHostProbe();
-    if ((await probeLinkDelivery(skin.page, probe, "any")) === "delivered") {
+    const outcome = await probeLinkDelivery(skin.page, probe, "any");
+    if (outcome === "delivered") {
       findings.push({
         token: "link",
         problem: "undeclared",
         detail:
           "der Page-Renderer zeichnet einen Sprung (ein Klick ruft host.followLink), aber layout.honors nennt 'link' nicht - der Host tritt nicht zurueck und beide Affordanzen liegen uebereinander",
       });
+    } else if (outcome === "threw") {
+      // Auch OHNE Deklaration ein Befund: die Render-Achse fährt `skin.page` nie,
+      // ein kaputter Ganzseiten-Renderer bliebe sonst unentdeckt.
+      findings.push({
+        token: "link",
+        problem: "broken",
+        detail: "der Page-Renderer wirft beim Zeichnen",
+      });
     }
+    // `unmeasured` ist hier KEIN Befund: ohne Deklaration ist nichts versprochen,
+    // was ungeprüft bliebe.
   }
 
   return findings;
@@ -242,7 +316,7 @@ async function probeLinkDelivery(
    * genau dieser Fall stumm.
    */
   need: "all" | "any" = "all",
-): Promise<"delivered" | "absent" | "unmeasured"> {
+): Promise<"delivered" | "absent" | "threw" | "unmeasured"> {
   const vue = await domRuntime();
   // Ohne DOM-Laufzeit wird NICHT gemessen — und damit auch nichts behauptet.
   // Bewusst ein EIGENER Zustand statt eines gutmütigen `true`: seit auch die
@@ -277,11 +351,13 @@ async function probeLinkDelivery(
   try {
     app.mount(container);
   } catch {
-    // Wirft der Renderer, zeichnet er nichts — derselbe Befund wie ein leerer Baum.
+    // Ein Wurf ist NICHT dasselbe wie "zeichnet nichts": der Renderer ist kaputt,
+    // und das gehört gemeldet, auch wenn der Skin `link` gar nicht deklariert —
+    // die Render-Achse fährt `skin.page` nie, es fiele sonst nirgends auf.
     // Aufgeräumt wird trotzdem: ein Wurf MITTEN im Mounten lässt eine halb
     // gemountete Anwendung zurück, deren Knoten sonst im Dokument stehen bleiben.
     cleanup();
-    return "absent";
+    return "threw";
   }
 
   // ZWEI PHASEN: was der Renderer beim ZEICHNEN am Host fragt, wird verworfen;
@@ -528,7 +604,22 @@ export async function ensureDom(): Promise<boolean> {
  * nachlädt), bekommt eine Laufzeit ohne Dokument — deshalb ruft `cli.ts`
  * {@link ensureDom} auf, BEVOR es den Skin importiert.
  */
-async function domRuntime(): Promise<{ createApp: typeof import("vue").createApp } | null> {
+let domRuntimeOnce: Promise<{ createApp: typeof import("vue").createApp } | null> | undefined;
+
+/**
+ * Die DOM-Laufzeit — EINMAL geprüft, dann gemerkt. Die Antwort ändert sich innerhalb
+ * eines Laufs nicht: das Dokument wird einmal hochgezogen und bleibt. Seit auch die
+ * Aktions-Achse montiert, sind es gut hundert Aufrufe je Skin statt einer Handvoll,
+ * und der Kanarienvogel-Mount bei jedem einzelnen war messbar teuer.
+ */
+function domRuntime(): Promise<{ createApp: typeof import("vue").createApp } | null> {
+  domRuntimeOnce ??= checkDomRuntime();
+  return domRuntimeOnce;
+}
+
+async function checkDomRuntime(): Promise<{
+  createApp: typeof import("vue").createApp;
+} | null> {
   if (!(await ensureDom())) return null;
   const vue = await import("vue");
   // KANARIENVOGEL. Ein dynamischer Import liefert das Modul aus dem Cache — wer
@@ -551,88 +642,7 @@ async function domRuntime(): Promise<{ createApp: typeof import("vue").createApp
   return vue;
 }
 
-/**
- * Rendert einen Komponenten-VNode aus, falls es einer ist.
- *
- * Ein Renderer darf seine Elemente durch eine Komponente ziehen
- * (`h(PageComponent, { host })`); erst deren Render-Funktion erzeugt das Markup.
- * Wer nur `props`/`children` des äusseren VNode liest, sieht davon nichts.
- *
- * Nur noch für die AKTIONS-Achse ({@link collectActions}): die sucht `data-action`
- * im zurückgegebenen Baum und arbeitet bewusst ohne DOM, weil sie jede Fixture
- * jedes Typs durch jede Renderer-Fläche jagt — Hunderte Läufe, für die ein Mount
- * je Fixture zu teuer wäre. Der `honors`-Probelauf ist genau diesen Weg gegangen
- * und wieder abgebogen: dort wurde aus dem Auflösen ein Nachbau von Vues
- * Semantik, den {@link probeLinkDelivery} jetzt Vue selbst überlässt.
- *
- * Wirft die Komponente ohne echte Laufzeit, bleibt sie schlicht ungemessen —
- * `broken` ist dem Renderer selbst vorbehalten, nicht unserer Unfähigkeit, ihn
- * zu instanziieren.
- */
-function expandComponent(vnode: { type?: unknown; props?: unknown; children?: unknown }): unknown {
-  const type = vnode.type;
-  const props = (vnode.props ?? {}) as Record<string, unknown>;
-  const slots = vnode.children;
-  const ctx = { slots, attrs: props, emit: () => {}, expose: () => {} };
-  const options = type && typeof type === "object" ? (type as Record<string, unknown>) : undefined;
 
-  // Die HÄUFIGSTE Komponentenform der Composition API — `defineComponent({ setup()
-  // { return () => h(…) } })` — hat WEDER einen aufrufbaren `type` NOCH ein
-  // `type.render`, solange Vue keine Instanz gebaut hat. Der Zweig gab hier
-  // `undefined` zurück, der Teilbaum blieb ungeprüft, und ein funktionierender
-  // Link in genau dieser Form galt als `undelivered`.
-  //
-  // `setup()` liefert entweder die Render-Funktion selbst (der Fall oben) oder ein
-  // Objekt mit Bindungen — dann rendert `type.render` mit diesen Bindungen als
-  // `this`. Beides wird bedient; wirft `setup` ohne echte Laufzeit, bleibt die
-  // Komponente ungemessen wie bisher.
-  let setupRender: ((props?: unknown, ctx?: unknown) => unknown) | undefined;
-  let setupState: Record<string, unknown> | undefined;
-  if (options && typeof options.setup === "function") {
-    try {
-      const produced = (options.setup as (p: unknown, c: unknown) => unknown)(props, ctx);
-      if (typeof produced === "function") {
-        setupRender = produced as (props?: unknown, ctx?: unknown) => unknown;
-      } else if (produced && typeof produced === "object") {
-        setupState = produced as Record<string, unknown>;
-      }
-    } catch {
-      /* ungemessen, nicht `broken` - siehe oben */
-    }
-  }
-
-  const render =
-    setupRender ??
-    (typeof type === "function"
-      ? (type as (props?: unknown, ctx?: unknown) => unknown)
-      : options && typeof options.render === "function"
-        ? (options.render as (props?: unknown, ctx?: unknown) => unknown)
-        : undefined);
-  if (!render) return undefined;
-  // Der `this`-Stellvertreter für die Options-API. Vue ruft `render()` dort mit
-  // dem Komponenten-Proxy, über den `this.host`, `this.$props` usw. laufen. Als
-  // nackte Funktion aufgerufen warf so ein `render()` an seiner ersten Zeile,
-  // die Ausnahme galt als leerer Teilbaum, und der Skin fiel als `undelivered`
-  // durch — dieselbe Fehlalarm-Klasse wie ein Handler ohne Ereignis-Argument.
-  // Ein Proxy wäre hier falsch: er beantwortete JEDEN Namen und verschöbe damit
-  // das Verhalten des Renderers; der Stellvertreter reicht genau die Props durch,
-  // die der VNode mitbringt.
-  const self = {
-    ...props,
-    // Die Bindungen aus `setup()`, falls es welche statt einer Render-Funktion
-    // lieferte: `type.render` greift dort über `this` darauf zu.
-    ...(setupState ?? {}),
-    $props: props,
-    $attrs: props,
-    $slots: slots ?? {},
-    $emit: () => {},
-  };
-  try {
-    return render.call(self, props, ctx);
-  } catch {
-    return undefined;
-  }
-}
 
 type Summary = {
   full: number;
@@ -677,55 +687,71 @@ function toleratedActions(type: CoreWidgetType): ReadonlySet<string> {
   return new Set(type === "blind" || type === "jalousie" ? [...base, "stop"] : base);
 }
 
+
+
 /**
- * Läuft einen Renderer-Rückgabewert ab und sammelt jede markierte `data-action`.
- * Verträgt beide Formen, die {@link Renderer} zurückgeben darf: einen Framework-Knoten
- * (Vue-VNode: `props` + `children`) und rohes Markup (String). Tiefe begrenzt, damit ein
- * zyklischer Baum den Lauf nicht aufhängt.
+ * Was ein Renderer WIRKLICH zeichnet — gemessen an einem echten Mount.
+ *
+ * ══ Warum das den Nachbau ersetzt
+ *
+ * Die Aktions-Achse lief den VNode-Baum von Hand ab und musste dafür Vues
+ * Prop-Auflösung nachbilden: Defaults, Default-Fabriken mit rohen Props, die
+ * reihenfolgeabhängige `Boolean`-Umwandlung, camelCase gegen kebab-case. Jede
+ * Review-Runde fand die nächste Regel, die der Nachbau anders sah als Vue — dieselbe
+ * unbegrenzte Fehlerfläche, die der `honors`-Probelauf schon hinter sich hat.
+ *
+ * Die Begründung dagegen war die Laufzeit ("Hunderte Fixtures, ein Mount je Fixture
+ * wäre zu teuer"). Nachgezählt: der Vertrag bringt **26** Fixture-Zustände über zehn
+ * Typen mit, bei bis zu drei Flächen also unter hundert Mounts je Skin. Die Schätzung
+ * lag um eine Grössenordnung daneben — der reale Preis ist ein Gate-Lauf von gut zwei
+ * statt gut einer halben Minute, und dafür misst die Achse, was der Browser zeichnet.
+ *
+ * Gratis dabei: die ganze Prop-Semantik, `data-action` in rohem Markup (`innerHTML`),
+ * Teleports, Slots — alles, was im DOM landet, wird gefunden, weil im DOM gesucht wird.
+ * Und die Inline-Stile gleich mit, dort fertig aufgelöst.
+ *
+ * Ohne DOM-Laufzeit wird NICHT gemessen, und weil diese Achse keinen
+ * `unmeasured`-Zustand kennt (ihre Stufe ist "n/m"), ist das ein Fehler statt einer
+ * stillen Null. Ein Rückfall auf einen Baum-Durchlauf wäre die schlechtere Antwort:
+ * er müsste Vues Semantik wieder von Hand nachbilden — genau das, was hier endet.
  */
-export function collectActions(
-  node: unknown,
-  out: Set<string> = new Set(),
-  depth = 0,
-): Set<string> {
-  if (depth > 64 || node === null || node === undefined) return out;
+async function markedInDom(
+  render: () => unknown,
+): Promise<{ actions: Set<string>; styles: Set<string> }> {
+  const vue = await domRuntime();
+  if (!vue) throw new Error("keine DOM-Laufzeit: die Aktions-Achse kann nicht messen");
 
-  if (typeof node === "string") {
-    // HTML-Attributregeln statt "nur direkt anliegend und gequotet": Leerraum um
-    // das `=`, einfache/doppelte Quotes und der unquotierte Fall sind alle gueltig.
-    // Ein Renderer, der `<button data-action=toggle>` liefert, wurde sonst still
-    // als display/partial abgewertet — der Waechter haette geschwiegen.
-    const ATTR = /data-action\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'`=<>]+))/g;
-    for (const m of node.matchAll(ATTR)) {
-      const action = m[1] ?? m[2] ?? m[3];
-      if (action && action.length > 0) out.add(action);
+  const container = document.createElement("div");
+  const before = new Set<Element>(Array.from(document.body.children));
+  document.body.appendChild(container);
+  const app = vue.createApp({ render: () => render() as never });
+  const actions = new Set<string>();
+  const styles = new Set<string>();
+  try {
+    app.mount(container);
+    for (const el of container.querySelectorAll("[data-action]")) {
+      const action = el.getAttribute("data-action");
+      if (action && action.length > 0) actions.add(action);
     }
-    return out;
+    for (const el of container.querySelectorAll("[style]")) {
+      for (const part of (el.getAttribute("style") ?? "").split(";")) {
+        if (part.includes(":")) styles.add(part.trim());
+      }
+    }
+  } finally {
+    // Auch nach einem Wurf: eine halb gemountete Anwendung liesse ihre Knoten sonst
+    // im Dokument stehen, und das Gate misst drei Skins nacheinander im selben.
+    try {
+      app.unmount();
+    } catch {
+      /* der Abbau gehört nicht zur Messung */
+    }
+    container.remove();
+    for (const el of Array.from(document.body.children)) {
+      if (!before.has(el)) el.remove();
+    }
   }
-  if (Array.isArray(node)) {
-    for (const child of node) collectActions(child, out, depth + 1);
-    return out;
-  }
-  if (typeof node !== "object") return out;
-
-  const vnode = node as {
-    type?: unknown;
-    props?: Record<string, unknown> | null;
-    children?: unknown;
-  };
-  const marked = vnode.props?.["data-action"];
-  if (typeof marked === "string" && marked.length > 0) out.add(marked);
-
-  // Komponenten-VNodes aufloesen: Ein Renderer darf seine Bedienelemente durch eine
-  // Komponente ziehen (`h(ActionButton)`), deren Render-Funktion erst das Element mit
-  // `data-action` erzeugt. Wer nur props/children des aeusseren VNode liest, sieht die
-  // Aktion nie und stuft einen voll bedienbaren Skin auf display/partial herunter.
-  // Dieselbe Aufloesung benutzt der `honors`-Probelauf ({@link expandComponent}).
-  const expanded = expandComponent(vnode);
-  if (expanded !== undefined) collectActions(expanded, out, depth + 1);
-
-  if (vnode.children !== undefined) collectActions(vnode.children, out, depth + 1);
-  return out;
+  return { actions, styles };
 }
 
 /** Name einer Renderer-Funktion für die Herkunftsangabe im Report. */
@@ -749,7 +775,11 @@ interface SurfaceRun {
  * Reine Funktionsaufrufe — Vue-`h()` braucht kein DOM. Wirft ein Renderer, ist der Typ
  * `broken` (Fehler, kein stilles Überspringen).
  */
-function renderAll(type: CoreWidgetType, surfaces: readonly [string, Renderer][]): SurfaceRun {
+async function renderAll(
+  type: CoreWidgetType,
+  surfaces: readonly [string, Renderer][],
+  inlineStyles?: Set<string>,
+): Promise<SurfaceRun> {
   const states = FIXTURES[type] ?? {};
   const ctx = ctxStub();
   const marked = new Set<string>();
@@ -760,7 +790,11 @@ function renderAll(type: CoreWidgetType, surfaces: readonly [string, Renderer][]
     for (const state of Object.keys(states)) {
       const device = { type, id: `${type}.${state}`, ...states[state] } as never;
       try {
-        collectActions(fn(device, tokensStub, ctx), marked);
+        // Gemessen wird am MONTIERTEN Ergebnis: dort steht, was der Renderer wirklich
+        // zeichnet — samt Vues eigener Prop-Auflösung und samt rohem Markup.
+        const mounted = await markedInDom(() => fn(device, tokensStub, ctx));
+        for (const a of mounted.actions) marked.add(a);
+        if (inlineStyles) for (const st of mounted.styles) inlineStyles.add(st);
         done.add(state);
       } catch (err: unknown) {
         return {
@@ -777,11 +811,12 @@ function renderAll(type: CoreWidgetType, surfaces: readonly [string, Renderer][]
 
 /* ------------------------------------------------------------ Klassifikation */
 
-function classify(
+async function classify(
   type: CoreWidgetType,
   manifest: SkinManifest,
   skin: SkinInput,
-): SupportWidgetEntry {
+  inlineStyles?: Set<string>,
+): Promise<SupportWidgetEntry> {
   const declaredUnsupported = manifest.unsupported.includes(type);
   const entry = manifest.widgets[type];
   const tile = skin.tiles[type];
@@ -807,7 +842,7 @@ function classify(
   const preset = skin.presets?.[type];
   if (typeof preset === "function") surfaces.push(["preset", preset]);
 
-  const run = renderAll(type, surfaces);
+  const run = await renderAll(type, surfaces, inlineStyles);
   const canonical = canonicalActions(type);
   const declared = new Set<string>(entry.actions);
   const tolerated = toleratedActions(type);
@@ -897,8 +932,16 @@ export async function generateSupport(
     broken: 0,
   };
 
+  /**
+   * Die Inline-Stile ALLER Renderer-Flächen — sie entstehen beim ohnehin laufenden
+   * Render-Durchgang und gehen unten in die Farb-Achse. Ohne sie sähe die Achse nur
+   * die Stylesheets, und `style: { color: "#777" }` über einer hellen Fläche käme an
+   * ihr vorbei.
+   */
+  const inlineStyles = new Set<string>();
+
   for (const type of CORE_WIDGET_TYPES) {
-    const entry = classify(type, manifest, skin);
+    const entry = await classify(type, manifest, skin, inlineStyles);
     widgets[type] = entry;
     summary[entry.level] += 1;
   }
@@ -926,7 +969,17 @@ export async function generateSupport(
       // Lauf, der es geschrieben hat.
       ...(honors.length > 0 ? { honorsFindings: honors } : {}),
     },
+    // Die Farb-Achse (Vertrag 1.13). Sie steht IMMER im Report — auch wenn der
+    // Skin nichts deklariert: dann als `undeclared`, ausdruecklich unterscheidbar
+    // von `pass` (Goldene Regel 3). AA ist Pflicht (Regel 6), deshalb zaehlt alles
+    // ausser `pass` unten als harter Fehler.
+    a11y: measureA11y({ manifest, styles: skin.styles, inlineStyles: [...inlineStyles] }),
   };
 
-  return { report, hasGap: summary.gap > 0 || summary.broken > 0 || honors.length > 0, honors };
+  const a11yFailed = report.a11y?.status !== "pass";
+  return {
+    report,
+    hasGap: summary.gap > 0 || summary.broken > 0 || honors.length > 0 || a11yFailed,
+    honors,
+  };
 }

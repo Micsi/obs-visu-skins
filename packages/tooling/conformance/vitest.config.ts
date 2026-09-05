@@ -17,7 +17,15 @@ export default defineConfig({
     // Das deckt keinen echten Hänger: der honors-Probelauf trägt sein EIGENES
     // Budget von 3 s je Skin, ein hängender Handler wird also dort gefangen und
     // nicht hier. Diese Grenze fängt nur den Kaltstart ab.
-    testTimeout: 60_000,
+    //
+    // 120 s seit der a11y-Achse: `pnpm -r test` fährt sechs Pakete gleichzeitig,
+    // und die Farbmessung rechnet dabei über Tausende Paarungen. Der erste Lauf
+    // nach `pnpm install` riss die 60 s deshalb gelegentlich — einzeln lief
+    // dieselbe Datei in 4 s durch, und die Folgeläufe waren grün. Ein Flake also,
+    // aber einer mit hässlicher Nebenwirkung: der abgebrochene Test schreibt
+    // SPÄTER weiter auf stdout und landet im Puffer des nächsten, dessen
+    // JSON.parse dann an einer Stelle bricht, die mit ihm nichts zu tun hat.
+    testTimeout: 120_000,
     typecheck: {
       enabled: true,
       include: ["tests/**/*.spec.ts"],

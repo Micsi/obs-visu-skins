@@ -7,5 +7,5 @@
     "noEmit": false,
     "types": ["node", "vitest/importMeta"]
   },
-  "include": ["index.ts", "cli.ts", "stubs.ts", "tests/**/*.ts"]
+  "include": ["index.ts", "cli.ts", "stubs.ts", "a11y.ts", "tests/**/*.ts"]
 }
