@@ -47,7 +47,6 @@
 
   /* Popup: Abdunklung der Seite, Kartenflaeche, Schatten, Schliessknopf. */
   --edomi-dim: rgba(0, 0, 0, 0.45);
-  --edomi-popup-bg: var(--ion-card-background, #1a1f26);
   --edomi-popup-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
   --edomi-close-bg: rgba(255, 255, 255, 0.1);
 }
@@ -59,6 +58,12 @@
 .visu-root {
   --edomi-canvas-bg: var(--ion-background-color, #0f1216);
   --edomi-canvas-ink: var(--ion-text-color, #e8ecf2);
+  /* Die Popup-Flaeche gehoert hierher, aus demselben Grund: sie stand in :root und
+     loeste --ion-card-background DORT auf. Setzt die einbettende App den Wert auf
+     dem Skin-Wurzelelement, sieht die :root-Deklaration ihn nie — sie friert auf
+     ihren Rueckfall #1a1f26 ein, und das Popup folgt der eingestellten Ionic-Karte
+     nicht mehr. Substitution passiert am Element, das die DEKLARATION traegt. */
+  --edomi-popup-bg: var(--ion-card-background, #1a1f26);
 }
 
 .edomi-root {

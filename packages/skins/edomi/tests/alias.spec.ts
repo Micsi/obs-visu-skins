@@ -111,6 +111,22 @@ const ON_DESCENDANT = new Set(
 const refs = (value: string): string[] =>
   [...value.matchAll(/var\(\s*(--[^\s,)]+)/g)].map((m) => m[1]!);
 
+/**
+ * Die zweite Sorte Nachfahren-Token: die IONIC-BRÜCKE.
+ *
+ * `--ion-*` kommt nicht aus diesem Blatt, sondern von der einbettenden Anwendung,
+ * und sie setzt es auf dem Skin-Wurzelelement — dort, wo auch der `.visu-root`-Block
+ * steht, der es liest. In `<html>` existiert es nicht.
+ *
+ * `ON_DESCENDANT` allein fängt das NICHT: dort stehen nur Namen, die irgendwo im
+ * Blatt deklariert sind. `--ion-card-background` wird nirgends deklariert — es wird
+ * nur gelesen —, also rutschte `--edomi-popup-bg: var(--ion-card-background, …)` in
+ * `:root` durch und fror auf seinen Rückfall ein, sobald eine Anwendung die
+ * Kartenfarbe wirklich setzte. Genau der Fall, gegen den diese Datei steht, nur eine
+ * Ebene weiter aussen.
+ */
+const isBridgeToken = (name: string): boolean => name.startsWith("--ion-");
+
 describe("kein Alias in :root liest ein Token, das erst auf einem Nachfahren steht", () => {
   it("die Blaetter sind ueberhaupt gelesen", () => {
     // Ohne diese Zeile waere ein falscher Pfad ein gruener Lauf.
@@ -131,6 +147,11 @@ describe("kein Alias in :root liest ein Token, das erst auf einem Nachfahren ste
     ]);
     expect(ON_DESCENDANT.has("--ion-background-color")).toBe(true);
     expect(ON_DESCENDANT.has("--vz-bg")).toBe(true);
+    // Und der Brücken-Riegel greift auch bei einem Namen, den KEIN Blatt deklariert
+    // — sonst fiele genau der Fall durch, der ihn nötig gemacht hat.
+    expect(ON_DESCENDANT.has("--ion-card-background")).toBe(false);
+    expect(isBridgeToken("--ion-card-background")).toBe(true);
+    expect(isBridgeToken("--vz-bg")).toBe(false);
   });
 
   it("jede :root-Deklaration in edomi.css bleibt in :root aufloesbar", () => {
@@ -144,6 +165,8 @@ describe("kein Alias in :root liest ein Token, das erst auf einem Nachfahren ste
         // :root steht (der :root-Wert friert ein, die Ueberschreibung fehlt).
         if (ON_DESCENDANT.has(ref)) {
           frozen.push(`${d.name}: var(${ref}) — ${ref} steht erst auf einem Nachfahren`);
+        } else if (isBridgeToken(ref)) {
+          frozen.push(`${d.name}: var(${ref}) — ${ref} setzt die einbettende App auf .visu-root`);
         }
       }
     }

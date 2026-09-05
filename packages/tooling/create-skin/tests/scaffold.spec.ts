@@ -16,7 +16,11 @@ import { fileURLToPath } from "node:url";
 import { afterAll, describe, expect, it } from "vitest";
 
 import { generateSupport } from "@obs-visu-skins/conformance";
-import { version as contractVersion, type SkinManifest } from "@obs/visu-contract";
+import {
+  schema as contractSchema,
+  version as contractVersion,
+  type SkinManifest,
+} from "@obs/visu-contract";
 import { scaffoldSkin, scaffoldFiles } from "../index.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -190,4 +194,35 @@ describe("scaffoldSkin (end-to-end against a temporary target)", () => {
       });
     }
   }, 180_000);
+});
+
+describe("das Akzent-Vokabular kommt aus dem Vertrag", () => {
+  it("die Palette ist dieselbe, die der Vertrag beschreibt", () => {
+    // Eine feste Liste hier wuerde vom Vertrag wegdriften: kaeme ein Akzent dazu,
+    // riefe ein frisch erzeugter Skin `t.accent(d.accent)` dafuer auf, ohne die
+    // zugehoerige `--s-acc-*`-Variable oder eine a11y-Deklaration zu schreiben — und
+    // die mitgenerierten Tests wiederholten dieselbe feste Liste, wuerden es also
+    // nicht zeigen.
+    const described = (
+      contractSchema as { widgets?: Record<string, { data?: Record<string, unknown> }> }
+    ).widgets?.["light"]?.data?.["accent"];
+    const fromContract = /Palette-Schl(?:ü|ue)ssel:\s*([a-z|]+)/i
+      .exec(String(described))?.[1]
+      ?.split("|");
+    expect(fromContract, "der Vertrag beschreibt die Akzente nicht mehr so").toBeDefined();
+
+    // Jeder Akzent des Vertrags bekommt eine CSS-Variable UND eine a11y-Deklaration.
+    const files = scaffoldFiles({ name: "probe" });
+    const css = files.find((f) => f.path.endsWith("probe.css"))!.contents;
+    const manifest = JSON.parse(files.find((f) => f.path.endsWith("manifest.json"))!.contents) as {
+      a11y: { tokens: Record<string, unknown> };
+    };
+    for (const accent of fromContract!) {
+      expect(css, `--s-acc-${accent} fehlt im Blatt`).toContain(`--s-acc-${accent}`);
+      expect(
+        Object.keys(manifest.a11y.tokens),
+        `--s-acc-${accent} fehlt in a11y.tokens`,
+      ).toContain(`--s-acc-${accent}`);
+    }
+  });
 });

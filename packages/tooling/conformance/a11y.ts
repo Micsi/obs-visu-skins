@@ -1097,13 +1097,37 @@ export function measureA11y(input: A11yInput): SupportA11y {
   const sheets = typeof decl.stylesheet === "string" ? [decl.stylesheet] : [...decl.stylesheet];
   const sources: string[] = [];
   for (const path of sheets) {
-    const src = input.styles?.[path];
-    if (src === undefined) {
+    /**
+     * Die gemessenen Quellen sind das deklarierte Blatt UND alles, was es per
+     * `@import` hereinholt — der Lader legt sie unter Schlüsseln wie
+     * `./entry.css → ./components.css` ab, und zwar bereits in Kaskadenreihenfolge
+     * (das Importierte VOR dem Importierenden, wie CSS es anwendet).
+     *
+     * Ohne diese Zeilen wäre der Lader wirkungslos gewesen: die Schleife las nur die
+     * Schlüssel, die wörtlich im Manifest stehen, und ein Einstiegsblatt mit
+     * bestandener Palette hätte Komponenten-CSS mit unklassifizierten oder
+     * kontrastschwachen Farben importieren können, während das Gate `pass` meldet.
+     */
+    const own = Object.entries(input.styles ?? {}).filter(
+      ([key]) => key === path || key.startsWith(`${path} → `),
+    );
+    if (own.length === 0) {
       findings.push({
         problem: "stylesheet-unreadable",
         detail: `${path} wurde nicht geladen — ohne Quelltext ist die Palette nicht messbar`,
       });
-    } else sources.push(src);
+      continue;
+    }
+    for (const [key, src] of own) {
+      if (src.length === 0 && key !== path) {
+        findings.push({
+          problem: "stylesheet-unreadable",
+          detail: `${key} liess sich nicht auflösen — der Browser wendet es an, gemessen ist es nicht`,
+        });
+        continue;
+      }
+      sources.push(src);
+    }
   }
 
   const exemptThemes = decl.exemptThemes ?? {};

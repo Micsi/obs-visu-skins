@@ -1396,3 +1396,44 @@ describe("der Scan gewöhnlicher Deklarationen kennt die Eigenschaft, nicht nur 
     expect(r.findings.map((f) => f.detail).join(" ")).toContain("--unbekannt");
   });
 });
+
+describe("importierte Blätter werden mitgemessen, nicht nur mitgeladen", () => {
+  it("eine Farbe aus einem importierten Blatt zählt", () => {
+    // Der Lader folgt `@import` seit 41694e6 — aber die Messung las nur die Schlüssel,
+    // die wörtlich im Manifest stehen. Der Lader war damit wirkungslos: ein
+    // Einstiegsblatt mit bestandener Palette konnte Komponenten-CSS mit
+    // kontrastschwachen Farben importieren und trotzdem `pass` bekommen.
+    const decl = {
+      stylesheet: SHEET,
+      themes: { dark: ".p" },
+      grounds: [{ token: "--bg" }],
+      tokens: { "--bg": { role: "ground" }, "--fg": { role: "text" } },
+    };
+    const r = measureA11y({
+      manifest: manifestWith(decl),
+      styles: {
+        [SHEET]: ".p{--bg:#ffffff}",
+        [`${SHEET} → ./komponenten.css`]: ".p{--fg:#000000}",
+      },
+    });
+    // `--fg` steht NUR im importierten Blatt — ohne es wäre es `unclassified`.
+    expect(r.findings).toEqual([]);
+    expect(r.combinations).toBeGreaterThan(0);
+    expect(r.status).toBe("pass");
+  });
+
+  it("ein Import, der sich nicht auflösen liess, ist ein Befund", () => {
+    // Der Lader legt ihn als leeren Eintrag ab; verschwiegen würde er zur Lücke.
+    const decl = {
+      stylesheet: SHEET,
+      themes: { dark: ".p" },
+      grounds: [{ token: "--bg" }],
+      tokens: { "--bg": { role: "ground" }, "--fg": { role: "text" } },
+    };
+    const r = measureA11y({
+      manifest: manifestWith(decl),
+      styles: { [SHEET]: ".p{--bg:#ffffff;--fg:#000000}", [`${SHEET} → ./fehlt.css`]: "" },
+    });
+    expect(r.findings.map((f) => f.problem)).toContain("stylesheet-unreadable");
+  });
+});

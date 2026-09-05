@@ -40,21 +40,43 @@ export const CORE_WIDGET_TYPES: readonly string[] = Object.freeze(
 );
 
 /**
- * Die Akzent-Palette des Vertrags (§2). Das Scaffold bringt sie vollstaendig mit,
- * weil `t.accent(d.accent)` genau diese acht Schluessel aufloest — ein Skin mit nur
- * einem Akzent-Token faellt in der Fixture-Wand auf den Fallback zurueck und zeigt
- * nicht seine eigene Optik.
+ * Die Akzent-Palette — AUS DEM VERTRAG gelesen, nicht hier hingeschrieben.
+ *
+ * Das Scaffold bringt sie vollstaendig mit, weil `t.accent(d.accent)` genau diese
+ * Schluessel aufloest; ein Skin mit nur einem Akzent-Token faellt in der Fixture-Wand
+ * auf den Rueckfall zurueck und zeigt nicht seine eigene Optik.
+ *
+ * Eine feste Liste hier wuerde vom Vertrag wegdriften: kaeme ein Akzent dazu, riefe
+ * ein frisch erzeugter Skin `t.accent(d.accent)` fuer Geraete auf, die ihn benutzen,
+ * ohne die zugehoerige `--s-acc-*`-Variable oder eine a11y-Deklaration zu schreiben —
+ * und die mitgenerierten Tests wiederholten dieselbe feste Liste, wuerden es also
+ * nicht zeigen.
+ *
+ * Der Vertrag fuehrt das Vokabular (Stand 1.13) nur als Prosa im Beschreibungstext
+ * von `widgets.light.data.accent`. Es wird deshalb dort ausgelesen — und wenn dieses
+ * Muster eines Tages nicht mehr passt, WIRFT das hier, statt still auf eine veraltete
+ * Liste zurueckzufallen.
  */
-const ACCENT_TOKENS = [
-  "orange",
-  "teal",
-  "violet",
-  "green",
-  "blue",
-  "rose",
-  "amber",
-  "slate",
-] as const;
+const ACCENT_TOKENS = accentVocabulary();
+
+function accentVocabulary(): readonly string[] {
+  const described = (
+    contractSchema as { widgets?: Record<string, { data?: Record<string, unknown> }> }
+  ).widgets?.["light"]?.data?.["accent"];
+  const list =
+    typeof described === "string"
+      ? /Palette-Schl(?:ü|ue)ssel:\s*([a-z|]+)/i.exec(described)?.[1]
+      : undefined;
+  const tokens = list?.split("|").filter((t) => t.length > 0) ?? [];
+  if (tokens.length < 2) {
+    throw new Error(
+      "create-skin: das Akzent-Vokabular liess sich nicht aus dem Vertrag lesen " +
+        "(widgets.light.data.accent). Der Vertrag hat sein Format geaendert — " +
+        "hier nachziehen, statt eine feste Liste zu benutzen.",
+    );
+  }
+  return tokens;
+}
 
 /** Layout-Modell des Scaffolds — `grid` (Default) oder `list`. */
 export type LayoutModel = "grid" | "list";

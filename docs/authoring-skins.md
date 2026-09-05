@@ -180,10 +180,19 @@ Weglassen. Acht Riegel:
    wie `exempt` bei einem Token.
 4. **Tweak weglassen** → **jeder** Tweak aus `manifest.tweaks` muss eingeordnet sein:
    als messbare Achse (`tweakAxes`), als farbneutral (`neutralTweaks`, mit Grund) oder
-   als farbwirksam-aber-hier-nicht-erfassbar (`unmeasuredTweaks`, mit Grund — und dann
-   ist `checkedTweakExtremes` **false**, und damit ist der Skin **nicht** `pass` —
-   ein eingeräumt ungeprüftes Extrem ist eine Lücke in der Messung, kein Bestehen).
-   Befund: `undeclared-tweak`.
+   als farbwirksam-aber-hier-nicht-erfassbar (`unmeasuredTweaks`, mit Grund).
+   Ein **eingeräumtes** Loch senkt `checkedTweakExtremes` auf **false**, aber nicht das
+   Urteil: der Skin kann weiterhin `pass` sein, und die Lücke steht sichtbar im Report
+   (das Gate schreibt sie zusätzlich auf stderr). Der Grund ist, dass es für einen Skin
+   mit attributgeschalteter Farbwirkung — ionic schaltet `stil`/`accentStyle` über
+   `data-*` ein anderes Regelwerk frei, nicht über eine CSS-Variable — sonst **keinen
+   ehrlichen Weg** zu voller Deckung gäbe; eine Latte, die darauf besteht, bestraft
+   genau die Deklaration, die das einräumt (openbridgeserver#181).
+   Ein **verschwiegenes** Loch fällt weiter durch: ein Tweak, der nirgends eingeordnet
+   ist, behauptet Deckung, die es nicht gibt. Befund: `undeclared-tweak`. Ebenso eine
+   Einräumung ohne Begründung (`exempt-without-reason`) — eine Auslassung muss eine
+   Aussage sein. Und `gate.spec.ts` schreibt fest, welcher Skin was einräumen darf:
+   ein neuer Eintrag bricht das Spec und muss dort begründet nachgetragen werden.
 5. **Theme gar nicht nennen** → jedes Theme aus `manifest.themes` muss in `a11y.themes`
    stehen oder mit Begründung in `exemptThemes`. Wer `light` und `dark` anbietet und nur
    `dark` deklariert, lässt die halbe Palette ungemessen. Befund: `selector-missing`.
@@ -250,10 +259,20 @@ Der `a11y`-Block landet in `support.json`:
 | `atTweakExtreme` | volle Deckkraft, aber erst am Regler-Anschlag sichtbar    |
 | `whenDimmed`     | nur bei gedimmter Deckkraft (gesperrt/inert)              |
 
-WCAG 1.4.3 nimmt „inactive user interface components" ausdrücklich aus. Diese Fläche
-nimmt die Ausnahme **nicht** — sie misst konservativ. Sie benennt die Teilmenge aber,
-damit niemand sie als harten Verstoss verkauft. Wenn du eine Zahl zitierst, zitiere
-`atDefault`.
+WCAG 1.4.3 und 1.4.11 nehmen „inactive user interface components" ausdrücklich aus,
+und diese Fläche nimmt die Ausnahme **in Anspruch — aber nur für genau das**: für den
+Zustand, in dem ein Bedienelement wirklich inaktiv ist (`disabled`, `aria-disabled`).
+Praktisch heisst das: du lässt die Deckkraft dieses Zustands aus `alphas` weg und
+begründest es im `reason` des Tokens. ionic und edomi tun das für ihre `0.55` der
+inerten Bedienelemente.
+
+Was **nicht** ausgenommen ist, ist alles, was weiterhin gelesen werden soll. Eine
+gesperrte oder `readonly` Kachel zeigt ihre Werte noch — ihre `0.7` steht deshalb in
+`alphas` und wird gemessen. Wer eine Deckkraft weglässt, sagt damit „dieser Zustand ist
+inaktiv"; stimmt das nicht, ist es eine Lücke, die niemand mehr sieht.
+
+`whenDimmed` zählt also die Verstösse der GEMESSENEN gedimmten Zustände, nicht aller
+gedimmten. Wenn du eine Zahl zitierst, zitiere `atDefault`.
 
 Trage dein Skin ins CI-Gate ein und fahre es:
 
