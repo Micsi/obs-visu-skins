@@ -964,3 +964,65 @@ describe("Deckkraft und Präzision", () => {
     expect(m!.ratio).not.toBe(4.5);
   });
 });
+
+describe("Gründe: Zyklen und das, was wirklich deckend ist", () => {
+  it("ein Zyklus in der `over`-Kette wird nicht zu einem deckenden Grund gerechnet", () => {
+    // `--a über --b` und `--b über --a` lief vorher in die Tiefengrenze, und beim
+    // Zurückwickeln nahm jeder Aufrufer seine eigene transluzente Farbe als gültigen
+    // Unterbau: die zyklischen Farben wurden so oft übereinandergelegt, bis das
+    // Ergebnis deckend AUSSAH — und die Messung bestand ohne jeden deckenden Grund.
+    const css = '.p[data-theme="dark"]{--a:rgba(255,255,255,0.5);--b:rgba(255,255,255,0.5);--fg:#000000;}';
+    const decl = {
+      stylesheet: SHEET,
+      themes: { dark: '.p[data-theme="dark"]' },
+      grounds: [
+        { token: "--a", over: "--b" },
+        { token: "--b", over: "--a" },
+      ],
+      tokens: {
+        "--a": { role: "ground" },
+        "--b": { role: "ground" },
+        "--fg": { role: "text", on: ["--a"] },
+      },
+    };
+    const r = measure(decl, css);
+    expect(r.status).toBe("fail");
+    // Kein Fall darf gegen einen der beiden Zyklus-Gründe gemessen worden sein.
+    expect(r.combinations).toBe(0);
+  });
+
+  it("dieselbe Kette mit deckendem Boden misst normal", () => {
+    // Die Gegenprobe: der Riegel darf nur den Zyklus fangen, nicht jede Kette.
+    const css = '.p[data-theme="dark"]{--a:rgba(255,255,255,0.5);--b:#ffffff;--fg:#000000;}';
+    const decl = {
+      stylesheet: SHEET,
+      themes: { dark: '.p[data-theme="dark"]' },
+      grounds: [{ token: "--a", over: "--b" }, { token: "--b" }],
+      tokens: {
+        "--a": { role: "ground" },
+        "--b": { role: "ground" },
+        "--fg": { role: "text", on: ["--a"] },
+      },
+    };
+    const r = measure(decl, css);
+    expect(r.findings).toEqual([]);
+    expect(r.combinations).toBeGreaterThan(0);
+    expect(r.status).toBe("pass");
+  });
+
+  it("99.9 % Deckkraft ohne Unterbau ist nicht deckend", () => {
+    // Die alte Schwelle liess alles ab 0.999 als deckend durchgehen. Gerechnet wurde
+    // dann gegen reines Weiss, während der Browser weiter mit einem unbekannten Ton
+    // darunter mischt — nah an der Grenze wird daraus ein `pass`, das nichts belegt.
+    const css = '.p[data-theme="dark"]{--bg:rgba(255,255,255,0.999);--fg:#000000;}';
+    const decl = {
+      stylesheet: SHEET,
+      themes: { dark: '.p[data-theme="dark"]' },
+      grounds: [{ token: "--bg" }],
+      tokens: { "--bg": { role: "ground" }, "--fg": { role: "text" } },
+    };
+    const r = measure(decl, css);
+    expect(r.findings.map((f) => f.problem)).toContain("translucent-ground");
+    expect(r.status).toBe("fail");
+  });
+});

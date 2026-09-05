@@ -51,12 +51,53 @@ function loadStyles(
         : entry.startsWith(".")
           ? join(dirname(manifestPath), entry)
           : resolve(entry);
-      out[entry] = readFileSync(file, "utf8");
+      readInto(out, entry, file, resolve);
     } catch {
       /* bleibt ungelesen -> a11y meldet `stylesheet-unreadable` */
     }
   }
   return out;
+}
+
+/**
+ * Liest eine Datei und FOLGT ihren `@import`s — rekursiv, in Kaskadenreihenfolge.
+ *
+ * Ohne das sah die Messung nur den Einstieg: ein Skin konnte ein paar bestandene
+ * Paletten-Token im Einstiegsblatt halten, seine Komponenten-CSS mit kontrastarmen
+ * oder gar nicht deklarierten Farben importieren — und `a11y.status: "pass"`
+ * bekommen, obwohl der Browser beide Dateien anwendet. `parseRules` kann den Import
+ * auch nicht sehen: er hat keinen Regelrumpf.
+ *
+ * Reihenfolge: CSS wendet einen `@import` VOR den Regeln der importierenden Datei
+ * an, deshalb landet die importierte Quelle zuerst in `out`. Ein Import, der sich
+ * nicht auflösen lässt, wird als eigener, leerer Eintrag vermerkt — dann meldet die
+ * Messung ihn als `stylesheet-unreadable`, statt ihn zu verschweigen.
+ */
+function readInto(
+  out: Record<string, string>,
+  key: string,
+  file: string,
+  resolve: (id: string) => string,
+  seen: Set<string> = new Set(),
+): void {
+  if (seen.has(file)) return; // zyklische Importe: einmal reicht
+  seen.add(file);
+  const css = readFileSync(file, "utf8");
+  for (const m of css.matchAll(/@import\s+(?:url\(\s*)?["']([^"']+)["']/g)) {
+    const spec = m[1]!;
+    const importKey = `${key} → ${spec}`;
+    try {
+      const target = spec.startsWith(".")
+        ? join(dirname(file), spec)
+        : isAbsolute(spec)
+          ? spec
+          : resolve(spec);
+      readInto(out, importKey, target, resolve, seen);
+    } catch {
+      out[importKey] = ""; // unauflösbar -> `stylesheet-unreadable`
+    }
+  }
+  out[key] = css;
 }
 
 async function loadSkin(pkg: string): Promise<{ skin: SkinInput; manifestPath: string }> {
@@ -70,6 +111,15 @@ async function loadSkin(pkg: string): Promise<{ skin: SkinInput; manifestPath: s
   const mod = (await import(pkg)) as SkinModule;
   const manifestPath = require.resolve(`${pkg}/manifest.json`);
   const manifest = require(manifestPath) as SkinManifest;
+  /**
+   * Paket-Exporte werden aus Sicht des SKINS aufgelöst, nicht aus Sicht dieser
+   * Datei. Unter pnpms isoliertem `node_modules` sieht ein `require` an `cli.ts`
+   * nur die eigenen Abhängigkeiten des conformance-Pakets: nennt ein Skin ein
+   * Stylesheet aus einer seiner eigenen Abhängigkeiten, kam ein gültiger Export als
+   * `stylesheet-unreadable` zurück. Dass edomi ionics Blatt heute findet, liegt nur
+   * daran, dass ionic zufällig auch hier als devDependency steht.
+   */
+  const fromSkin = createRequire(manifestPath);
   return {
     skin: {
       manifest,
@@ -77,7 +127,7 @@ async function loadSkin(pkg: string): Promise<{ skin: SkinInput; manifestPath: s
       details: mod.details,
       presets: mod.presets,
       page: mod.page,
-      styles: loadStyles(manifest, manifestPath, (id) => require.resolve(id)),
+      styles: loadStyles(manifest, manifestPath, (id) => fromSkin.resolve(id)),
     },
     manifestPath,
   };

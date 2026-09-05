@@ -116,3 +116,78 @@ describe("loadStyles — die drei Pfadformen aus manifest.a11y.stylesheet", () =
     expect(out).toEqual({});
   });
 });
+
+describe("loadStyles folgt dem, was der Browser auch anwendet", () => {
+  /** Ein Manifest-Gerüst, das nur ein Stylesheet nennt. */
+  function manifestNaming(sheet: string): SkinManifest {
+    return {
+      name: "probe",
+      targetsContract: "1.13",
+      unsupported: [],
+      widgets: {},
+      layout: { model: "list", honors: ["order"] },
+      a11y: { stylesheet: sheet, themes: {}, grounds: [], tokens: {} },
+    } as unknown as SkinManifest;
+  }
+
+  it("lädt `@import`-Ketten mit, in Kaskadenreihenfolge", () => {
+    // Ohne das sah die Messung nur den Einstieg: ein Skin konnte ein paar bestandene
+    // Token oben halten, seine echten Farben importieren — und `pass` bekommen,
+    // obwohl der Browser beide Dateien anwendet. `parseRules` sieht den Import auch
+    // nicht, er hat keinen Regelrumpf.
+    const dir = mkdtempSync(join(tmpdir(), "obs-import-"));
+    writeFileSync(join(dir, "deep.css"), ".d{color:#111}");
+    writeFileSync(join(dir, "mid.css"), '@import "./deep.css";\n.m{color:#222}');
+    writeFileSync(join(dir, "entry.css"), '@import url("./mid.css");\n.e{color:#333}');
+    const manifestPath = join(dir, "manifest.json");
+
+    const out = loadStyles(manifestNaming("./entry.css"), manifestPath, (id) => id);
+    const keys = Object.keys(out);
+
+    // Alle drei Dateien sind da …
+    expect(keys).toHaveLength(3);
+    expect(Object.values(out).join("\n")).toContain(".d{color:#111}");
+    // … und die importierten stehen VOR der importierenden, wie CSS sie anwendet.
+    expect(keys.indexOf("./entry.css → ./mid.css → ./deep.css")).toBeLessThan(
+      keys.indexOf("./entry.css → ./mid.css"),
+    );
+    expect(keys.indexOf("./entry.css → ./mid.css")).toBeLessThan(keys.indexOf("./entry.css"));
+  });
+
+  it("ein unauflösbarer Import wird vermerkt, nicht verschwiegen", () => {
+    const dir = mkdtempSync(join(tmpdir(), "obs-import-"));
+    writeFileSync(join(dir, "entry.css"), '@import "./fehlt.css";\n.e{color:#333}');
+    const out = loadStyles(manifestNaming("./entry.css"), join(dir, "manifest.json"), (id) => id);
+    // Als leerer Eintrag: die Messung meldet ihn dann als `stylesheet-unreadable`.
+    expect(out["./entry.css → ./fehlt.css"]).toBe("");
+    expect(out["./entry.css"]).toContain(".e{color:#333}");
+  });
+
+  it("ein zyklischer Import läuft nicht endlos", () => {
+    const dir = mkdtempSync(join(tmpdir(), "obs-import-"));
+    writeFileSync(join(dir, "a.css"), '@import "./b.css";\n.a{color:#111}');
+    writeFileSync(join(dir, "b.css"), '@import "./a.css";\n.b{color:#222}');
+    const out = loadStyles(manifestNaming("./a.css"), join(dir, "manifest.json"), (id) => id);
+    expect(Object.values(out).join("\n")).toContain(".b{color:#222}");
+  });
+
+  it("ein Paket-Export wird über den übergebenen Resolver gesucht", () => {
+    // Der Resolver kommt aus `createRequire(manifestPath)` — er sieht die
+    // Abhängigkeiten des SKINS, nicht die dieser Datei. Unter pnpms isoliertem
+    // node_modules war ein gültiger Export sonst `stylesheet-unreadable`.
+    const dir = mkdtempSync(join(tmpdir(), "obs-pkg-"));
+    const real = join(dir, "fremd.css");
+    writeFileSync(real, ".x{color:#444}");
+    const seen: string[] = [];
+    const out = loadStyles(
+      manifestNaming("@fremd/skin/fremd.css"),
+      join(dir, "manifest.json"),
+      (id) => {
+        seen.push(id);
+        return real;
+      },
+    );
+    expect(seen).toEqual(["@fremd/skin/fremd.css"]);
+    expect(out["@fremd/skin/fremd.css"]).toBe(".x{color:#444}");
+  });
+});

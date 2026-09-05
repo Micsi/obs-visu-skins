@@ -532,6 +532,22 @@ export function contrast(a: Rgba, b: Rgba): number {
 
 /** Vordergrund über Grund gemischt — das reale Pixel. `alpha` skaliert zusätzlich. */
 /**
+ * DECKEND heisst alpha 1 — nicht "fast 1".
+ *
+ * Vorher galt alles ab 0.999 als deckend. `rgb(255 255 255 / 99.9%)` ohne erklärten
+ * Unterbau rutschte damit durch beide Riegel: gerechnet wurde gegen reines Weiss,
+ * während der Browser weiter mit einem unbekannten Ton darunter mischt — nah an der
+ * Schwelle wird daraus ein `pass`, das nichts belegt.
+ *
+ * Die Toleranz hier ist deshalb kein Spielraum für Deklarationen, sondern nur für
+ * Gleitkomma-Reste: `composite` mit deckendem Grund rechnet `a + 1 * (1 - a)`, und
+ * das trifft die 1 nicht immer exakt.
+ */
+function isOpaque(alpha: number): boolean {
+  return alpha >= 1 - 1e-9;
+}
+
+/**
  * Vordergrund über Grund, mit zusätzlicher Deckkraft auf dem Vordergrund.
  *
  * ══ Was `alpha` hier BEDEUTET, und was nicht
@@ -1023,7 +1039,7 @@ export function measureA11y(input: A11yInput): SupportA11y {
           });
           continue;
         }
-        if (resolved.a < 0.999) {
+        if (!isOpaque(resolved.a)) {
           findings.push({
             problem: "translucent-ground",
             detail: `${theme}/${stop.label}: Grund ${g.token} bleibt nach dem Mischen durchscheinend (a=${resolved.a.toFixed(2)}) — nenne einen over-Grund`,
@@ -1206,18 +1222,32 @@ function resolveGround(
   ground: A11yGround,
   all: readonly A11yGround[],
   env: Map<string, string>,
-  depth = 0,
+  seen: ReadonlySet<string> = new Set(),
 ): Rgba | null {
-  if (depth > 8) return null;
+  // ZYKLUS: `--a über --b` und `--b über --a` lief vorher nur in die Tiefengrenze,
+  // und beim Zurückwickeln behandelte JEDER Aufrufer das Scheitern so, als sei seine
+  // eigene transluzente Farbe ein gültiger Unterbau — die zyklischen Farben wurden
+  // wieder und wieder übereinandergelegt, bis das Ergebnis deckend AUSSAH und die
+  // Messung bestand, obwohl es gar keinen deckenden Grund gibt. Jetzt bricht der
+  // Zyklus die Auflösung ab, statt sie zu erfinden.
+  if (seen.has(ground.token)) return null;
   const raw = env.get(ground.token);
   if (raw === undefined) return null;
   const color = resolveColor(raw, env);
   if (color === null) return null;
-  if (color.a >= 0.999 || ground.over === undefined) return color;
+  // DECKEND heisst alpha === 1, nicht "fast". `rgb(255 255 255 / 99.9%)` ohne `over`
+  // nahm diesen Weg und bestand auch die spätere Transluzenz-Prüfung: gerechnet
+  // wurde gegen reines Weiss, während der Browser weiter mit einem unbekannten Ton
+  // darunter mischt. Nah an der Schwelle wird daraus ein `pass`, das nichts belegt.
+  if (isOpaque(color.a)) return color;
+  // Transluzent OHNE erklärten Unterbau: die Farbe kommt so zurück, wie sie ist —
+  // der `translucent-ground`-Riegel weiter oben ist der genauere Befund dafür als
+  // ein pauschales „unauflösbar".
+  if (ground.over === undefined) return color;
   const under = all.find((g) => g.token === ground.over);
-  if (!under) return color;
-  const beneath = resolveGround(under, all, env, depth + 1);
-  return beneath === null ? color : composite(color, beneath);
+  if (!under) return color; // als `unknown-ground` bereits gemeldet
+  const beneath = resolveGround(under, all, env, new Set([...seen, ground.token]));
+  return beneath === null ? null : composite(color, beneath);
 }
 
 function dedupe(findings: readonly A11yFinding[]): A11yFinding[] {
