@@ -12,6 +12,7 @@
     { "path": "./packages/skins/edomi" },
     { "path": "./packages/tooling/conformance" },
     { "path": "./packages/tooling/create-skin" },
-    { "path": "./packages/tooling/fixture-wand" }
+    { "path": "./packages/tooling/fixture-wand" },
+    { "path": "./packages/tooling/docs-guard" }
   ]
 }

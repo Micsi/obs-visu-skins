@@ -2,9 +2,19 @@
  * Zentrale Konstante für den Paketnamen des Vertrags.
  *
  * U2 (offene Frage): npm-Scope/Paketname des Vertrags ist noch nicht endgültig.
- * `@obs/visu-contract` ist ein Vorschlag (DECISIONS.md → D4). Damit eine spätere
- * Umbenennung trivial bleibt, referenziert das gesamte Repo den Vertrag NUR über
- * diese eine Konstante — nie als hartkodierten String an mehreren Stellen.
+ * `@obs/visu-contract` ist ein Vorschlag (DECISIONS.md → D4).
+ *
+ * **Diese Konstante ist KEINE Einzelquelle des Namens, auch wenn ihr Name das nahelegt.**
+ * Sie wird im Repo derzeit nirgends gelesen, und der Paketname steht in jedem Import
+ * ausgeschrieben — Dutzende Stellen unter `packages/`, dazu die `dependencies`-Einträge,
+ * `scripts/contract-link.sh` und `.github/workflows/ci.yml`. Eine Umbenennung ist ein
+ * repo-weites Suchen-und-Ersetzen.
+ *
+ * Sie lässt sich auch nicht nachträglich zur Einzelquelle machen: ein `import`-Spezifizierer
+ * muss in ESM ein String-Literal sein, auch beim Typ-Import. Was diese Konstante kann, ist
+ * den Namen für Fehlermeldungen und Werkzeuge bereitstellen — mehr nicht. Der frühere
+ * Kommentar behauptete das Gegenteil und stand genau an der Stelle, auf die das README
+ * beim Thema Umbenennung zeigt.
  *
  * Bezug während der Entwicklung: per pnpm-Workspace-Link bzw. Git-Dependency
  * (siehe README → „Vertrag während der Entwicklung beziehen").
