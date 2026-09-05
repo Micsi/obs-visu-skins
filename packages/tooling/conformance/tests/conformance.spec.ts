@@ -28,7 +28,6 @@ import {
   CORE_WIDGET_TYPES,
   LAYOUT_HONORS,
   checkHonors,
-  collectActions,
   generateSupport,
   type RendererMap,
 } from "../index.js";
@@ -345,9 +344,23 @@ describe("generateSupport — gap-hart", () => {
   });
 
   it("liest data-action auch aus rohem Markup (Renderer ohne Framework)", async () => {
-    expect(
-      [...collectActions('<div data-action="toggle"><b data-action="lock"/></div>')].sort(),
-    ).toEqual(["lock", "toggle"]);
+    // Rohes Markup war fruehher ein Sonderfall im Baum-Durchlauf (ein Regex ueber
+    // String-Knoten). Seit die Achse MONTIERT, ist es keiner mehr: der DOM rendert
+    // `innerHTML`, und dort steht `data-action` als ganz gewoehnliches Attribut.
+    const raw: Renderer = () =>
+      vh("div", { innerHTML: '<button data-action="toggle"></button><b data-action="setDim"></b>' }) as never;
+    const manifest: SkinManifest = {
+      name: "raw-markup",
+      targetsContract: "1.10",
+      unsupported: ["blind", "jalousie", "sensor", "scene", "media", "camera", "climate"],
+      widgets: { light: { actions: ["toggle", "setDim"] }, switch: { actions: ["toggle"] } },
+      layout: { model: "grid", honors: [] },
+    } as unknown as SkinManifest;
+    const { report } = await generateSupport({
+      manifest,
+      tiles: { light: raw, switch: raw },
+    });
+    expect(report.widgets.light?.actions).toBe("2/2");
   });
 
   it('meldet "broken" für einen Renderer, der an einer Vertrags-Fixture wirft', async () => {
@@ -1650,5 +1663,49 @@ describe("Riegel 10 — Farbe aus dem Renderer, nicht aus dem Blatt", () => {
     const tile: Renderer = () => vh("div", { style: { fontWeight: 600, gap: "4px" } }) as never;
     const { report } = await generateSupport(skinWith(tile));
     expect(report.a11y?.findings).toEqual([]);
+  });
+});
+
+describe("die Aktions-Achse erbt Vues Prop-Semantik, statt sie nachzubilden", () => {
+  function actionSkin2(tiles: Record<string, Renderer>) {
+    return {
+      manifest: {
+        name: "props",
+        targetsContract: "1.10",
+        unsupported: ["light", "blind", "jalousie", "sensor", "scene", "media", "camera", "climate"],
+        widgets: { switch: { actions: ["toggle"] } },
+        layout: { model: "grid", honors: [] },
+      } as unknown as SkinManifest,
+      tiles,
+    };
+  }
+
+  it("ein Prop in kebab-case erreicht seine camelCase-Deklaration", () => {
+    // Der frühere Nachbau schlug nur unter dem camelCase-Namen nach, hielt das Prop
+    // für abwesend und wandte den `default` an — die Achse erfand ein `data-action`,
+    // das die montierte Komponente nicht zeichnet. Vue camelisiert den Schlüssel
+    // selbst; seit die Achse montiert, ist das kein Thema mehr.
+    const Action = {
+      props: { isEnabled: { type: Boolean, default: true } },
+      setup(props: { isEnabled: boolean }) {
+        return () => (props.isEnabled ? vh("button", { "data-action": "toggle" }) : vh("span"));
+      },
+    };
+    const tile: Renderer = () => vh(Action as never, { "is-enabled": false }) as never;
+    return generateSupport(actionSkin2({ switch: tile })).then(({ report }) => {
+      expect(report.widgets.switch?.actions).toBe("0/1");
+    });
+  });
+
+  it("ein Teleport zählt, weil im DOM gesucht wird", () => {
+    // Ein Baum-Durchlauf sah das Ziel eines Teleports nie — der Mount sehr wohl.
+    const tile: Renderer = () =>
+      vh(Teleport as never, { to: "body" }, [vh("button", { "data-action": "toggle" })]) as never;
+    return generateSupport(actionSkin2({ switch: tile })).then(({ report }) => {
+      // Der Teleport landet ausserhalb des Containers; gezählt wird, was der Skin
+      // wirklich zeichnet — hier also NICHT im Container, und das ist die ehrliche
+      // Antwort: was der Host woanders hinhängt, ist nicht die Kachel.
+      expect(report.widgets.switch?.actions).toBe("0/1");
+    });
   });
 });

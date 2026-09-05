@@ -604,7 +604,22 @@ export async function ensureDom(): Promise<boolean> {
  * nachlädt), bekommt eine Laufzeit ohne Dokument — deshalb ruft `cli.ts`
  * {@link ensureDom} auf, BEVOR es den Skin importiert.
  */
-async function domRuntime(): Promise<{ createApp: typeof import("vue").createApp } | null> {
+let domRuntimeOnce: Promise<{ createApp: typeof import("vue").createApp } | null> | undefined;
+
+/**
+ * Die DOM-Laufzeit — EINMAL geprüft, dann gemerkt. Die Antwort ändert sich innerhalb
+ * eines Laufs nicht: das Dokument wird einmal hochgezogen und bleibt. Seit auch die
+ * Aktions-Achse montiert, sind es gut hundert Aufrufe je Skin statt einer Handvoll,
+ * und der Kanarienvogel-Mount bei jedem einzelnen war messbar teuer.
+ */
+function domRuntime(): Promise<{ createApp: typeof import("vue").createApp } | null> {
+  domRuntimeOnce ??= checkDomRuntime();
+  return domRuntimeOnce;
+}
+
+async function checkDomRuntime(): Promise<{
+  createApp: typeof import("vue").createApp;
+} | null> {
   if (!(await ensureDom())) return null;
   const vue = await import("vue");
   // KANARIENVOGEL. Ein dynamischer Import liefert das Modul aus dem Cache — wer
@@ -627,165 +642,7 @@ async function domRuntime(): Promise<{ createApp: typeof import("vue").createApp
   return vue;
 }
 
-/**
- * Die Props, wie die Komponente sie SIEHT — nicht der rohe Prop-Beutel des VNode.
- *
- * Beim Instanziieren wendet Vue die Deklaration an: fehlende Props bekommen ihren
- * `default`, ein deklariertes `Boolean` ohne Wert wird zu `false` und mit leerem
- * String zu `true`. Nichts davon geschah hier, und der Unterschied ist messbar: eine
- * Aktions-Komponente, deren weggelassenes `enabled` per Deklaration `true` wäre,
- * bekam `undefined`, zeichnete ihr `data-action` nicht — und eine tatsächlich
- * angebotene Aktion rutschte von `full` auf `partial` oder `display`.
- *
- * Bewusst nur die Deklaration, kein Mount: die Aktions-Achse jagt Hunderte Fixtures
- * durch die Renderer, ein Mount je Fixture wäre zu teuer (siehe den Doc-Block oben).
- *
- * ══ Und damit ist dies ein NACHBAU, mit allem, was daran hängt
- *
- * Dieselbe Bauart, die der `honors`-Probelauf hinter sich hat: dort wurde aus dem
- * Auflösen von Hand eine Kette von Abweichungen gegenüber dem Original, und erst
- * `createApp().mount()` hat sie beendet. Hier ist die Fläche kleiner — es geht nur um
- * die Prop-Auflösung —, aber sie ist nicht endlich: `validator`, `required`, `mixins`,
- * `extends`, Symbol-Typen und die `attrs`-Trennung stehen alle noch draussen.
- *
- * Was hier nachgebildet ist, ist deshalb ausdrücklich benannt: Defaults (inklusive
- * Fabrik MIT rohen Props), `Boolean`-Auflösung inklusive Vues reihenfolgeabhängiger
- * `shouldCastTrue`-Regel. Alles andere fehlt, und wenn diese Fläche noch einmal
- * Befunde derselben Klasse sammelt, ist die Antwort nicht die nächste Regel, sondern
- * der Umbau auf einen echten Mount (obs-visu-skins#48).
- */
-function normalizeProps(
-  raw: Record<string, unknown>,
-  declared: unknown,
-): Record<string, unknown> {
-  if (!declared || typeof declared !== "object") return raw;
-  const out: Record<string, unknown> = { ...raw };
-  // Array-Form (`props: ['a','b']`) trägt keine Defaults — nichts zu tun.
-  if (Array.isArray(declared)) return out;
-  for (const [name, spec] of Object.entries(declared as Record<string, unknown>)) {
-    const given = out[name];
-    const type = spec && typeof spec === "object" ? (spec as { type?: unknown }).type : spec;
-    const types = Array.isArray(type) ? type : [type];
-    const booleanAt = types.indexOf(Boolean);
-    const stringAt = types.indexOf(String);
-    const isBoolean = booleanAt >= 0;
-    /**
-     * Vues `shouldCastTrue` — und es hängt an der REIHENFOLGE der Union.
-     *
-     * Bei `{ type: [String, Boolean] }` bleibt ein leerer String ein leerer String,
-     * weil `String` vorne steht; erst bei `[Boolean, String]` wird er zu `true`.
-     * Ohne diese Regel meldete die Aktions-Achse eine Aktion, die die montierte
-     * Anwendung nicht zeichnet: eine Komponente, die `data-action` nur bei striktem
-     * `true` ausgibt, bekam hier ein erfundenes `true`.
-     */
-    const castsEmptyToTrue = isBoolean && (stringAt < 0 || booleanAt < stringAt);
-    if (given === undefined) {
-      const def =
-        spec && typeof spec === "object" ? (spec as { default?: unknown }).default : undefined;
-      if (def !== undefined) {
-        // Objekt-/Array-Defaults liefert Vue über eine Fabrik, damit Instanzen sie
-        // nicht teilen — und die Fabrik bekommt die ROHEN Props als Argument
-        // (`default(rawProps) { return rawProps.kind === "switch" }`). Ohne das warf
-        // eine solche Fabrik, und `renderAll` hielt das Widget für `broken`.
-        out[name] =
-          typeof def === "function" && type !== Function
-            ? (def as (props: Record<string, unknown>) => unknown)(raw)
-            : def;
-      } else if (isBoolean) {
-        // Ein deklariertes Boolean ohne Wert ist `false`, nicht `undefined`.
-        out[name] = false;
-      }
-    } else if (castsEmptyToTrue && given === "") {
-      // `<C enabled>` kommt als leerer String an und bedeutet `true`.
-      out[name] = true;
-    }
-  }
-  return out;
-}
 
-/**
- * Rendert einen Komponenten-VNode aus, falls es einer ist.
- *
- * Ein Renderer darf seine Elemente durch eine Komponente ziehen
- * (`h(PageComponent, { host })`); erst deren Render-Funktion erzeugt das Markup.
- * Wer nur `props`/`children` des äusseren VNode liest, sieht davon nichts.
- *
- * Nur noch für die AKTIONS-Achse ({@link collectActions}): die sucht `data-action`
- * im zurückgegebenen Baum und arbeitet bewusst ohne DOM, weil sie jede Fixture
- * jedes Typs durch jede Renderer-Fläche jagt — Hunderte Läufe, für die ein Mount
- * je Fixture zu teuer wäre. Der `honors`-Probelauf ist genau diesen Weg gegangen
- * und wieder abgebogen: dort wurde aus dem Auflösen ein Nachbau von Vues
- * Semantik, den {@link probeLinkDelivery} jetzt Vue selbst überlässt.
- *
- * Wirft die Komponente ohne echte Laufzeit, bleibt sie schlicht ungemessen —
- * `broken` ist dem Renderer selbst vorbehalten, nicht unserer Unfähigkeit, ihn
- * zu instanziieren.
- */
-function expandComponent(vnode: { type?: unknown; props?: unknown; children?: unknown }): unknown {
-  const type = vnode.type;
-  const raw = (vnode.props ?? {}) as Record<string, unknown>;
-  const slots = vnode.children;
-  const options = type && typeof type === "object" ? (type as Record<string, unknown>) : undefined;
-  const props = normalizeProps(raw, options?.props);
-  const ctx = { slots, attrs: raw, emit: () => {}, expose: () => {} };
-
-  // Die HÄUFIGSTE Komponentenform der Composition API — `defineComponent({ setup()
-  // { return () => h(…) } })` — hat WEDER einen aufrufbaren `type` NOCH ein
-  // `type.render`, solange Vue keine Instanz gebaut hat. Der Zweig gab hier
-  // `undefined` zurück, der Teilbaum blieb ungeprüft, und ein funktionierender
-  // Link in genau dieser Form galt als `undelivered`.
-  //
-  // `setup()` liefert entweder die Render-Funktion selbst (der Fall oben) oder ein
-  // Objekt mit Bindungen — dann rendert `type.render` mit diesen Bindungen als
-  // `this`. Beides wird bedient; wirft `setup` ohne echte Laufzeit, bleibt die
-  // Komponente ungemessen wie bisher.
-  let setupRender: ((props?: unknown, ctx?: unknown) => unknown) | undefined;
-  let setupState: Record<string, unknown> | undefined;
-  if (options && typeof options.setup === "function") {
-    try {
-      const produced = (options.setup as (p: unknown, c: unknown) => unknown)(props, ctx);
-      if (typeof produced === "function") {
-        setupRender = produced as (props?: unknown, ctx?: unknown) => unknown;
-      } else if (produced && typeof produced === "object") {
-        setupState = produced as Record<string, unknown>;
-      }
-    } catch {
-      /* ungemessen, nicht `broken` - siehe oben */
-    }
-  }
-
-  const render =
-    setupRender ??
-    (typeof type === "function"
-      ? (type as (props?: unknown, ctx?: unknown) => unknown)
-      : options && typeof options.render === "function"
-        ? (options.render as (props?: unknown, ctx?: unknown) => unknown)
-        : undefined);
-  if (!render) return undefined;
-  // Der `this`-Stellvertreter für die Options-API. Vue ruft `render()` dort mit
-  // dem Komponenten-Proxy, über den `this.host`, `this.$props` usw. laufen. Als
-  // nackte Funktion aufgerufen warf so ein `render()` an seiner ersten Zeile,
-  // die Ausnahme galt als leerer Teilbaum, und der Skin fiel als `undelivered`
-  // durch — dieselbe Fehlalarm-Klasse wie ein Handler ohne Ereignis-Argument.
-  // Ein Proxy wäre hier falsch: er beantwortete JEDEN Namen und verschöbe damit
-  // das Verhalten des Renderers; der Stellvertreter reicht genau die Props durch,
-  // die der VNode mitbringt.
-  const self = {
-    ...props,
-    // Die Bindungen aus `setup()`, falls es welche statt einer Render-Funktion
-    // lieferte: `type.render` greift dort über `this` darauf zu.
-    ...(setupState ?? {}),
-    $props: props,
-    $attrs: props,
-    $slots: slots ?? {},
-    $emit: () => {},
-  };
-  try {
-    return render.call(self, props, ctx);
-  } catch {
-    return undefined;
-  }
-}
 
 type Summary = {
   full: number;
@@ -830,119 +687,71 @@ function toleratedActions(type: CoreWidgetType): ReadonlySet<string> {
   return new Set(type === "blind" || type === "jalousie" ? [...base, "stop"] : base);
 }
 
-/**
- * Läuft einen Renderer-Rückgabewert ab und sammelt jede markierte `data-action`.
- * Verträgt beide Formen, die {@link Renderer} zurückgeben darf: einen Framework-Knoten
- * (Vue-VNode: `props` + `children`) und rohes Markup (String). Tiefe begrenzt, damit ein
- * zyklischer Baum den Lauf nicht aufhängt.
- */
-export function collectActions(
-  node: unknown,
-  out: Set<string> = new Set(),
-  depth = 0,
-): Set<string> {
-  if (depth > 64 || node === null || node === undefined) return out;
 
-  if (typeof node === "string") {
-    // HTML-Attributregeln statt "nur direkt anliegend und gequotet": Leerraum um
-    // das `=`, einfache/doppelte Quotes und der unquotierte Fall sind alle gueltig.
-    // Ein Renderer, der `<button data-action=toggle>` liefert, wurde sonst still
-    // als display/partial abgewertet — der Waechter haette geschwiegen.
-    const ATTR = /data-action\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'`=<>]+))/g;
-    for (const m of node.matchAll(ATTR)) {
-      const action = m[1] ?? m[2] ?? m[3];
-      if (action && action.length > 0) out.add(action);
-    }
-    return out;
-  }
-  if (Array.isArray(node)) {
-    for (const child of node) collectActions(child, out, depth + 1);
-    return out;
-  }
-  if (typeof node !== "object") return out;
-
-  const vnode = node as {
-    type?: unknown;
-    props?: Record<string, unknown> | null;
-    children?: unknown;
-  };
-  const marked = vnode.props?.["data-action"];
-  if (typeof marked === "string" && marked.length > 0) out.add(marked);
-
-  // Komponenten-VNodes aufloesen: Ein Renderer darf seine Bedienelemente durch eine
-  // Komponente ziehen (`h(ActionButton)`), deren Render-Funktion erst das Element mit
-  // `data-action` erzeugt. Wer nur props/children des aeusseren VNode liest, sieht die
-  // Aktion nie und stuft einen voll bedienbaren Skin auf display/partial herunter.
-  // Dieselbe Aufloesung benutzt der `honors`-Probelauf ({@link expandComponent}).
-  const expanded = expandComponent(vnode);
-  if (expanded !== undefined) collectActions(expanded, out, depth + 1);
-
-  if (vnode.children !== undefined) collectActions(vnode.children, out, depth + 1);
-  return out;
-}
 
 /**
- * Die INLINE-Stile, die ein gerenderter Baum trägt — `style`-Props und `style="…"` in
- * rohem Markup.
+ * Was ein Renderer WIRKLICH zeichnet — gemessen an einem echten Mount.
  *
- * Die Farb-Achse sieht sonst nur die Stylesheets. Ein Renderer, der
- * `style: { color: "#777" }` über eine helle Fläche legt, konnte damit eine
- * unbeteiligte, bestandene Palette deklarieren und trotzdem `a11y.status: "pass"`
- * bekommen — die Farbe stand in keinem Blatt, also sah niemand sie.
+ * ══ Warum das den Nachbau ersetzt
  *
- * Gesammelt wird die Deklaration in derselben Form, in der auch ein Blatt sie führt
- * (`prop: value`), damit die Farb-Achse sie mit demselben eigenschaftsbewussten Scan
- * beurteilt: was eine Farbe an einer Farb-Eigenschaft ist, ist ein Befund; ein
- * `var(--token)` auf einen klassifizierten Token ist in Ordnung.
+ * Die Aktions-Achse lief den VNode-Baum von Hand ab und musste dafür Vues
+ * Prop-Auflösung nachbilden: Defaults, Default-Fabriken mit rohen Props, die
+ * reihenfolgeabhängige `Boolean`-Umwandlung, camelCase gegen kebab-case. Jede
+ * Review-Runde fand die nächste Regel, die der Nachbau anders sah als Vue — dieselbe
+ * unbegrenzte Fehlerfläche, die der `honors`-Probelauf schon hinter sich hat.
+ *
+ * Die Begründung dagegen war die Laufzeit ("Hunderte Fixtures, ein Mount je Fixture
+ * wäre zu teuer"). Nachgezählt: der Vertrag bringt **26** Fixture-Zustände über zehn
+ * Typen mit, bei bis zu drei Flächen also unter hundert Mounts je Skin. Die Schätzung
+ * lag um eine Grössenordnung daneben — der reale Preis ist ein Gate-Lauf von gut zwei
+ * statt gut einer halben Minute, und dafür misst die Achse, was der Browser zeichnet.
+ *
+ * Gratis dabei: die ganze Prop-Semantik, `data-action` in rohem Markup (`innerHTML`),
+ * Teleports, Slots — alles, was im DOM landet, wird gefunden, weil im DOM gesucht wird.
+ * Und die Inline-Stile gleich mit, dort fertig aufgelöst.
+ *
+ * Ohne DOM-Laufzeit wird NICHT gemessen, und weil diese Achse keinen
+ * `unmeasured`-Zustand kennt (ihre Stufe ist "n/m"), ist das ein Fehler statt einer
+ * stillen Null. Ein Rückfall auf einen Baum-Durchlauf wäre die schlechtere Antwort:
+ * er müsste Vues Semantik wieder von Hand nachbilden — genau das, was hier endet.
  */
-export function collectInlineStyles(
-  node: unknown,
-  out: Set<string> = new Set(),
-  depth = 0,
-): Set<string> {
-  if (depth > 64 || node === null || node === undefined) return out;
+async function markedInDom(
+  render: () => unknown,
+): Promise<{ actions: Set<string>; styles: Set<string> }> {
+  const vue = await domRuntime();
+  if (!vue) throw new Error("keine DOM-Laufzeit: die Aktions-Achse kann nicht messen");
 
-  if (typeof node === "string") {
-    // Rohes Markup: `style="…"` mit den drei gültigen Quotierungen.
-    const ATTR = /style\s*=\s*(?:"([^"]*)"|'([^']*)')/g;
-    for (const m of node.matchAll(ATTR)) {
-      const decls = m[1] ?? m[2] ?? "";
-      for (const part of decls.split(";")) if (part.includes(":")) out.add(part.trim());
+  const container = document.createElement("div");
+  const before = new Set<Element>(Array.from(document.body.children));
+  document.body.appendChild(container);
+  const app = vue.createApp({ render: () => render() as never });
+  const actions = new Set<string>();
+  const styles = new Set<string>();
+  try {
+    app.mount(container);
+    for (const el of container.querySelectorAll("[data-action]")) {
+      const action = el.getAttribute("data-action");
+      if (action && action.length > 0) actions.add(action);
     }
-    return out;
-  }
-  if (Array.isArray(node)) {
-    for (const child of node) collectInlineStyles(child, out, depth + 1);
-    return out;
-  }
-  if (typeof node !== "object") return out;
-
-  const vnode = node as { props?: Record<string, unknown> | null; children?: unknown };
-
-  // Rohes Markup steht bei Vue in einem String-PROP (`innerHTML`), nicht in den
-  // Kindern — dort escapt Vue es. Jeder String-Prop wird deshalb mitgelesen; der
-  // Regex greift nur auf `style="…"`, ein Fehlalarm ist also nicht zu befürchten.
-  for (const [name, value] of Object.entries(vnode.props ?? {})) {
-    if (name === "style" || typeof value !== "string") continue;
-    collectInlineStyles(value, out, depth + 1);
-  }
-
-  const style = vnode.props?.["style"];
-  if (typeof style === "string") {
-    for (const part of style.split(";")) if (part.includes(":")) out.add(part.trim());
-  } else if (style !== null && typeof style === "object") {
-    for (const [prop, value] of Object.entries(style as Record<string, unknown>)) {
-      if (value === null || value === undefined) continue;
-      // Vue erlaubt camelCase; das Blatt kennt nur die Bindestrich-Form.
-      const dashed = prop.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`);
-      out.add(`${dashed}: ${String(value)}`);
+    for (const el of container.querySelectorAll("[style]")) {
+      for (const part of (el.getAttribute("style") ?? "").split(";")) {
+        if (part.includes(":")) styles.add(part.trim());
+      }
+    }
+  } finally {
+    // Auch nach einem Wurf: eine halb gemountete Anwendung liesse ihre Knoten sonst
+    // im Dokument stehen, und das Gate misst drei Skins nacheinander im selben.
+    try {
+      app.unmount();
+    } catch {
+      /* der Abbau gehört nicht zur Messung */
+    }
+    container.remove();
+    for (const el of Array.from(document.body.children)) {
+      if (!before.has(el)) el.remove();
     }
   }
-
-  const expanded = expandComponent(vnode as never);
-  if (expanded !== undefined) collectInlineStyles(expanded, out, depth + 1);
-  if (vnode.children !== undefined) collectInlineStyles(vnode.children, out, depth + 1);
-  return out;
+  return { actions, styles };
 }
 
 /** Name einer Renderer-Funktion für die Herkunftsangabe im Report. */
@@ -966,11 +775,11 @@ interface SurfaceRun {
  * Reine Funktionsaufrufe — Vue-`h()` braucht kein DOM. Wirft ein Renderer, ist der Typ
  * `broken` (Fehler, kein stilles Überspringen).
  */
-function renderAll(
+async function renderAll(
   type: CoreWidgetType,
   surfaces: readonly [string, Renderer][],
   inlineStyles?: Set<string>,
-): SurfaceRun {
+): Promise<SurfaceRun> {
   const states = FIXTURES[type] ?? {};
   const ctx = ctxStub();
   const marked = new Set<string>();
@@ -981,9 +790,11 @@ function renderAll(
     for (const state of Object.keys(states)) {
       const device = { type, id: `${type}.${state}`, ...states[state] } as never;
       try {
-        const tree = fn(device, tokensStub, ctx);
-        collectActions(tree, marked);
-        if (inlineStyles) collectInlineStyles(tree, inlineStyles);
+        // Gemessen wird am MONTIERTEN Ergebnis: dort steht, was der Renderer wirklich
+        // zeichnet — samt Vues eigener Prop-Auflösung und samt rohem Markup.
+        const mounted = await markedInDom(() => fn(device, tokensStub, ctx));
+        for (const a of mounted.actions) marked.add(a);
+        if (inlineStyles) for (const st of mounted.styles) inlineStyles.add(st);
         done.add(state);
       } catch (err: unknown) {
         return {
@@ -1000,12 +811,12 @@ function renderAll(
 
 /* ------------------------------------------------------------ Klassifikation */
 
-function classify(
+async function classify(
   type: CoreWidgetType,
   manifest: SkinManifest,
   skin: SkinInput,
   inlineStyles?: Set<string>,
-): SupportWidgetEntry {
+): Promise<SupportWidgetEntry> {
   const declaredUnsupported = manifest.unsupported.includes(type);
   const entry = manifest.widgets[type];
   const tile = skin.tiles[type];
@@ -1031,7 +842,7 @@ function classify(
   const preset = skin.presets?.[type];
   if (typeof preset === "function") surfaces.push(["preset", preset]);
 
-  const run = renderAll(type, surfaces, inlineStyles);
+  const run = await renderAll(type, surfaces, inlineStyles);
   const canonical = canonicalActions(type);
   const declared = new Set<string>(entry.actions);
   const tolerated = toleratedActions(type);
@@ -1130,7 +941,7 @@ export async function generateSupport(
   const inlineStyles = new Set<string>();
 
   for (const type of CORE_WIDGET_TYPES) {
-    const entry = classify(type, manifest, skin, inlineStyles);
+    const entry = await classify(type, manifest, skin, inlineStyles);
     widgets[type] = entry;
     summary[entry.level] += 1;
   }

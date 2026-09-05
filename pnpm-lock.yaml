@@ -138,6 +138,9 @@ importers:
       '@obs-visu-skins/conformance':
         specifier: workspace:*
         version: link:../conformance
+      jsdom:
+        specifier: ^25.0.1
+        version: 25.0.1
       tsx:
         specifier: ^4.19.2
         version: 4.22.4

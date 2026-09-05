@@ -15,7 +15,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, describe, expect, it } from "vitest";
 
-import { generateSupport } from "@obs-visu-skins/conformance";
+import { ensureDom, generateSupport } from "@obs-visu-skins/conformance";
 import {
   schema as contractSchema,
   version as contractVersion,
@@ -97,6 +97,13 @@ describe("scaffoldSkin (end-to-end against a temporary target)", () => {
 
     try {
       const manifest = JSON.parse(readFileSync(join(dir, "manifest.json"), "utf8")) as SkinManifest;
+      // VOR dem Skin-Import: der zieht Vue nach, und `@vue/runtime-dom` greift
+      // `document` beim MODUL-LADEN ab. Steht das Dokument erst danach, merkt sich
+      // die Laufzeit `document: null`, und jedes spaetere `mount()` wirft — die
+      // Aktions-Achse meldete dann jeden Typ als `broken` mit der Begruendung "keine
+      // DOM-Laufzeit". `cli.ts` haelt dieselbe Reihenfolge ein; wer `generateSupport`
+      // programmatisch aufruft, muss sie ebenfalls einhalten.
+      await ensureDom();
       const mod = (await import(/* @vite-ignore */ join(dir, "renderers.ts"))) as {
         tiles: Record<string, unknown>;
       };
