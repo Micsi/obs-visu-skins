@@ -137,7 +137,14 @@ export function parseRules(css: string): Rule[] {
     conditional.some(([a, b]) => at >= a && at < b);
 
   for (const m of clean.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
-    const selectors = (m[1] ?? "")
+    // Alles VOR dem letzten `;` gehört zu einer At-Anweisung, nicht zum Selektor:
+    // `@import "…";` klebte sonst am folgenden Selektor, die Selektorliste begann
+    // mit `@` und wurde weggefiltert — der ganze Block fiel damit aus dem Scan.
+    // edomis erste Regel (`.edomi-root`, direkt nach dem @import) war auf diese
+    // Weise unsichtbar: weder ihre Token noch ihre rohen Farben wurden je geprüft.
+    const head = m[1] ?? "";
+    const afterAtRule = head.slice(head.lastIndexOf(";") + 1);
+    const selectors = afterAtRule
       .split(",")
       .map((s) => s.trim())
       .filter((s) => s.length > 0 && !s.startsWith("@"));

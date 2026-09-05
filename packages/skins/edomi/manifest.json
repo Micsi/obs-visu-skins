@@ -97,6 +97,33 @@
       },
       {
         "token": "--vz-accent"
+      },
+      {
+        "token": "--vz-live-bg"
+      },
+      {
+        "token": "--jal-window-lo"
+      },
+      {
+        "token": "--jal-shade-lo"
+      },
+      {
+        "token": "--edomi-canvas-bg"
+      },
+      {
+        "token": "--edomi-nav-hover-bg",
+        "over": "--edomi-canvas-bg"
+      },
+      {
+        "token": "--edomi-nav-active-bg",
+        "over": "--edomi-canvas-bg"
+      },
+      {
+        "token": "--edomi-popup-bg"
+      },
+      {
+        "token": "--edomi-close-bg",
+        "over": "--edomi-popup-bg"
       }
     ],
     "alphas": [1],
@@ -197,8 +224,18 @@
       },
       "--vz-accent-ink": {
         "role": "text",
-        "on": ["--vz-accent"],
-        "reason": "Ink zum Host-Akzent"
+        "on": [
+          "--vz-acc-orange",
+          "--vz-acc-teal",
+          "--vz-acc-violet",
+          "--vz-acc-green",
+          "--vz-acc-blue",
+          "--vz-acc-rose",
+          "--vz-acc-amber",
+          "--vz-acc-slate",
+          "--vz-accent"
+        ],
+        "reason": "Ink zum Host-Akzent Der Token faerbt jetzt jede akzentgefuellte Flaeche des Skins (Schloss-Badge, Play/Pause, Fahrknopf, Fahr-Badge, Kamera-Refresh, Segment-Knopf); --acc kann dort JEDER der acht Palette-Akzente sein, deshalb wird er gegen alle neun Gruende gemessen und nicht nur gegen --vz-accent. Kein alphas, und das ist eine Aussage: von diesen Stellen werden genau zwei gedaempft, und beide sind INAKTIVE Bedienelemente — der Play/Pause-Knopf einer readonly Medienkachel (.vz-media-transport 0.7, der Knopf selbst zusaetzlich :disabled 0.55) und der Fahrknopf einer gesperrten Jalousie (.jal-btns 0.55, ebenfalls :disabled). Beide tragen `disabled` und `aria-disabled` im Markup und sind damit nach WCAG 1.4.3/1.4.11 von der Kontrastanforderung ausgenommen. Zur Einordnung, nicht als Beschoenigung: gedaempft laege der Token bei 0.7 zwischen 3.68:1 und 5.05:1, bei 0.55 zwischen 2.74:1 und 3.55:1. Alle uebrigen Stellen (Schloss-Badge, Schloss-Toggle, Fahr-Badge, Kamera-Refresh, Segment-Knopf) liegen ausserhalb jedes Dimmers."
       },
       "--vz-on": {
         "role": "graphic",
@@ -404,17 +441,14 @@
       "--handle-background": {
         "role": "graphic",
         "on": [
-          "--vz-acc-orange",
-          "--vz-acc-teal",
-          "--vz-acc-violet",
-          "--vz-acc-green",
-          "--vz-acc-blue",
-          "--vz-acc-rose",
-          "--vz-acc-amber",
-          "--vz-acc-slate",
-          "--vz-accent"
+          "--vz-bg",
+          "--vz-tile-bg",
+          "--vz-tile-bg-strong",
+          "--vz-solid",
+          "--vz-solid-2",
+          "--vz-chip-bg"
         ],
-        "reason": "Der Toggle-Knopf. Gemessen gegen die befüllte (akzentfarbene) Spur — der Zustand EIN. Gegen die unbefüllte Spur ist er nicht messbar, weil die eine color-mix() ist."
+        "reason": "Der Knopf des AUSgeschalteten Ionic-Toggles. Er stand in `.visu-root ion-toggle` — einem Block, der in kein gemessenes Theme kaskadiert — und fiel deshalb trotz Deklaration aus jeder Messung. Er steht jetzt in .visu-root und traegt --vz-fg-mute statt Weiss: auf einer weissen Karte war ein weisser Knopf im hellen Theme unsichtbar. Gemessen gegen die Flaechen, auf denen das Toggle steht; das Gleis darueber ist ein 22-%-Wasch von --vz-fg-soft, die Flaeche bleibt also der beherrschende Grund. Kein alphas: dieses Blatt daempft kein ion-toggle — die :disabled-Liste (0.55) nennt .vz-action, .vz-preset, .vz-range, .vz-media-btn, .vz-step-btn, .vz-lock-toggle und .vz-toggle, nicht ion-toggle."
       },
       "--handle-background-checked": {
         "role": "graphic",
@@ -429,12 +463,355 @@
           "--vz-acc-slate",
           "--vz-accent"
         ],
-        "reason": "wie --handle-background, im Zustand EIN"
+        "reason": "Der Knopf des EINgeschalteten Ionic-Toggles. Er liegt auf dem Akzentgleis (--track-background-checked: var(--vz-accent)) und traegt deshalb die Ink des Akzents — dieselbe Achse wie --ion-color-primary-contrast und jede akzentgefuellte Flaeche des Skins. Weiss erreichte gegen den hellen Akzent des dunklen Bodens nur 2.52:1."
       },
       "--edomi-accent": {
         "role": "graphic",
         "on": ["--vz-bg", "--vz-tile-bg", "--vz-tile-bg-strong", "--vz-solid", "--vz-solid-2"],
         "reason": "Der eigene Akzent des Skins: Fokusring, Aktiv-Indikator und die dauerhafte Sprung-Marke des Links. Nicht-Text (WCAG 3:1). Er liegt auf dem Rand oder in der Ecke des platzierten Elements, also auf dem Seiten- oder Kachelgrund — nie auf einem Akzentgrund, deshalb sind die Akzent-Gruende hier nicht genannt."
+      },
+      "--vz-tile-shadow-hover": {
+        "role": "exempt",
+        "reason": "Schatten: Tiefenandeutung UNTER der deckenden Flaeche, die ihn wirft. Er steht auf keinem erklaerten Grund, faerbt keinen Text und kein tragendes Grafikelement; faellt er weg, aendert sich nichts an dem, was ablesbar ist."
+      },
+      "--vz-tile-shadow-ios": {
+        "role": "exempt",
+        "reason": "Schatten: Tiefenandeutung UNTER der deckenden Flaeche, die ihn wirft. Er steht auf keinem erklaerten Grund, faerbt keinen Text und kein tragendes Grafikelement; faellt er weg, aendert sich nichts an dem, was ablesbar ist."
+      },
+      "--vz-tile-shadow-ios-glow": {
+        "role": "exempt",
+        "reason": "Schatten: Tiefenandeutung UNTER der deckenden Flaeche, die ihn wirft. Er steht auf keinem erklaerten Grund, faerbt keinen Text und kein tragendes Grafikelement; faellt er weg, aendert sich nichts an dem, was ablesbar ist."
+      },
+      "--vz-tile-shadow-md": {
+        "role": "exempt",
+        "reason": "Schatten: Tiefenandeutung UNTER der deckenden Flaeche, die ihn wirft. Er steht auf keinem erklaerten Grund, faerbt keinen Text und kein tragendes Grafikelement; faellt er weg, aendert sich nichts an dem, was ablesbar ist."
+      },
+      "--vz-badge-shadow": {
+        "role": "exempt",
+        "reason": "Schatten: Tiefenandeutung UNTER der deckenden Flaeche, die ihn wirft. Er steht auf keinem erklaerten Grund, faerbt keinen Text und kein tragendes Grafikelement; faellt er weg, aendert sich nichts an dem, was ablesbar ist."
+      },
+      "--vz-thumb-shadow": {
+        "role": "exempt",
+        "reason": "Schatten: Tiefenandeutung UNTER der deckenden Flaeche, die ihn wirft. Er steht auf keinem erklaerten Grund, faerbt keinen Text und kein tragendes Grafikelement; faellt er weg, aendert sich nichts an dem, was ablesbar ist."
+      },
+      "--vz-thumb-shadow-sm": {
+        "role": "exempt",
+        "reason": "Schatten: Tiefenandeutung UNTER der deckenden Flaeche, die ihn wirft. Er steht auf keinem erklaerten Grund, faerbt keinen Text und kein tragendes Grafikelement; faellt er weg, aendert sich nichts an dem, was ablesbar ist."
+      },
+      "--vz-thumb-shadow-lg": {
+        "role": "exempt",
+        "reason": "Schatten: Tiefenandeutung UNTER der deckenden Flaeche, die ihn wirft. Er steht auf keinem erklaerten Grund, faerbt keinen Text und kein tragendes Grafikelement; faellt er weg, aendert sich nichts an dem, was ablesbar ist."
+      },
+      "--jal-window-inset": {
+        "role": "exempt",
+        "reason": "Schatten: Tiefenandeutung UNTER der deckenden Flaeche, die ihn wirft. Er steht auf keinem erklaerten Grund, faerbt keinen Text und kein tragendes Grafikelement; faellt er weg, aendert sich nichts an dem, was ablesbar ist."
+      },
+      "--jal-headrail-shadow": {
+        "role": "exempt",
+        "reason": "Schatten: Tiefenandeutung UNTER der deckenden Flaeche, die ihn wirft. Er steht auf keinem erklaerten Grund, faerbt keinen Text und kein tragendes Grafikelement; faellt er weg, aendert sich nichts an dem, was ablesbar ist."
+      },
+      "--jal-louver-shadow": {
+        "role": "exempt",
+        "reason": "Schatten: Tiefenandeutung UNTER der deckenden Flaeche, die ihn wirft. Er steht auf keinem erklaerten Grund, faerbt keinen Text und kein tragendes Grafikelement; faellt er weg, aendert sich nichts an dem, was ablesbar ist."
+      },
+      "--vz-appbar-scrim": {
+        "role": "exempt",
+        "reason": "Schleier: ein Verlauf nach transparent, der einen Grund abdunkelt, damit der Text DARAUF besser steht. Er ist weder Vordergrund noch flache Farbe; er kann einen gemessenen Kontrast nur verbessern, nie verschlechtern. Hier: die Kopfleiste ueber der dunklen Seite bzw. ueber dem Foto."
+      },
+      "--vz-dialog-scrim": {
+        "role": "exempt",
+        "reason": "Schleier: ein Verlauf nach transparent, der einen Grund abdunkelt, damit der Text DARAUF besser steht. Er ist weder Vordergrund noch flache Farbe; er kann einen gemessenen Kontrast nur verbessern, nie verschlechtern. Hier: das Detail-Modal ueber dem Foto des image-Themes."
+      },
+      "--vz-lock-hatch": {
+        "role": "exempt",
+        "reason": "Schraffur ueber der gesperrten Kachel (.vz-lockveil). Die Sperre wird zusaetzlich vom Schloss-Badge im Markup und von der Daempfung des Rumpfes auf 0.7 getragen (beide gemessen); die Schraffur ist die dritte, rein grafische Wiederholung derselben Aussage und faerbt weder Text noch ein tragendes Grafikelement."
+      },
+      "--vz-lock-hatch-soft": {
+        "role": "exempt",
+        "reason": "Schraffur ueber dem gesperrten Jalousie-Fenster und dem Kamera-Platzhalter. Die Sperre wird zusaetzlich vom Schloss-Badge im Markup und von der Daempfung des Rumpfes auf 0.7 getragen (beide gemessen); die Schraffur ist die dritte, rein grafische Wiederholung derselben Aussage und faerbt weder Text noch ein tragendes Grafikelement."
+      },
+      "--vz-seg-on-glow": {
+        "role": "exempt",
+        "reason": "Weicher Saum um den aktiven Knopf des Segment-Controls. Die Farbe, die den Saum traegt, ist selbst gemessen (--acc/--vz-accent bzw. die Zustandsfarbe); der Saum wiederholt sie nur weich nach aussen und traegt keine Information, die nicht schon in der Flaeche darunter steht."
+      },
+      "--vz-glow-rim": {
+        "role": "exempt",
+        "reason": "Weicher Saum um die eingeschaltete Kachel im Akzent-Stil 'glow'. Die Farbe, die den Saum traegt, ist selbst gemessen (--acc/--vz-accent bzw. die Zustandsfarbe); der Saum wiederholt sie nur weich nach aussen und traegt keine Information, die nicht schon in der Flaeche darunter steht."
+      },
+      "--vz-glow-bloom": {
+        "role": "exempt",
+        "reason": "Weicher Saum um die eingeschaltete Kachel im Akzent-Stil 'glow'. Die Farbe, die den Saum traegt, ist selbst gemessen (--acc/--vz-accent bzw. die Zustandsfarbe); der Saum wiederholt sie nur weich nach aussen und traegt keine Information, die nicht schon in der Flaeche darunter steht."
+      },
+      "--vz-glow-glyph": {
+        "role": "exempt",
+        "reason": "Weicher Saum um das Glyph der eingeschalteten Kachel; das Glyph selbst traegt --acc und ist gemessen. Die Farbe, die den Saum traegt, ist selbst gemessen (--acc/--vz-accent bzw. die Zustandsfarbe); der Saum wiederholt sie nur weich nach aussen und traegt keine Information, die nicht schon in der Flaeche darunter steht."
+      },
+      "--vz-ring-bloom": {
+        "role": "exempt",
+        "reason": "Weicher Saum um die eingeschaltete Kachel im Akzent-Stil 'ring'. Die Farbe, die den Saum traegt, ist selbst gemessen (--acc/--vz-accent bzw. die Zustandsfarbe); der Saum wiederholt sie nur weich nach aussen und traegt keine Information, die nicht schon in der Flaeche darunter steht."
+      },
+      "--vz-flash-bloom": {
+        "role": "exempt",
+        "reason": "Weicher Saum um die kurz aufblitzende Szenen-Kachel. Die Farbe, die den Saum traegt, ist selbst gemessen (--acc/--vz-accent bzw. die Zustandsfarbe); der Saum wiederholt sie nur weich nach aussen und traegt keine Information, die nicht schon in der Flaeche darunter steht."
+      },
+      "--vz-roomdot-glow": {
+        "role": "exempt",
+        "reason": "Weicher Saum um den Raumkopf-Punkt; der Punkt selbst ist --vz-accent und gemessen. Die Farbe, die den Saum traegt, ist selbst gemessen (--acc/--vz-accent bzw. die Zustandsfarbe); der Saum wiederholt sie nur weich nach aussen und traegt keine Information, die nicht schon in der Flaeche darunter steht."
+      },
+      "--vz-dot-rim": {
+        "role": "exempt",
+        "reason": "Weicher Saum um den Zustandspunkt der Jalousie; der Punkt selbst ist --vz-bad/--vz-good/--vz-fg-soft und gemessen. Die Farbe, die den Saum traegt, ist selbst gemessen (--acc/--vz-accent bzw. die Zustandsfarbe); der Saum wiederholt sie nur weich nach aussen und traegt keine Information, die nicht schon in der Flaeche darunter steht."
+      },
+      "--vz-on-glow": {
+        "role": "exempt",
+        "reason": "Weicher Saum um den Online-Punkt der Kamera; der Punkt selbst ist --vz-on und gemessen. Die Farbe, die den Saum traegt, ist selbst gemessen (--acc/--vz-accent bzw. die Zustandsfarbe); der Saum wiederholt sie nur weich nach aussen und traegt keine Information, die nicht schon in der Flaeche darunter steht."
+      },
+      "--vz-bad-glow": {
+        "role": "exempt",
+        "reason": "Weicher Saum um den ausgeloesten Zustandspunkt; der Punkt selbst ist --vz-bad und gemessen. Die Farbe, die den Saum traegt, ist selbst gemessen (--acc/--vz-accent bzw. die Zustandsfarbe); der Saum wiederholt sie nur weich nach aussen und traegt keine Information, die nicht schon in der Flaeche darunter steht."
+      },
+      "--vz-lock-glow": {
+        "role": "exempt",
+        "reason": "Weicher Saum um das Schloss-Badge der Kachel. Die Farbe, die den Saum traegt, ist selbst gemessen (--acc/--vz-accent bzw. die Zustandsfarbe); der Saum wiederholt sie nur weich nach aussen und traegt keine Information, die nicht schon in der Flaeche darunter steht."
+      },
+      "--vz-media-play-glow": {
+        "role": "exempt",
+        "reason": "Weicher Saum um den Play/Pause-Knopf. Die Farbe, die den Saum traegt, ist selbst gemessen (--acc/--vz-accent bzw. die Zustandsfarbe); der Saum wiederholt sie nur weich nach aussen und traegt keine Information, die nicht schon in der Flaeche darunter steht."
+      },
+      "--vz-bulb-glow": {
+        "role": "exempt",
+        "reason": "Weicher Saum um das Leuchtmittel-Glyph der eingeschalteten Kachel. Die Farbe, die den Saum traegt, ist selbst gemessen (--acc/--vz-accent bzw. die Zustandsfarbe); der Saum wiederholt sie nur weich nach aussen und traegt keine Information, die nicht schon in der Flaeche darunter steht."
+      },
+      "--jal-lock-glow": {
+        "role": "exempt",
+        "reason": "Weicher Saum um den eingerasteten Sperrknopf der Jalousie. Die Farbe, die den Saum traegt, ist selbst gemessen (--acc/--vz-accent bzw. die Zustandsfarbe); der Saum wiederholt sie nur weich nach aussen und traegt keine Information, die nicht schon in der Flaeche darunter steht."
+      },
+      "--jal-btn-active-glow": {
+        "role": "exempt",
+        "reason": "Weicher Saum um den aktiven Fahrknopf der Jalousie. Die Farbe, die den Saum traegt, ist selbst gemessen (--acc/--vz-accent bzw. die Zustandsfarbe); der Saum wiederholt sie nur weich nach aussen und traegt keine Information, die nicht schon in der Flaeche darunter steht."
+      },
+      "--jal-glow-bloom": {
+        "role": "exempt",
+        "reason": "Weicher Saum um die Jalousie-Kachel im Akzent-Stil 'glow'. Die Farbe, die den Saum traegt, ist selbst gemessen (--acc/--vz-accent bzw. die Zustandsfarbe); der Saum wiederholt sie nur weich nach aussen und traegt keine Information, die nicht schon in der Flaeche darunter steht."
+      },
+      "--jal-pulse-ring": {
+        "role": "exempt",
+        "reason": "Weicher Saum um das fahrende Jalousie-Fenster; dass gefahren wird, sagt zusaetzlich das .jal-moving-Badge im Markup. Die Farbe, die den Saum traegt, ist selbst gemessen (--acc/--vz-accent bzw. die Zustandsfarbe); der Saum wiederholt sie nur weich nach aussen und traegt keine Information, die nicht schon in der Flaeche darunter steht."
+      },
+      "--vz-ring-inset": {
+        "role": "exempt",
+        "reason": "Der ruhige Akzentrahmen der AUSgeschalteten Kachel im Stil 'ring' (24% Akzent). Er unterscheidet nichts: der eingeschaltete Ring steht als voller, gemessener --acc unverpackt in derselben Deklaration, dieser hier zeichnet nur die Kachelkante nach."
+      },
+      "--vz-ring-inset-strong": {
+        "role": "exempt",
+        "reason": "Der ruhige Akzentrahmen der AUSgeschalteten Kachel im Stil 'ring' (26% Akzent). Er unterscheidet nichts: der eingeschaltete Ring steht als voller, gemessener --acc unverpackt in derselben Deklaration, dieser hier zeichnet nur die Kachelkante nach."
+      },
+      "--vz-tile-border-on": {
+        "role": "exempt",
+        "reason": "Kante/Rahmen: die eingeschaltete Kachel im Stil 'glow'. Den Zustand tragen zusaetzlich die Kachelflaeche (4 % -> 18 % Akzent), der Leuchtschleier und .is-on im Markup. Wie --vz-tile-border und --vz-hairline Chrome, das die Flaeche gliedert — kein Vordergrund und nicht der Traeger der Aussage."
+      },
+      "--vz-tile-border-flash": {
+        "role": "exempt",
+        "reason": "Kante/Rahmen: die kurz aufblitzende Szenen-Kachel. Wie --vz-tile-border und --vz-hairline Chrome, das die Flaeche gliedert — kein Vordergrund und nicht der Traeger der Aussage."
+      },
+      "--vz-tile-border-warn": {
+        "role": "exempt",
+        "reason": "Kante/Rahmen: die gewarnte Sensor-Kachel. Die Warnung traegt der Messwert selbst: .vz-tile--sensor.is-warn .vz-num faerbt auf --vz-warn und .vz-status.is-warn ebenso — beide als Text gemessen. Wie --vz-tile-border und --vz-hairline Chrome, das die Flaeche gliedert — kein Vordergrund und nicht der Traeger der Aussage."
+      },
+      "--jal-window-border": {
+        "role": "exempt",
+        "reason": "Kante/Rahmen: das Jalousie-Fenster. Wie --vz-tile-border und --vz-hairline Chrome, das die Flaeche gliedert — kein Vordergrund und nicht der Traeger der Aussage."
+      },
+      "--jal-vtrack-rim": {
+        "role": "exempt",
+        "reason": "Kante/Rahmen: die Spur des Positionsreglers. Wie --vz-tile-border und --vz-hairline Chrome, das die Flaeche gliedert — kein Vordergrund und nicht der Traeger der Aussage."
+      },
+      "--vz-glow-veil": {
+        "role": "exempt",
+        "reason": "Der Leuchtschleier der Kachel im Akzent-Stil 'glow' — ein radialer Verlauf nach transparent, also keine flache Farbe. Er liegt mit Deckkraft 0.05 (eingeschaltet 0.5) unter dem Inhalt. Den Zustand tragen zusaetzlich die Kachelflaeche (4 % -> 18 % Akzent), die Rahmenfarbe und .is-on im Markup."
+      },
+      "--vz-thumb-fill": {
+        "role": "exempt",
+        "reason": "Kern des Reglerknopfes (Range, Positionsschiene, Lamellenschieber). Identifiziert wird der Knopf durch seinen 2-3 px starken Ring aus --acc — der ist als Grafik gegen die Flaechen gemessen, auf denen der Regler steht; der helle Kern ist die Fase darunter und traegt die Stellung nicht."
+      },
+      "--jal-window-sky": {
+        "role": "exempt",
+        "reason": "Teil der Fenster-Illustration der Jalousie — das BILD einer Jalousie, keine Flaeche des Skins, und als Verlauf ohnehin keine flache Farbe. Die Information (Position und Lamellenwinkel) steht redundant als Text im selben Element: .jal-pct/.jal-sub (--jal-ink/--jal-ink-soft, gegen den dunkelsten Punkt der Illustration gemessen) und .jal-slatval. Die Illustration ist damit Darstellung, nicht das erforderliche Grafikobjekt nach WCAG 1.4.11."
+      },
+      "--jal-sun": {
+        "role": "exempt",
+        "reason": "Teil der Fenster-Illustration der Jalousie — das BILD einer Jalousie, keine Flaeche des Skins, und als Verlauf ohnehin keine flache Farbe. Die Information (Position und Lamellenwinkel) steht redundant als Text im selben Element: .jal-pct/.jal-sub (--jal-ink/--jal-ink-soft, gegen den dunkelsten Punkt der Illustration gemessen) und .jal-slatval. Die Illustration ist damit Darstellung, nicht das erforderliche Grafikobjekt nach WCAG 1.4.11."
+      },
+      "--jal-headrail-fill": {
+        "role": "exempt",
+        "reason": "Teil der Fenster-Illustration der Jalousie — das BILD einer Jalousie, keine Flaeche des Skins, und als Verlauf ohnehin keine flache Farbe. Die Information (Position und Lamellenwinkel) steht redundant als Text im selben Element: .jal-pct/.jal-sub (--jal-ink/--jal-ink-soft, gegen den dunkelsten Punkt der Illustration gemessen) und .jal-slatval. Die Illustration ist damit Darstellung, nicht das erforderliche Grafikobjekt nach WCAG 1.4.11."
+      },
+      "--jal-louver-fill": {
+        "role": "exempt",
+        "reason": "Teil der Fenster-Illustration der Jalousie — das BILD einer Jalousie, keine Flaeche des Skins, und als Verlauf ohnehin keine flache Farbe. Die Information (Position und Lamellenwinkel) steht redundant als Text im selben Element: .jal-pct/.jal-sub (--jal-ink/--jal-ink-soft, gegen den dunkelsten Punkt der Illustration gemessen) und .jal-slatval. Die Illustration ist damit Darstellung, nicht das erforderliche Grafikobjekt nach WCAG 1.4.11."
+      },
+      "--jal-louver-hi": {
+        "role": "exempt",
+        "reason": "Teil der Fenster-Illustration der Jalousie — das BILD einer Jalousie, keine Flaeche des Skins, und als Verlauf ohnehin keine flache Farbe. Die Information (Position und Lamellenwinkel) steht redundant als Text im selben Element: .jal-pct/.jal-sub (--jal-ink/--jal-ink-soft, gegen den dunkelsten Punkt der Illustration gemessen) und .jal-slatval. Die Illustration ist damit Darstellung, nicht das erforderliche Grafikobjekt nach WCAG 1.4.11."
+      },
+      "--jal-louver-lo": {
+        "role": "exempt",
+        "reason": "Teil der Fenster-Illustration der Jalousie — das BILD einer Jalousie, keine Flaeche des Skins, und als Verlauf ohnehin keine flache Farbe. Die Information (Position und Lamellenwinkel) steht redundant als Text im selben Element: .jal-pct/.jal-sub (--jal-ink/--jal-ink-soft, gegen den dunkelsten Punkt der Illustration gemessen) und .jal-slatval. Die Illustration ist damit Darstellung, nicht das erforderliche Grafikobjekt nach WCAG 1.4.11."
+      },
+      "--jal-readout-halo": {
+        "role": "exempt",
+        "reason": "Heller Saum unter dem Ablesetext im Jalousie-Fenster. Kein eigener Vordergrund: der Text selbst (--jal-ink 12.49:1 / --jal-ink-soft 8.78:1 gegen --jal-window-lo) ist gemessen und braucht den Saum nicht — der Saum war frueher das EINZIGE, was den weissen Text auf der hellen Illustration lesbar hielt, und genau das ist jetzt behoben."
+      },
+      "--jal-vfill-grad": {
+        "role": "exempt",
+        "reason": "Verlauf der Positionsfuellung von 78 % Akzent nach vollem Akzent. Der volle Akzent ist gemessen; der Verlauf ist nur seine weiche obere Kante."
+      },
+      "--jal-hslider-track": {
+        "role": "exempt",
+        "reason": "Verlauf der Lamellen-Schiene von Akzent nach Neutral. Die eingestellte Stellung tragen der Knopf (Akzentring, gemessen) und der Zahlenwert daneben (.jal-slatval auf --vz-fg-mute, als Text gemessen), nicht der Verlauf der Schiene."
+      },
+      "--jal-stopsq-fill": {
+        "role": "exempt",
+        "reason": "currentColor: die Flaeche uebernimmt die Schriftfarbe ihres Knopfes — im Ruhezustand --vz-fg-mute, unter dem Zeiger --vz-bad, beide als Text gemessen. Ein eigener Farbwert existiert nicht; der Token macht die Weiterleitung im Report sichtbar, statt sie als rohes Schluesselwort im Blatt verschwinden zu lassen."
+      },
+      "--vz-tile-bg-on": {
+        "role": "ground",
+        "reason": "Glas-Kachel, eingeschaltet: --vz-tile-bg mit 13 % Kachel-Akzent — ein GRUND, kein Vordergrund. Er steht nicht in `grounds`: color-mix() ist fuer den Generator nicht aufloesbar (resolveColor kennt keinen color-mix-Zweig), und der Akzent (--acc) steht erst zur Laufzeit fest. Diese Flaeche ist damit UNGEMESSEN. Nachgerechnet ausserhalb des Laufs ueber beide Themes, alle acht Akzente und alle drei tileAlpha-Stopps: bei voller Deckkraft haelt jede Paarung ihre Schwelle (knappster Fall --vz-off auf 4.21:1 gegen 3.0:1). Unter der 0.7-Daempfung der gesperrten/readonly Kachel REISST sie: schlechtester Fall --vz-warn mit 4.18:1 gegen 4.5:1. Das ist die Folge, die hinter dieser Auslassung liegt — ein offener Rest, kein Formfehler."
+      },
+      "--vz-tile-bg-ios": {
+        "role": "ground",
+        "reason": "iOS-Kachel: --vz-solid mit 11 % Kachel-Akzent — ein GRUND, kein Vordergrund. Er steht nicht in `grounds`: color-mix() ist fuer den Generator nicht aufloesbar (resolveColor kennt keinen color-mix-Zweig), und der Akzent (--acc) steht erst zur Laufzeit fest. Diese Flaeche ist damit UNGEMESSEN. Nachgerechnet ausserhalb des Laufs ueber beide Themes, alle acht Akzente und alle drei tileAlpha-Stopps: bei voller Deckkraft haelt jede Paarung ihre Schwelle (knappster Fall --vz-off auf 4.64:1 gegen 3.0:1). Unter der 0.7-Daempfung der gesperrten/readonly Kachel REISST sie: schlechtester Fall --vz-warn mit 4.49:1 gegen 4.5:1. Das ist die Folge, die hinter dieser Auslassung liegt — ein offener Rest, kein Formfehler."
+      },
+      "--vz-tile-bg-ios-on": {
+        "role": "ground",
+        "reason": "iOS-Kachel, eingeschaltet: --vz-solid mit 24 % Kachel-Akzent — ein GRUND, kein Vordergrund. Er steht nicht in `grounds`: color-mix() ist fuer den Generator nicht aufloesbar (resolveColor kennt keinen color-mix-Zweig), und der Akzent (--acc) steht erst zur Laufzeit fest. Diese Flaeche ist damit UNGEMESSEN. Nachgerechnet ausserhalb des Laufs ueber beide Themes, alle acht Akzente und alle drei tileAlpha-Stopps: bei voller Deckkraft haelt jede Paarung ihre Schwelle (knappster Fall --vz-off auf 3.52:1 gegen 3.0:1). Unter der 0.7-Daempfung der gesperrten/readonly Kachel REISST sie: schlechtester Fall --vz-warn mit 3.66:1 gegen 4.5:1. Das ist die Folge, die hinter dieser Auslassung liegt — ein offener Rest, kein Formfehler."
+      },
+      "--vz-tile-bg-md": {
+        "role": "ground",
+        "reason": "MD-Kachel: --vz-solid mit 14 % Kachel-Akzent — ein GRUND, kein Vordergrund. Er steht nicht in `grounds`: color-mix() ist fuer den Generator nicht aufloesbar (resolveColor kennt keinen color-mix-Zweig), und der Akzent (--acc) steht erst zur Laufzeit fest. Diese Flaeche ist damit UNGEMESSEN. Nachgerechnet ausserhalb des Laufs ueber beide Themes, alle acht Akzente und alle drei tileAlpha-Stopps: bei voller Deckkraft haelt jede Paarung ihre Schwelle (knappster Fall --vz-off auf 4.37:1 gegen 3.0:1). Unter der 0.7-Daempfung der gesperrten/readonly Kachel REISST sie: schlechtester Fall --vz-warn mit 4.30:1 gegen 4.5:1. Das ist die Folge, die hinter dieser Auslassung liegt — ein offener Rest, kein Formfehler."
+      },
+      "--vz-tile-bg-md-on": {
+        "role": "ground",
+        "reason": "MD-Kachel, eingeschaltet: --vz-solid mit 28 % Kachel-Akzent — ein GRUND, kein Vordergrund. Er steht nicht in `grounds`: color-mix() ist fuer den Generator nicht aufloesbar (resolveColor kennt keinen color-mix-Zweig), und der Akzent (--acc) steht erst zur Laufzeit fest. Diese Flaeche ist damit UNGEMESSEN. Nachgerechnet ausserhalb des Laufs ueber beide Themes, alle acht Akzente und alle drei tileAlpha-Stopps: bei voller Deckkraft haelt jede Paarung ihre Schwelle (knappster Fall --vz-off auf 3.20:1 gegen 3.0:1). Unter der 0.7-Daempfung der gesperrten/readonly Kachel REISST sie: schlechtester Fall --vz-warn mit 3.41:1 gegen 4.5:1. Das ist die Folge, die hinter dieser Auslassung liegt — ein offener Rest, kein Formfehler."
+      },
+      "--vz-tile-bg-glow": {
+        "role": "ground",
+        "reason": "Glas-Kachel im Stil 'glow': --vz-tile-bg mit 4 % Kachel-Akzent — ein GRUND, kein Vordergrund. Er steht nicht in `grounds`: color-mix() ist fuer den Generator nicht aufloesbar (resolveColor kennt keinen color-mix-Zweig), und der Akzent (--acc) steht erst zur Laufzeit fest. Diese Flaeche ist damit UNGEMESSEN. Nachgerechnet ausserhalb des Laufs ueber beide Themes, alle acht Akzente und alle drei tileAlpha-Stopps: bei voller Deckkraft haelt jede Paarung ihre Schwelle (knappster Fall der Kachel-Akzent auf 4.97:1 gegen 3.0:1). Auch unter der 0.7-Daempfung der gesperrten/readonly Kachel reisst hier keine Paarung — die Auslassung kostet an DIESER Flaeche heute nichts, sie bleibt aber eine Auslassung."
+      },
+      "--vz-tile-bg-glow-on": {
+        "role": "ground",
+        "reason": "Glas-Kachel im Stil 'glow', eingeschaltet: --vz-tile-bg mit 18 % Kachel-Akzent — ein GRUND, kein Vordergrund. Er steht nicht in `grounds`: color-mix() ist fuer den Generator nicht aufloesbar (resolveColor kennt keinen color-mix-Zweig), und der Akzent (--acc) steht erst zur Laufzeit fest. Diese Flaeche ist damit UNGEMESSEN. Nachgerechnet ausserhalb des Laufs ueber beide Themes, alle acht Akzente und alle drei tileAlpha-Stopps: bei voller Deckkraft haelt jede Paarung ihre Schwelle (knappster Fall --vz-off auf 3.79:1 gegen 3.0:1). Unter der 0.7-Daempfung der gesperrten/readonly Kachel REISST sie: schlechtester Fall --vz-warn mit 3.87:1 gegen 4.5:1. Das ist die Folge, die hinter dieser Auslassung liegt — ein offener Rest, kein Formfehler."
+      },
+      "--jal-bg-ios": {
+        "role": "ground",
+        "reason": "iOS-Jalousiekachel: --vz-solid mit 9 % Kachel-Akzent — ein GRUND, kein Vordergrund. Er steht nicht in `grounds`: color-mix() ist fuer den Generator nicht aufloesbar (resolveColor kennt keinen color-mix-Zweig), und der Akzent (--acc) steht erst zur Laufzeit fest. Diese Flaeche ist damit UNGEMESSEN. Nachgerechnet ausserhalb des Laufs ueber beide Themes, alle acht Akzente und alle drei tileAlpha-Stopps: bei voller Deckkraft haelt jede Paarung ihre Schwelle (knappster Fall --vz-off auf 4.82:1 gegen 3.0:1). Auch unter der 0.7-Daempfung der gesperrten/readonly Kachel reisst hier keine Paarung — die Auslassung kostet an DIESER Flaeche heute nichts, sie bleibt aber eine Auslassung."
+      },
+      "--jal-bg-md": {
+        "role": "ground",
+        "reason": "MD-Jalousiekachel: --vz-solid mit 12 % Kachel-Akzent — ein GRUND, kein Vordergrund. Er steht nicht in `grounds`: color-mix() ist fuer den Generator nicht aufloesbar (resolveColor kennt keinen color-mix-Zweig), und der Akzent (--acc) steht erst zur Laufzeit fest. Diese Flaeche ist damit UNGEMESSEN. Nachgerechnet ausserhalb des Laufs ueber beide Themes, alle acht Akzente und alle drei tileAlpha-Stopps: bei voller Deckkraft haelt jede Paarung ihre Schwelle (knappster Fall --vz-off auf 4.55:1 gegen 3.0:1). Unter der 0.7-Daempfung der gesperrten/readonly Kachel REISST sie: schlechtester Fall --vz-warn mit 4.42:1 gegen 4.5:1. Das ist die Folge, die hinter dieser Auslassung liegt — ein offener Rest, kein Formfehler."
+      },
+      "--vz-cam-view-bg": {
+        "role": "ground",
+        "reason": "Flaeche hinter dem Kamerabild: 10 % --vz-fg ueber der Kachel — ein GRUND unter dem Zeiger bzw. im Aktiv-Zustand, kein Vordergrund. Er steht nicht in `grounds`: color-mix() ist fuer den Generator nicht aufloesbar. Ob eine Zwischenstufe schlechter steht als die beiden gemessenen Enden, entscheidet die Leuchtdichte des Vordergrunds — deshalb wird hier gerechnet statt argumentiert. Nachgerechnet ausserhalb des Laufs ueber beide Themes, alle acht Akzente und alle drei tileAlpha-Stopps: bei voller Deckkraft haelt jede Paarung ihre Schwelle (knappster Fall der Kachel-Akzent auf 3.94:1 gegen 3.0:1). Unter der 0.7-Daempfung der gesperrten/readonly Kachel REISST sie: schlechtester Fall --vz-warn mit 4.02:1 gegen 4.5:1. Das ist die Folge, die hinter dieser Auslassung liegt — ein offener Rest, kein Formfehler."
+      },
+      "--vz-toggle-on-bg": {
+        "role": "ground",
+        "reason": "Gleis des eigenen Toggles im Zustand 'an': 18 % --vz-accent ueber der Kachel — ein GRUND unter dem Zeiger bzw. im Aktiv-Zustand, kein Vordergrund. Er steht nicht in `grounds`: color-mix() ist fuer den Generator nicht aufloesbar. Ob eine Zwischenstufe schlechter steht als die beiden gemessenen Enden, entscheidet die Leuchtdichte des Vordergrunds — deshalb wird hier gerechnet statt argumentiert. Nachgerechnet ausserhalb des Laufs ueber beide Themes, alle acht Akzente und alle drei tileAlpha-Stopps: bei voller Deckkraft haelt jede Paarung ihre Schwelle (knappster Fall --vz-off auf 3.64:1 gegen 3.0:1). Unter der 0.7-Daempfung der gesperrten/readonly Kachel REISST sie: schlechtester Fall --vz-fg-soft mit 3.75:1 gegen 4.5:1. Das ist die Folge, die hinter dieser Auslassung liegt — ein offener Rest, kein Formfehler."
+      },
+      "--jal-vtrack-bg": {
+        "role": "ground",
+        "reason": "Spur des Positionsreglers: 15 % --vz-fg ueber der Kachel — ein GRUND unter dem Zeiger bzw. im Aktiv-Zustand, kein Vordergrund. Er steht nicht in `grounds`: color-mix() ist fuer den Generator nicht aufloesbar. Ob eine Zwischenstufe schlechter steht als die beiden gemessenen Enden, entscheidet die Leuchtdichte des Vordergrunds — deshalb wird hier gerechnet statt argumentiert. Nachgerechnet ausserhalb des Laufs ueber beide Themes, alle acht Akzente und alle drei tileAlpha-Stopps: bei voller Deckkraft haelt jede Paarung ihre Schwelle (knappster Fall der Kachel-Akzent auf 3.36:1 gegen 3.0:1). Unter der 0.7-Daempfung der gesperrten/readonly Kachel REISST sie: schlechtester Fall --vz-warn mit 3.57:1 gegen 4.5:1. Das ist die Folge, die hinter dieser Auslassung liegt — ein offener Rest, kein Formfehler."
+      },
+      "--vz-seg-hover-bg": {
+        "role": "ground",
+        "reason": "Segment-Knopf unter dem Zeiger: 8 % --vz-fg — ein GRUND unter dem Zeiger bzw. im Aktiv-Zustand, kein Vordergrund. Er steht nicht in `grounds`: color-mix() ist fuer den Generator nicht aufloesbar. Ob eine Zwischenstufe schlechter steht als die beiden gemessenen Enden, entscheidet die Leuchtdichte des Vordergrunds — deshalb wird hier gerechnet statt argumentiert. Nachgerechnet ausserhalb des Laufs ueber beide Themes, alle acht Akzente und alle drei tileAlpha-Stopps: bei voller Deckkraft haelt jede Paarung ihre Schwelle (knappster Fall der Kachel-Akzent auf 3.79:1 gegen 3.0:1). Unter der 0.7-Daempfung der gesperrten/readonly Kachel REISST sie: schlechtester Fall --vz-warn mit 3.91:1 gegen 4.5:1. Das ist die Folge, die hinter dieser Auslassung liegt — ein offener Rest, kein Formfehler."
+      },
+      "--jal-slatbtn-hover-bg": {
+        "role": "ground",
+        "reason": "Lamellen-Knopf unter dem Zeiger: --vz-chip-bg mit 16 % Akzent — ein GRUND unter dem Zeiger bzw. im Aktiv-Zustand, kein Vordergrund. Er steht nicht in `grounds`: color-mix() ist fuer den Generator nicht aufloesbar. Ob eine Zwischenstufe schlechter steht als die beiden gemessenen Enden, entscheidet die Leuchtdichte des Vordergrunds — deshalb wird hier gerechnet statt argumentiert. Nachgerechnet ausserhalb des Laufs ueber beide Themes, alle acht Akzente und alle drei tileAlpha-Stopps: bei voller Deckkraft haelt jede Paarung ihre Schwelle (knappster Fall --vz-off auf 3.58:1 gegen 3.0:1). Unter der 0.7-Daempfung der gesperrten/readonly Kachel REISST sie: schlechtester Fall --vz-warn mit 3.71:1 gegen 4.5:1. Das ist die Folge, die hinter dieser Auslassung liegt — ein offener Rest, kein Formfehler."
+      },
+      "--jal-btn-hover-bg": {
+        "role": "ground",
+        "reason": "Fahrknopf unter dem Zeiger: --vz-chip-bg mit 14 % Akzent — ein GRUND unter dem Zeiger bzw. im Aktiv-Zustand, kein Vordergrund. Er steht nicht in `grounds`: color-mix() ist fuer den Generator nicht aufloesbar. Ob eine Zwischenstufe schlechter steht als die beiden gemessenen Enden, entscheidet die Leuchtdichte des Vordergrunds — deshalb wird hier gerechnet statt argumentiert. Nachgerechnet ausserhalb des Laufs ueber beide Themes, alle acht Akzente und alle drei tileAlpha-Stopps: bei voller Deckkraft haelt jede Paarung ihre Schwelle (knappster Fall --vz-off auf 3.74:1 gegen 3.0:1). Unter der 0.7-Daempfung der gesperrten/readonly Kachel REISST sie: schlechtester Fall --vz-warn mit 3.82:1 gegen 4.5:1. Das ist die Folge, die hinter dieser Auslassung liegt — ein offener Rest, kein Formfehler."
+      },
+      "--jal-btn-hover-bad-bg": {
+        "role": "ground",
+        "reason": "Stopp-Knopf unter dem Zeiger: --vz-chip-bg mit 12 % --vz-bad — ein GRUND unter dem Zeiger bzw. im Aktiv-Zustand, kein Vordergrund. Er steht nicht in `grounds`: color-mix() ist fuer den Generator nicht aufloesbar. Ob eine Zwischenstufe schlechter steht als die beiden gemessenen Enden, entscheidet die Leuchtdichte des Vordergrunds — deshalb wird hier gerechnet statt argumentiert. Nachgerechnet ausserhalb des Laufs ueber beide Themes, alle acht Akzente und alle drei tileAlpha-Stopps: bei voller Deckkraft haelt jede Paarung ihre Schwelle (knappster Fall der Kachel-Akzent auf 3.82:1 gegen 3.0:1). Unter der 0.7-Daempfung der gesperrten/readonly Kachel REISST sie: schlechtester Fall der Kachel-Akzent mit 2.62:1 gegen 3.0:1. Das ist die Folge, die hinter dieser Auslassung liegt — ein offener Rest, kein Formfehler."
+      },
+      "--vz-action-active-bg": {
+        "role": "ground",
+        "reason": "Aktions-/Preset-Knopf im Detail, gedrueckt: --vz-tile-bg-strong mit 14 % Akzent — ein GRUND unter dem Zeiger bzw. im Aktiv-Zustand, kein Vordergrund. Er steht nicht in `grounds`: color-mix() ist fuer den Generator nicht aufloesbar. Ob eine Zwischenstufe schlechter steht als die beiden gemessenen Enden, entscheidet die Leuchtdichte des Vordergrunds — deshalb wird hier gerechnet statt argumentiert. Nachgerechnet ausserhalb des Laufs ueber beide Themes, alle acht Akzente und alle drei tileAlpha-Stopps: bei voller Deckkraft haelt jede Paarung ihre Schwelle (knappster Fall --vz-off auf 3.73:1 gegen 3.0:1). Unter der 0.7-Daempfung der gesperrten/readonly Kachel REISST sie: schlechtester Fall --vz-warn mit 3.82:1 gegen 4.5:1. Das ist die Folge, die hinter dieser Auslassung liegt — ein offener Rest, kein Formfehler."
+      },
+      "--vz-live-bg": {
+        "role": "ground",
+        "reason": "Grund des '● LIVE'-Badges der Kamera. Steht in `grounds` und wird gemessen: statt der frueheren color-mix(--vz-bad 72%, #000) eine FLACHE Farbe je Theme, damit der weisse Text darauf ueberhaupt messbar ist. Die alte Mischung trug ihn im dunklen Theme mit 4.41:1, also unter AA."
+      },
+      "--vz-live-ink": {
+        "role": "text",
+        "on": ["--vz-live-bg"],
+        "reason": "Der Text und der Punkt des LIVE-Badges. 10 px fett, also echter Text — gemessen gegen den Grund des Badges. Kein alphas, und das ist geprueft: das Badge liegt in .vz-cam-view, einem direkten Kind der Kachel; der 0.7-Dimmer der gesperrten/readonly Kachel trifft nur .vz-tile-body und .vz-tile-foot. Gedaempft laege es im dunklen Theme bei 3.36:1."
+      },
+      "--jal-window-lo": {
+        "role": "ground",
+        "reason": "Der dunkelste Punkt des HIMMELS und zugleich sein erster Verlaufsstopp (#b9d8ee). In `grounds` gefuehrt und gemessen. Er ist NICHT der dunkelste Punkt der ganzen Illustration — das ist --jal-shade-lo; beide stehen als Grund unter dem Ablesetext."
+      },
+      "--jal-shade-lo": {
+        "role": "ground",
+        "reason": "Der dunkelste Pixel IM ABLESEBEREICH des Fensters: die untere Lamellenkante (--jal-louver-lo, rgba(0,0,0,0.22)) ueber dem dunkelsten Lamellenstopp (#c3c8ce) ergibt #989ca1. Nicht der dunkelste Pixel der ganzen Illustration — der Schlagschatten der Kopfschiene liegt mit rund #8498a7 tiefer, steht aber am OBEREN Rand, wo der Ablesetext (unten links) nie steht. Gemalt wird der Token nirgends; er benennt den schlechtesten Grund, auf dem der Text real stehen kann. Ohne ihn wies der Report 8.78:1 fuer --jal-ink-soft aus, wo real 4.73:1 stehen."
+      },
+      "--jal-ink": {
+        "role": "text",
+        "on": ["--jal-window-lo", "--jal-shade-lo"],
+        "reason": "Die Prozentzahl im Jalousie-Fenster. Sie stand auf Weiss ueber einer hellen Illustration und war damit nur durch ihren Schlagschatten lesbar — und ungemessen. Dunkle Ink, gemessen gegen beide Gruende: 12.49:1 auf dem Himmelsanschlag, 6.73:1 auf dem dunkelsten Pixel des Ablesebereichs. Ohne alphas, und das ist jetzt WAHR: siehe --jal-ink-soft."
+      },
+      "--jal-ink-soft": {
+        "role": "text",
+        "on": ["--jal-window-lo", "--jal-shade-lo"],
+        "reason": "Die Nebenzeile im Jalousie-Fenster (Lamellenwinkel/Status). Wie --jal-ink, eine Stufe leiser: 8.78:1 auf dem Himmelsanschlag, 4.73:1 auf dem dunkelsten Pixel des Ablesebereichs. KEIN alphas — und das ist eine Aussage, keine Auslassung: bis zu dieser Runde lag der Ablesetext im 0.55-Opazitaetsverband der gesperrten Jalousie (.jal-tile.locked .jal-body) und stand dort bei 2.25:1, am Render nachgemessen 2.00:1. Kein Farbwert konnte das heilen — bei 0.55 erreicht auf --jal-shade-lo selbst reines Schwarz nur 3.42:1, bei 0.7 nur 4.87:1 und nur fuer die kraeftigere Ink. Die Daempfung war das Problem, also faellt sie dort weg: sie umfasst jetzt .jal-posrail/.jal-slatctl/.jal-btns — die Bedienelemente, die zugleich `disabled` tragen und damit sauber unter die WCAG-1.4.3/1.4.11-Ausnahme fallen —, aber nicht mehr das Fenster. Die Sperre traegt dort weiter die Schraffur und das (nun ungedaempfte) Schloss-Badge."
+      },
+      "--edomi-canvas-bg": {
+        "role": "ground",
+        "reason": "Die Seite des Edomi-Skins, ein Alias auf die Ionic-Bruecke (--ion-background-color -> --vz-bg). Er steht in .visu-root und NICHT in :root: das Wurzel-div dieses Skins traegt beide Klassen (edomi-root visu-root) und ist ein Nachfahre von <html>. In :root deklariert faende der Alias die Bruecke nicht und fiele auf #0f1216 zurueck, waehrend der Generator (der .visu-root in seine Umgebung faltet) weiter --vz-bg gemessen haette — eine Farbe, die der Browser nie malt. In `grounds` gefuehrt und gemessen; der Rueckfall greift nur, wenn der Skin ohne die Bruecke laeuft."
+      },
+      "--edomi-canvas-ink": {
+        "role": "text",
+        "on": [
+          "--edomi-canvas-bg",
+          "--edomi-nav-hover-bg",
+          "--edomi-nav-active-bg",
+          "--edomi-popup-bg",
+          "--edomi-close-bg"
+        ],
+        "alphas": [1, 0.6],
+        "reason": "Die Schrift der Seite, Alias auf --ion-text-color -> --vz-fg. Sie steht aus demselben Grund wie --edomi-canvas-bg in .visu-root und nicht in :root. Durch `color: inherit` reicht sie bis in Navigation, Popup und Schliessknopf und wird deshalb gegen alle fuenf Gruende gemessen, auf denen sie real steht. Das Blatt daempft sie an einer Stelle: die Gruppenueberschrift der Navigation ist ein `disabled` Knopf mit opacity 0.6 (.edomi-nav-link:disabled). Sie ist aber kein inaktives BEDIENELEMENT, sondern eine Beschriftung, die gelesen werden soll — deshalb wird 0.6 mitgemessen statt ausgenommen (schlechtester Fall 4.99:1 auf --edomi-close-bg)."
+      },
+      "--edomi-nav-border": {
+        "role": "exempt",
+        "reason": "Kante/Rahmen: die Trennkante der Navigationsschiene. Wie --vz-tile-border und --vz-hairline Chrome, das die Flaeche gliedert — kein Vordergrund und nicht der Traeger der Aussage."
+      },
+      "--edomi-nav-hover-bg": {
+        "role": "ground",
+        "reason": "Der Navigationseintrag unter dem Zeiger. Eine flache rgba-Flaeche ueber der Seite, also aufloesbar — sie steht in `grounds` und wird gemessen."
+      },
+      "--edomi-nav-active-bg": {
+        "role": "ground",
+        "reason": "Die aktive Seite in der Navigation. Sie traegt Zustand, ist aber ein GRUND (die Aussage traegt der Text darauf, zusaetzlich font-weight 600). Flach ueber der Seite, also aufloesbar — in `grounds` und gemessen."
+      },
+      "--edomi-dim": {
+        "role": "exempt",
+        "reason": "Schleier: ein Verlauf nach transparent, der einen Grund abdunkelt, damit der Text DARAUF besser steht. Er ist weder Vordergrund noch flache Farbe; er kann einen gemessenen Kontrast nur verbessern, nie verschlechtern. Hier: die Abdunklung der Seite hinter einem Popup."
+      },
+      "--edomi-popup-bg": {
+        "role": "ground",
+        "reason": "Die Kartenflaeche des Popups. Deckend und aufloesbar (Rueckfall #1a1f26) — in `grounds` und gemessen."
+      },
+      "--edomi-popup-shadow": {
+        "role": "exempt",
+        "reason": "Schatten: Tiefenandeutung UNTER der deckenden Flaeche, die ihn wirft. Er steht auf keinem erklaerten Grund, faerbt keinen Text und kein tragendes Grafikelement; faellt er weg, aendert sich nichts an dem, was ablesbar ist."
+      },
+      "--edomi-close-bg": {
+        "role": "ground",
+        "reason": "Die Flaeche des Schliessknopfes, ein 10-%-Weisswasch ueber der Popup-Karte. Flach und aufloesbar — in `grounds` und gemessen."
       }
     }
   },
