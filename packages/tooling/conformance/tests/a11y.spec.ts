@@ -842,3 +842,125 @@ describe("bedingte Bloecke — was nur unter einer Bedingung gilt, misst nicht d
     expect(r.findings.map((f) => f.detail).join(" ")).toContain("--geheim");
   });
 });
+
+describe("Tweak-Stopps messen, was der Benutzer wirklich einstellen kann", () => {
+  // Ein Blatt mit ZWEI farbwirksamen Achsen: der Vordergrund und der Grund lassen
+  // sich unabhängig verschieben. Jede Achse für sich bleibt lesbar, zusammen nicht.
+  const TWO_AXIS_CSS =
+    '.p[data-theme="dark"]{--fg-lvl:#000000;--bg-lvl:#ffffff;--bg:var(--bg-lvl);--fg:var(--fg-lvl);}';
+  const TWO_AXIS_DECL = {
+    stylesheet: SHEET,
+    themes: { dark: '.p[data-theme="dark"]' },
+    grounds: [{ token: "--bg" }],
+    tokens: {
+      "--bg": { role: "ground" },
+      "--fg": { role: "text" },
+      // Die Reglerstufen selbst tragen Farbe und müssen deshalb eingeordnet sein
+      // (Riegel 1); gemessen werden sie über --bg/--fg, nicht noch einmal selbst.
+      "--fg-lvl": { role: "exempt", reason: "Reglerstufe hinter --fg, dort gemessen." },
+      "--bg-lvl": { role: "exempt", reason: "Reglerstufe hinter --bg, dort gemessen." },
+    },
+    tweakAxes: [
+      { tweak: "fg", cssVar: "--fg-lvl" },
+      { tweak: "bg", cssVar: "--bg-lvl" },
+    ],
+  };
+  const TWO_AXIS_TWEAKS = {
+    fg: { type: "select", options: ["#000000", "#707070"] },
+    bg: { type: "select", options: ["#ffffff", "#777777"] },
+  };
+
+  it("fährt das KARTESISCHE Produkt der Achsen an, nicht eine Achse je Stopp", () => {
+    // Vorher überschrieb jeder Stopp genau eine Variable; die anderen Achsen blieben
+    // auf ihrem Blatt-Wert. `#707070` auf Weiss besteht, Schwarz auf `#777777`
+    // besteht — die gleichzeitige Stellung hat 1.09:1 und wurde nie gemessen.
+    const r = measure(TWO_AXIS_DECL, TWO_AXIS_CSS, TWO_AXIS_TWEAKS);
+    expect(r.tweakStops).toContain("fg=#707070 bg=#777777");
+    const joint = r.violations.filter((v) => v.tweaks === "fg=#707070 bg=#777777");
+    expect(joint.length).toBeGreaterThan(0);
+    expect(r.status).toBe("fail");
+  });
+
+  it("die Einzelstellungen bleiben trotzdem erhalten", () => {
+    // Die Gegenprobe zum Produkt: es ERSETZT die Einzelachsen nicht, es ergänzt sie.
+    // Sonst verlöre der Report die Stellung, die ein Benutzer am ehesten wählt.
+    const r = measure(TWO_AXIS_DECL, TWO_AXIS_CSS, TWO_AXIS_TWEAKS);
+    expect(r.tweakStops).toContain("default");
+    expect(r.tweakStops).toContain("fg=#707070");
+    expect(r.tweakStops).toContain("bg=#777777");
+  });
+
+  it("der Manifest-`default` eines Reglers wird angefahren", () => {
+    // Ein Regler liefert nur min und max. Steht der Default DAZWISCHEN, wurde er nie
+    // gemessen — obwohl genau ihn der Host beim Start setzt. Hier liegt der Grund bei
+    // 0.5 so nah am Vordergrund, dass nur der mittlere Stopp reisst.
+    const css = '.p[data-theme="dark"]{--lvl:1;--bg:rgba(0,0,0,var(--lvl));--fg:#808080;}';
+    const decl = {
+      stylesheet: SHEET,
+      themes: { dark: '.p[data-theme="dark"]' },
+      grounds: [{ token: "--bg" }],
+      tokens: { "--bg": { role: "ground" }, "--fg": { role: "text" } },
+      tweakAxes: [{ tweak: "lvl", cssVar: "--lvl" }],
+    };
+    const r = measure(decl, css, { lvl: { type: "slider", min: 0, max: 1, default: 0.5 } });
+    expect(r.tweakStops).toContain("lvl=0.5");
+  });
+
+  it("eine Achse, deren Variable im Blatt fehlt, ist ein BEFUND", () => {
+    // Ein Tippfehler im `cssVar` erzeugte Stopps, die die Default-Palette
+    // wiederholten — `stops.length > 1` machte `checkedTweakExtremes` wahr, und ein
+    // Skin mit einem echten, unzugänglichen Tweak konnte bestehen.
+    const decl = {
+      ...PASSING_DECL,
+      tweakAxes: [{ tweak: "veil", cssVar: "--aplha" }],
+    };
+    const r = measure(decl, PASSING_CSS, { veil: { type: "slider", min: 0, max: 1 } });
+    expect(r.findings.map((f) => f.detail).join(" ")).toContain("--aplha");
+    expect(r.status).toBe("fail");
+  });
+
+  it("dieselbe Achse mit richtig geschriebener Variable ist es nicht", () => {
+    // Die Gegenprobe: der Riegel darf nicht jede Achse fangen, nur die inerte.
+    const css = '.p[data-theme="dark"]{--alpha:1;--bg:#ffffff;--fg:rgba(0,0,0,var(--alpha));}';
+    const decl = {
+      stylesheet: SHEET,
+      themes: { dark: '.p[data-theme="dark"]' },
+      grounds: [{ token: "--bg" }],
+      tokens: { "--bg": { role: "ground" }, "--fg": { role: "text" } },
+      tweakAxes: [{ tweak: "veil", cssVar: "--alpha" }],
+    };
+    const r = measure(decl, css, { veil: { type: "slider", min: 1, max: 1 } });
+    expect(r.findings).toEqual([]);
+    expect(r.checkedTweakExtremes).toBe(true);
+  });
+});
+
+describe("Deckkraft und Präzision", () => {
+  it("eine Deckkraft ausserhalb 0…1 wird gemeldet, nicht gerechnet", () => {
+    // `composite` extrapoliert bei alpha > 1 die Kanäle, statt eine Deckkraft
+    // anzuwenden, die es im Browser gar nicht gibt: `#777` auf Weiss rechnete sich
+    // so zu einem hohen Verhältnis hoch, während der Schirm ~4.48:1 zeigt.
+    const decl = { ...PASSING_DECL, alphas: [2] };
+    const r = measure(decl);
+    expect(r.findings.map((f) => f.detail).join(" ")).toContain("ausserhalb 0…1");
+    expect(r.status).toBe("fail");
+  });
+
+  it("das Verhältnis steht mit voller Präzision im Report", () => {
+    // Der Vergleich nahm das exakte Verhältnis, der Report den auf zwei Stellen
+    // gerundeten: `#070707` auf `#777777` sind ~4.498:1 — korrekt ein Verstoss, und
+    // im Report stand `4.5`, wo jeder Leser ein Bestehen sieht.
+    const css = '.p[data-theme="dark"]{--bg:#777777;--fg:#070707;}';
+    const decl = {
+      stylesheet: SHEET,
+      themes: { dark: '.p[data-theme="dark"]' },
+      grounds: [{ token: "--bg" }],
+      tokens: { "--bg": { role: "ground" }, "--fg": { role: "text" } },
+    };
+    const r = measure(decl, css);
+    const m = r.violations.find((v) => v.token === "--fg");
+    expect(m).toBeDefined();
+    expect(m!.ratio).toBeLessThan(4.5);
+    expect(m!.ratio).not.toBe(4.5);
+  });
+});

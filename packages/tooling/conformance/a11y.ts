@@ -531,6 +531,29 @@ export function contrast(a: Rgba, b: Rgba): number {
 }
 
 /** Vordergrund über Grund gemischt — das reale Pixel. `alpha` skaliert zusätzlich. */
+/**
+ * Vordergrund über Grund, mit zusätzlicher Deckkraft auf dem Vordergrund.
+ *
+ * ══ Was `alpha` hier BEDEUTET, und was nicht
+ *
+ * Es ist **Vordergrund-Alpha**: die Farbe des Vordergrunds wird durchsichtiger, der
+ * Grund darunter bleibt, wie er ist. Genau so wirkt eine `opacity` auf einem
+ * Element, dessen Grund AUSSERHALB der gedämpften Gruppe liegt — etwa
+ * `.vz-tile.locked .vz-tile-body { opacity: 0.7 }`, wo die Kachelfläche an
+ * `.vz-tile` hängt und nicht mitgedämpft wird.
+ *
+ * Es ist NICHT die Gruppen-Opazität, bei der ein Element seinen eigenen Grund
+ * mitbringt: dort dämpft der Browser das FERTIGE Element gegen den Vorfahren, und
+ * beide Seiten des Verhältnisses bewegen sich. Weisser Text auf schwarzem Bedienteil
+ * über weissem Vorfahren steht bei 50 % real bei ~3.98:1; diese Rechnung käme auf
+ * ~5.28:1 und würde einen unzugänglichen Zustand bescheinigen.
+ *
+ * Die Fläche modelliert diesen zweiten Fall NICHT (obs-visu-skins#47). Ein Skin darf
+ * deshalb nur solche Dämpfungen als `alphas` deklarieren, deren Grund ausserhalb der
+ * Gruppe liegt — und dass das stimmt, prüft die Ratsche
+ * `packages/skins/ionic/tests/dimming.spec.ts` am echten gerenderten Baum, weil
+ * dieser Messpfad es aus eigener Kraft nicht sehen kann.
+ */
 export function composite(fg: Rgba, bg: Rgba, alpha = 1): Rgba {
   const a = fg.a * alpha;
   return {
@@ -753,8 +776,24 @@ export function measureA11y(input: A11yInput): SupportA11y {
   // Tweak-Achsen gegen die echten Tweaks des Manifests — eine Achse auf einen
   // Tweak, den es nicht gibt, fährt Extreme an, die niemand einstellen kann.
   const tweaks = input.manifest.tweaks ?? {};
-  const stops: TweakStop[] = [{ label: "default", overrides: new Map() }];
   const axes = decl.tweakAxes ?? [];
+
+  /**
+   * Die Namen, die im Blatt überhaupt vorkommen — als deklarierte Eigenschaft ODER
+   * als `var()`-Bezug. Eine Achse, deren `cssVar` hier fehlt, bewegt nichts: ihre
+   * Stopps wiederholen die Default-Palette, und `stops.length > 1` hätte trotzdem
+   * volle Deckung behauptet (`tweakAxes: [{ tweak: "veil", cssVar: "--aplha" }]`
+   * gegen ein Blatt, das `--alpha` liest). Ein Tippfehler ist damit ein BEFUND
+   * statt einer stillen Nullmessung.
+   */
+  const namesInSheet = new Set<string>();
+  for (const [, name, value] of allDeclarations(sources)) {
+    namesInSheet.add(name);
+    for (const ref of value.matchAll(/var\(\s*(--[^\s,)]+)/g)) namesInSheet.add(ref[1]!);
+  }
+
+  /** Je Achse: die anzufahrenden Werte, inklusive des Manifest-Defaults. */
+  const axisValues: { readonly axis: (typeof axes)[number]; readonly values: string[] }[] = [];
   for (const axis of axes) {
     const tweak = tweaks[axis.tweak];
     if (!tweak) {
@@ -772,13 +811,70 @@ export function measureA11y(input: A11yInput): SupportA11y {
       });
       continue;
     }
-    for (const value of values) {
-      stops.push({
-        label: `${axis.tweak}=${value}`,
-        overrides: new Map([[axis.cssVar, value]]),
+    if (!namesInSheet.has(axis.cssVar)) {
+      findings.push({
+        problem: "unknown-tweak",
+        detail: `Achse ${axis.tweak} schreibt ${axis.cssVar}, das in KEINEM Stylesheet vorkommt — weder deklariert noch per var() gelesen. Ihre Stopps wiederholen die Default-Palette`,
       });
+      continue;
+    }
+    // Der Manifest-`default` gehört dazu: bei einem Regler stehen sonst nur min und
+    // max, und ein Default DAZWISCHEN wird nie angefahren — obwohl genau ihn der
+    // Host beim Start setzt. Liegt er auf einem Extrem, fällt er durch das Set weg.
+    if (tweak.default !== undefined && tweak.default !== null) {
+      values.push(String(tweak.default));
+    }
+    axisValues.push({ axis, values: [...new Set(values)] });
+  }
+
+  /**
+   * Das KARTESISCHE PRODUKT der Achsen, nicht eine Achse je Stopp.
+   *
+   * Vorher überschrieb jeder Stopp genau eine Variable, alle anderen Achsen blieben
+   * auf ihrem Blatt-Wert — Wechselwirkungen wurden also nie gemessen. Schwarz auf
+   * Weiss besteht, wenn nur der Vordergrund nach `#707070` wandert, und besteht,
+   * wenn nur der Grund nach `#777777` wandert; die GLEICHZEITIGE Stellung hat fast
+   * keinen Kontrast — und der Report sagte `checkedTweakExtremes: true` und `pass`.
+   *
+   * Das Produkt wächst multiplikativ, deshalb eine Obergrenze: darüber wird die
+   * Vollständigkeit nicht behauptet, sondern als Befund gemeldet. Lieber eine
+   * benannte Grenze als eine Messung, die nie fertig wird.
+   */
+  // Über dieser Grenze wird die Vollständigkeit NICHT behauptet: `silentGap` unten
+  // greift, das Urteil fällt durch, und `tweakStops` im Report zeigt, dass nur die
+  // Einzelachsen angefahren wurden. Kein realer Skin kommt bisher in die Nähe (ionic
+  // hat eine Achse); die Grenze ist da, damit eine Deklaration mit sechs Achsen nicht
+  // in eine Messung läuft, die nie fertig wird.
+  const MAX_STOPS = 64;
+  // Je Achse gibt es ihre Werte PLUS "unverstellt" — daher (k+1), nicht k. Der
+  // Aufbau unten erzeugt genau diese Menge: jede Teilstellung und jede Kombination.
+  const productSize = axisValues.reduce((n, a) => n * (a.values.length + 1), 1);
+  let stops: TweakStop[] = [{ label: "default", overrides: new Map() }];
+  const stopsTruncated = productSize > MAX_STOPS;
+  if (stopsTruncated) {
+    // Wenigstens die einzelnen Achsen anfahren, statt gar nichts zu messen.
+    for (const { axis, values } of axisValues) {
+      for (const value of values) {
+        stops.push({ label: `${axis.tweak}=${value}`, overrides: new Map([[axis.cssVar, value]]) });
+      }
+    }
+  } else {
+    for (const { axis, values } of axisValues) {
+      const grown: TweakStop[] = [];
+      for (const base of stops) {
+        for (const value of values) {
+          const overrides = new Map(base.overrides);
+          overrides.set(axis.cssVar, value);
+          const label = base.label === "default" ? "" : `${base.label} `;
+          grown.push({ label: `${label}${axis.tweak}=${value}`, overrides });
+        }
+      }
+      // Der reine Default-Stopp bleibt erhalten — er ist der Zustand ohne Zutun.
+      stops = [...stops, ...grown];
     }
   }
+  const uniqueStops = new Map(stops.map((s) => [s.label, s]));
+  stops = [...uniqueStops.values()];
   // Riegel 4: JEDER Tweak des Manifests muss eingeordnet sein. Ohne diesen Abgleich
   // stand `checkedTweakExtremes: true` im Report, während ein unbenannter Tweak die
   // Farbe verschob — eine ungedeckte positive Aussage, und damit genau der Fehler,
@@ -840,7 +936,8 @@ export function measureA11y(input: A11yInput): SupportA11y {
   // Gemessene bestanden", `checkedTweakExtremes` sagt "es war alles Messbare".
   // Nur die erste ist das Urteil; die zweite bleibt im Report sichtbar, damit
   // die eingeräumte Lücke nicht verschwindet.
-  const silentGap = !(axes.length === 0 || stops.length > 1) || unclassifiedTweak;
+  const silentGap =
+    !(axes.length === 0 || stops.length > 1) || unclassifiedTweak || stopsTruncated;
   const checkedTweakExtremes = !silentGap && Object.keys(unmeasuredTweaks).length === 0;
 
   const measurements: A11yMeasurement[] = [];
@@ -861,6 +958,30 @@ export function measureA11y(input: A11yInput): SupportA11y {
   const base =
     sources.length > 0 && decl.base ? tokensFor(sources, decl.base) : new Map<string, string>();
   const alphas = decl.alphas && decl.alphas.length > 0 ? decl.alphas : [1];
+  /**
+   * Deckkräfte kommen aus dem Manifest und werden beim Laden nur TYP-geprüft. Ein
+   * Eintrag ausserhalb 0…1 extrapoliert in `composite` die Kanäle, statt die
+   * Deckkraft anzuwenden, die der Browser kennt: mit `alphas: [2]` rechnet `#777`
+   * auf Weiss zu einem hohen Verhältnis hoch, während auf dem Schirm die gewöhnlichen
+   * ~4.48:1 stehen. Eine unbrauchbare Zahl wird deshalb GEMELDET statt gemessen.
+   */
+  function usableAlphas(list: readonly number[], where: string): number[] {
+    const good: number[] = [];
+    for (const a of list) {
+      if (typeof a !== "number" || !Number.isFinite(a) || a < 0 || a > 1) {
+        findings.push({
+          // `unresolvable`, weil der Vertrag keinen eigenen Namen dafür führt und
+          // die Sache dieselbe ist: aus dieser Angabe lässt sich keine Messung
+          // gewinnen. Ein eigener Problem-Name wäre ein Vertrags-Minor.
+          problem: "unresolvable",
+          detail: `${where}: Deckkraft ${String(a)} liegt ausserhalb 0…1 — CSS kennt dort keinen Wert, die Messung waere erfunden`,
+        });
+        continue;
+      }
+      good.push(a);
+    }
+    return good;
+  }
 
   for (const [theme, selector] of measuredThemes) {
     if (sources.length === 0) break;
@@ -947,7 +1068,10 @@ export function measureA11y(input: A11yInput): SupportA11y {
         // Deckkraft je Token vor Deckkraft des Skins: ein Skin dimmt seine gesperrte
         // Kachel und seine Seitenüberschrift nicht — eine globale Liste erzeugte
         // Paarungen, die es auf dem Schirm nie gibt.
-        const tokenAlphas = entry.alphas && entry.alphas.length > 0 ? entry.alphas : alphas;
+        const tokenAlphas = usableAlphas(
+          entry.alphas && entry.alphas.length > 0 ? entry.alphas : alphas,
+          `${token}`,
+        );
         for (const target of targets) {
           const bg = ground.get(target);
           if (bg === undefined) continue; // schon als Befund vermerkt
@@ -961,7 +1085,13 @@ export function measureA11y(input: A11yInput): SupportA11y {
               ground: `${target} ${hex(bg)}`,
               alpha,
               tweaks: stop.label,
-              ratio: Math.round(ratio * 100) / 100,
+              // Volle Präzision, nicht auf zwei Stellen gerundet: der Vergleich
+              // unten nimmt das exakte Verhältnis, der Report nahm den gerundeten
+              // Wert — `#070707` auf `#777777` sind ~4.498:1, landeten korrekt in
+              // `violations` und standen dann als `ratio: 4.5` im Report, wo jeder
+              // Leser ein Bestehen sieht. Und bei Gleichstand wählte `worst` die
+              // falsche Paarung. Gerundet wird erst beim Ausgeben (`toFixed(2)`).
+              ratio,
               threshold,
             };
             measurements.push(m);
