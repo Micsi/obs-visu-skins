@@ -17,8 +17,12 @@
     "gate": "vitest run --config vitest.gate.config.ts"
   },
   "dependencies": {
+    "@csstools/selector-specificity": "^6.0.0",
     "@obs/visu-contract": "link:/Volumes/Daten/Projekte/openbridge/openbridgeserver-visu-integrate/packages/contract",
+    "culori": "^4.0.2",
     "jsdom": "^25.0.1",
+    "postcss": "^8.5.28",
+    "postcss-value-parser": "^4.2.0",
     "vue": "^3.5.13"
   },
   "devDependencies": {

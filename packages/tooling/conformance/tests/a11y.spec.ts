@@ -18,6 +18,7 @@ import {
   contrast,
   declarations,
   measureA11y,
+  parseRules,
   resolveColor,
   resolveNumber,
   THRESHOLDS,
@@ -1024,5 +1025,83 @@ describe("Gründe: Zyklen und das, was wirklich deckend ist", () => {
     const r = measure(decl, css);
     expect(r.findings.map((f) => f.problem)).toContain("translucent-ground");
     expect(r.status).toBe("fail");
+  });
+});
+
+describe("die CSS-Grammatik kommt von postcss, nicht aus einem Regex", () => {
+  // Jeder Fall hier stand als eigener Review-Befund am früheren Eigenbau. Sie stehen
+  // zusammen, weil sie EINE Ursache hatten: eine nachgebaute Grammatik. Wer den
+  // Parser wieder von Hand schreibt, bricht diesen Block als Ganzes.
+
+  it("ein Kommentar-Anfang IN einer Zeichenkette beendet nichts", () => {
+    // `replace(/\/\*[\s\S]*?\*\//g, "")` frass ab dem `/*` in der Zeichenkette alles
+    // bis zum nächsten echten `*/` — hier also `--fg`, den Blockschluss und den Kopf
+    // von `.b`. Der Test braucht deshalb BEIDE Hälften, sonst greift die alte
+    // Ersetzung mangels Gegenstück gar nicht und der Fall belegt nichts.
+    const rules = parseRules('.a{content:"/*";--fg:#123456}\n.b{/* echt */--bg:#654321}');
+    expect(rules.map((r) => r.selectors[0])).toEqual([".a", ".b"]);
+    expect(rules[0]!.decls.find((d) => d.prop === "--fg")?.value).toBe("#123456");
+    expect(rules[1]!.decls.find((d) => d.prop === "--bg")?.value).toBe("#654321");
+  });
+
+  it("eine geschweifte Klammer IN einer Zeichenkette teilt keinen Block", () => {
+    const rules = parseRules('.a{content:"}";--fg:#123456}');
+    expect(rules).toHaveLength(1);
+    expect(rules[0]!.selectors).toEqual([".a"]);
+    expect(rules[0]!.decls.find((d) => d.prop === "--fg")?.value).toBe("#123456");
+  });
+
+  it("ein Semikolon IN einem Wert schneidet den Wert nicht ab", () => {
+    const rules = parseRules('.a{--u:url("data:image/svg+xml;base64,AAA");--fg:#123456}');
+    expect(rules[0]!.decls.find((d) => d.prop === "--u")?.value).toContain("base64,AAA");
+    expect(rules[0]!.decls.find((d) => d.prop === "--fg")?.value).toBe("#123456");
+  });
+
+  it("ein Komma IN einem funktionalen Selektor teilt die Selektorliste nicht", () => {
+    // `.split(",")` machte aus `:is(.a, .b) .c` zwei Selektoren, von denen keiner
+    // gültig war — der ganze Block fiel aus der Messung.
+    const rules = parseRules(":is(.a, .b) .c, .d{--fg:#123456}");
+    expect(rules[0]!.selectors).toEqual([":is(.a, .b) .c", ".d"]);
+  });
+
+  it("die erste Regel nach einem `@import` bleibt sichtbar", () => {
+    // Der At-Kopf klebte am folgenden Selektor; die Selektorliste begann mit `@` und
+    // wurde weggefiltert. edomis erste Regel war so unsichtbar.
+    const rules = parseRules('@import "./x.css";\n.edomi-root{--fg:#123456}');
+    expect(rules.map((r) => r.selectors[0])).toContain(".edomi-root");
+  });
+
+  it("`!important` steht am Knoten, nicht im Wert", () => {
+    const rules = parseRules(".a{--fg:#123456 !important;--bg:#ffffff}");
+    const fg = rules[0]!.decls.find((d) => d.prop === "--fg")!;
+    expect(fg.value).toBe("#123456"); // ohne Marker — der berechnete Wert ist derselbe
+    expect(fg.important).toBe(true);
+    expect(rules[0]!.decls.find((d) => d.prop === "--bg")!.important).toBe(false);
+  });
+
+  it("ein Name mit Nicht-ASCII-Zeichen zählt als Deklaration", () => {
+    // `\w` kennt nur ASCII: `--zustand-grün` fiel weg, obwohl CSS ihn über `var()`
+    // sehr wohl verbraucht.
+    const rules = parseRules(".a{--zustand-grün:#123456}");
+    expect(rules[0]!.decls.map((d) => d.prop)).toEqual(["--zustand-grün"]);
+  });
+
+  it("ein Block in `@media` ist markiert, nicht weggeworfen", () => {
+    const rules = parseRules("@media (forced-colors:active){.a{--fg:#fff}}\n.b{--fg:#000}");
+    const a = rules.find((r) => r.selectors.includes(".a"))!;
+    const b = rules.find((r) => r.selectors.includes(".b"))!;
+    expect(a.conditional).toBe(true);
+    expect(b.conditional).toBe(false);
+  });
+
+  it("ein Block in `@layer` trägt seine Schicht mit", () => {
+    const rules = parseRules("@layer base{.a{--fg:#111}}\n.b{--fg:#222}");
+    expect(rules.find((r) => r.selectors.includes(".a"))!.layer).toBe("base");
+    expect(rules.find((r) => r.selectors.includes(".b"))!.layer).toBe("");
+  });
+
+  it("ein unlesbares Blatt wirft nicht, es liefert nichts", () => {
+    // Ein Ausnahmefehler hier würde den ganzen Lauf kippen statt den Skin zu melden.
+    expect(() => parseRules(".a{")).not.toThrow();
   });
 });

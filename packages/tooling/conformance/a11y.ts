@@ -58,6 +58,7 @@
 //     behauptete der Report, die Extreme geprüft zu haben, während ein unbenannter
 //     Tweak die Farbe verschiebt — eine ungedeckte positive Aussage.
 
+import postcss from "postcss";
 import {
   schema as contractSchema,
   type A11yGround,
@@ -97,7 +98,8 @@ export const A11Y_ROLES: readonly string[] = Object.freeze([
 /** Ein Regelblock: die (kommagetrennten) Selektoren plus der rohe Rumpf. */
 interface Rule {
   readonly selectors: readonly string[];
-  readonly body: string;
+  /** Die Deklarationen des Blocks, in Quelltextreihenfolge, mit `!important`. */
+  readonly decls: readonly Decl[];
   /**
    * Steht der Block in einer At-Bedingung (`@media`/`@supports`/`@container`)?
    * Solche Blöcke bleiben aus der Standard-Umgebung heraus: sie gelten nur unter
@@ -106,50 +108,97 @@ interface Rule {
    * Sonderfall zeigt.
    */
   readonly conditional: boolean;
+  /**
+   * Die `@layer`, in der der Block steht — leer für unlayered. Die Kaskade wertet
+   * Schichten VOR Spezifität, und unlayered gewinnt gegen jede Schicht.
+   */
+  readonly layer: string;
+}
+
+/** Eine einzelne Deklaration, so wie postcss sie sieht. */
+export interface Decl {
+  readonly prop: string;
+  readonly value: string;
+  readonly important: boolean;
 }
 
 /**
- * Kommentare raus, dann jeden INNERSTEN Block einsammeln.
+ * Die Regeln eines Stylesheets — geparst von **postcss**, nicht von Hand.
  *
- * Ein Block, der in einer Bedingung steht (`@media`, `@supports`, `@container`),
- * wird MARKIERT statt stillschweigend übernommen. Vorher fiel die Bedingung
- * einfach weg und die Regel galt universell: ein späteres
- * `@media (forced-colors: active) { … --fg: #fff }` überschrieb während der
- * Messung ein kontrastschwaches `--fg`, und die normale Darstellung bestand mit
- * einem Wert, den sie nie zeigt.
+ * ══ Warum eine Bibliothek und kein Regex mehr
+ *
+ * Der frühere Eigenbau las das Blatt mit `matchAll(/([^{}]+)\{([^{}]*)\}/g)` plus
+ * einer Kommentar-Entfernung davor, und jede Review-Runde fand die nächste CSS-Regel,
+ * die er anders sah als ein Browser: ein `/* … *\/` in einer Zeichenkette, eine
+ * geschweifte Klammer in `content: "}"`, ein `;` in einem Data-URI, ein Komma in
+ * `:is(a, b)`, die erste Regel nach einem `@import`. Das ist eine unbegrenzte
+ * Fehlerfläche — die Menge der CSS-Regeln ist gross und wächst.
+ *
+ * postcss BENUTZT die Grammatik, statt sie nachzubilden: Kommentare, Zeichenketten,
+ * Klammerungen, at-Regeln und `!important` sind dort eigene Knoten. Was hier bleibt,
+ * ist nur noch die Frage, die diese Fläche wirklich stellt: welcher Block gilt unter
+ * welcher Bedingung, in welcher Schicht.
+ *
+ * ══ Was weiterhin markiert statt übernommen wird
+ *
+ * Ein Block in einer At-BEDINGUNG (`@media`, `@supports`, `@container`) gilt nur unter
+ * ihr. Als immer aktiv behandelt liesse er eine kontrastschwache Standard-Darstellung
+ * mit einem Wert bestehen, den nur der Sonderfall zeigt — deshalb `conditional: true`
+ * und aus der Standard-Umgebung heraus.
+ *
+ * Ein Block in einer `@layer` trägt seine Schicht mit (`layer`), weil die Kaskade
+ * Schichten VOR Spezifität wertet: eine Deklaration in einer späteren Schicht schlägt
+ * eine spezifischere aus einer früheren. Ohne Schicht ist `layer` leer — unlayered
+ * gewinnt gegen jede Schicht (CSS Cascade 5 §6.4.4).
  */
 export function parseRules(css: string): Rule[] {
-  const clean = css.replace(/\/\*[\s\S]*?\*\//g, "");
   const out: Rule[] = [];
-  // Die Zeichenbereiche, die innerhalb einer At-Bedingung liegen.
-  const conditional: [number, number][] = [];
-  for (const at of clean.matchAll(/@(?:media|supports|container)[^{]*\{/g)) {
-    const start = at.index! + at[0].length;
-    let depth = 1;
-    let i = start;
-    for (; i < clean.length && depth > 0; i += 1) {
-      if (clean[i] === "{") depth += 1;
-      else if (clean[i] === "}") depth -= 1;
-    }
-    conditional.push([start, i]);
+  let root: postcss.Root;
+  try {
+    root = postcss.parse(css, { from: undefined });
+  } catch {
+    return out; // unlesbares Blatt -> die Messung meldet es als `stylesheet-unreadable`
   }
-  const inCondition = (at: number): boolean =>
-    conditional.some(([a, b]) => at >= a && at < b);
+  const walk = (container: postcss.Container, conditional: boolean, layer: string): void => {
+    for (const node of container.nodes ?? []) {
+      if (node.type === "rule") {
+        // `list.comma` splittet klammer- UND zeichenkettenbewusst: `:is(a, b)` bleibt
+        // ein Selektor, `[title="a,b"]` auch.
+        const selectors = postcss.list
+          .comma(node.selector)
+          .map((sel) => sel.trim())
+          .filter((sel) => sel.length > 0);
+        if (selectors.length === 0) continue;
+        out.push({ selectors, decls: declarationsOf(node), conditional, layer });
+        // Verschachtelte Regeln (CSS Nesting) sind eigene Blöcke.
+        walk(node, conditional, layer);
+      } else if (node.type === "atrule") {
+        const name = node.name.toLowerCase();
+        if (name === "layer") {
+          // `@layer a, b;` ordnet nur an und hat keinen Rumpf.
+          const inner = node.params.trim();
+          walk(node, conditional, layer.length > 0 ? `${layer}.${inner}` : inner);
+        } else if (name === "media" || name === "supports" || name === "container") {
+          walk(node, true, layer);
+        } else if (node.nodes) {
+          // `@scope`, `@starting-style`, Hersteller-Blöcke: Inhalt sehen, Bedingung erben.
+          walk(node, conditional, layer);
+        }
+      }
+    }
+  };
+  walk(root, false, "");
+  return out;
+}
 
-  for (const m of clean.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
-    // Alles VOR dem letzten `;` gehört zu einer At-Anweisung, nicht zum Selektor:
-    // `@import "…";` klebte sonst am folgenden Selektor, die Selektorliste begann
-    // mit `@` und wurde weggefiltert — der ganze Block fiel damit aus dem Scan.
-    // edomis erste Regel (`.edomi-root`, direkt nach dem @import) war auf diese
-    // Weise unsichtbar: weder ihre Token noch ihre rohen Farben wurden je geprüft.
-    const head = m[1] ?? "";
-    const afterAtRule = head.slice(head.lastIndexOf(";") + 1);
-    const selectors = afterAtRule
-      .split(",")
-      .map((s) => s.trim())
-      .filter((s) => s.length > 0 && !s.startsWith("@"));
-    if (selectors.length === 0) continue;
-    out.push({ selectors, body: m[2] ?? "", conditional: inCondition(m.index!) });
+/** Die Deklarationen EINES postcss-Blocks, in Quelltextreihenfolge. */
+function declarationsOf(rule: postcss.Container): Decl[] {
+  const out: Decl[] = [];
+  for (const node of rule.nodes ?? []) {
+    if (node.type !== "decl") continue;
+    const value = node.value.trim();
+    if (value.length === 0) continue;
+    out.push({ prop: node.prop.trim(), value, important: node.important === true });
   }
   return out;
 }
@@ -157,8 +206,8 @@ export function parseRules(css: string): Rule[] {
 /**
  * Alle `--name: wert`-Paare eines Rumpfes, in Quelltextreihenfolge.
  *
- * Über {@link splitTop} statt über einen Regex auf den Rohtext, und das behebt
- * drei Fehlurteile auf einmal:
+ * Über **postcss** statt über einen Regex auf den Rohtext, und das behebt drei
+ * Fehlurteile auf einmal:
  *
  *  - **Zeichenketten** zählten mit. `content: "--brand: #fff"` — oder dieselbe
  *    Folge in einem Data-URI — galt als echte Deklaration, und der
@@ -169,17 +218,15 @@ export function parseRules(css: string): Rule[] {
  *    gewöhnliches CSS ihn über `var()` sehr wohl verbraucht.
  */
 export function declarations(body: string): [string, string][] {
-  const out: [string, string][] = [];
-  for (const part of splitTop(body, ";")) {
-    const cut = part.indexOf(":");
-    if (cut <= 0) continue;
-    const name = part.slice(0, cut).trim();
-    if (!name.startsWith("--") || name.length < 3) continue;
-    const value = withoutImportance(part.slice(cut + 1));
-    if (value.length === 0) continue;
-    out.push([name, value]);
-  }
-  return out;
+  return declsOfBody(body)
+    .filter((d) => d.prop.startsWith("--") && d.prop.length >= 3)
+    .map((d) => [d.prop, d.value] as [string, string]);
+}
+
+/** Der Rumpf eines Blocks, geparst — postcss braucht dafür eine Hülle. */
+function declsOfBody(body: string): Decl[] {
+  const rules = parseRules(`x{${body}}`);
+  return rules.length > 0 ? [...rules[0]!.decls] : [];
 }
 
 /**
@@ -196,7 +243,9 @@ export function tokensFor(sources: readonly string[], selector: string): Map<str
       // neue Versteck für unklassifizierte Farbe.
       if (rule.conditional) continue;
       if (!rule.selectors.includes(selector)) continue;
-      for (const [name, value] of declarations(rule.body)) out.set(name, value);
+      for (const d of rule.decls) {
+        if (d.prop.startsWith("--") && d.prop.length >= 3) out.set(d.prop, d.value);
+      }
     }
   }
   return out;
@@ -211,8 +260,9 @@ export function allDeclarations(sources: readonly string[]): [string, string, st
   const out: [string, string, string][] = [];
   for (const css of sources) {
     for (const rule of parseRules(css)) {
-      for (const [name, value] of declarations(rule.body)) {
-        out.push([rule.selectors.join(", "), name, value]);
+      for (const d of rule.decls) {
+        if (!d.prop.startsWith("--") || d.prop.length < 3) continue;
+        out.push([rule.selectors.join(", "), d.prop, d.value]);
       }
     }
   }
@@ -265,7 +315,9 @@ function themeEnv(
     for (const rule of parseRules(css)) {
       if (rule.conditional) continue; // siehe `tokensFor`
       if (!rule.selectors.some((sel) => cascadesInto(sel, own, foreign))) continue;
-      for (const [name, value] of declarations(rule.body)) out.set(name, value);
+      for (const d of rule.decls) {
+        if (d.prop.startsWith("--") && d.prop.length >= 3) out.set(d.prop, d.value);
+      }
     }
   }
   return out;
@@ -283,18 +335,9 @@ function themeEnv(
  * `rgba(…)`-Liste nicht mitten in einem Wert schneidet.
  */
 export function plainDeclarations(body: string): [string, string][] {
-  const out: [string, string][] = [];
-  for (const part of splitTop(body, ";")) {
-    const cut = part.indexOf(":");
-    if (cut <= 0) continue;
-    const name = part.slice(0, cut).trim();
-    const value = withoutImportance(part.slice(cut + 1));
-    if (name.length === 0 || value.length === 0) continue;
-    if (name.startsWith("--")) continue; // die haben ihren eigenen Scan
-    if (!/^[a-z-]+$/i.test(name)) continue; // kein Eigenschaftsname
-    out.push([name, value]);
-  }
-  return out;
+  return declsOfBody(body)
+    .filter((d) => !d.prop.startsWith("--") && /^[a-z-]+$/i.test(d.prop))
+    .map((d) => [d.prop, d.value] as [string, string]);
 }
 
 /** Wie {@link allDeclarations}, aber für die gewöhnlichen Deklarationen. */
@@ -302,8 +345,9 @@ export function allPlainDeclarations(sources: readonly string[]): [string, strin
   const out: [string, string, string][] = [];
   for (const css of sources) {
     for (const rule of parseRules(css)) {
-      for (const [name, value] of plainDeclarations(rule.body)) {
-        out.push([rule.selectors.join(", "), name, value]);
+      for (const d of rule.decls) {
+        if (d.prop.startsWith("--") || !/^[a-z-]+$/i.test(d.prop)) continue;
+        out.push([rule.selectors.join(", "), d.prop, d.value]);
       }
     }
   }
@@ -429,17 +473,9 @@ function splitTop(input: string, sep: string): string[] {
   return out.map((s) => s.trim()).filter((s) => s.length > 0);
 }
 
-/**
- * Ein CSS-Wert ohne seinen Wichtigkeits-Marker.
- *
- * `!important` entscheidet im Browser nur, WELCHE Deklaration gewinnt — der
- * berechnete Wert ist derselbe. `--fg: #000 !important` erreichte
- * {@link resolveColor} aber samt Marker, wurde dort abgelehnt, und ein sonst
- * konformer Skin fiel mit `unresolvable` durch.
- */
-function withoutImportance(value: string): string {
-  return value.replace(/!\s*important\s*$/i, "").trim();
-}
+// `!important` trennt postcss selbst vom Wert ab (`Declaration.important`) — die
+// Handarbeit dafür ist entfallen. Was der Marker in der KASKADE bedeutet, steht bei
+// `cascadeValue`: er entscheidet, welche Deklaration gewinnt, nicht welchen Wert sie hat.
 
 /**
  * Löst einen CSS-Farbwert zu {@link Rgba} auf. Beherrscht die Formen, die ein
