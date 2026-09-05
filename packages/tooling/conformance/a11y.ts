@@ -58,8 +58,11 @@
 //     behauptete der Report, die Extreme geprüft zu haben, während ein unbenannter
 //     Tweak die Farbe verschiebt — eine ungedeckte positive Aussage.
 
+import { JSDOM } from "jsdom";
 import postcss from "postcss";
 import valueParser from "postcss-value-parser";
+import selectorParser from "postcss-selector-parser";
+import { selectorSpecificity as specificity } from "@csstools/selector-specificity";
 import { converter as culoriConverter, parse as culoriParse } from "culori";
 import {
   schema as contractSchema,
@@ -272,57 +275,184 @@ export function allDeclarations(sources: readonly string[]): [string, string, st
 }
 
 /**
- * Kaskadiert dieser Selektor in das gemessene Theme?
+ * Der MESSPUNKT eines Themes: ein echtes Element, auf dem die Token gelten.
  *
- * Nein, wenn er den Selektor eines ANDEREN Themes trägt und den eigenen nicht:
- * `.visu-root[data-theme="light"] .foo` gilt im dunklen Theme nicht. Ein Block,
- * dessen Selektorliste beide nennt, gilt in beiden — deshalb wird je Selektor
- * entschieden und der Block genommen, sobald EINER von ihnen passt.
+ * ══ Warum überhaupt ein Element
  *
- * Warum das zählt: der Rückfall-Boden wurde vorher aus JEDER Deklaration in JEDEM
- * Selektor gefüllt. Fehlte `--fg` im dunklen Block, borgte die dunkle Messung ihn
- * still aus dem hellen — eine unvollständige dunkle Palette konnte `pass`
- * bekommen, statt den Token als fehlend zu melden.
+ * Die Frage „gilt dieser Block in diesem Theme" wurde vorher über Zeichenketten
+ * beantwortet — `sel.includes(own)`, `own.startsWith(sel)`, eine Wurzel-Liste. Jede
+ * Review-Runde fand die nächste Selektor-Form, die das anders sah als ein Browser:
+ * der Universalselektor, `:is()`, ein Nachfahren-Block, der die Vorfahren-Kette
+ * betrifft, die Frage, in welchem Geltungsbereich ein Alias überhaupt deklariert ist.
+ *
+ * Mit einem Element ist die Frage keine Zeichenkettenfrage mehr: `element.matches()`
+ * kommt von jsdom und bringt die vollständige Selektor-Semantik mit. Was hier von
+ * Hand bleibt, ist nur noch die Synthese des Elements aus dem deklarierten
+ * Theme-Selektor — ein klar begrenztes Stück, das der Skin selbst vorgibt.
+ *
+ * Gebaut wird die Kette `html > body > <element>`, weil Custom Properties ERBEN:
+ * ein Block auf `:root` oder `html` gilt am Messpunkt genauso wie einer auf dem
+ * Element selbst.
  */
-function cascadesInto(selector: string, own: string, foreign: readonly string[]): boolean {
-  const sel = selector.trim();
-  if (own.length > 0 && sel.includes(own)) return true;
-  // Ein fremdes Theme nie.
-  if (foreign.some((f) => f.length > 0 && sel.includes(f))) return false;
-  // Wurzeln gelten für alles.
-  if (/^(?::root|html|body|\*)\b/.test(sel)) return true;
-  // Sonst nur, was der eigene Selektor WIRKLICH erbt: ein Block, dessen Selektor
-  // ein Präfix des eigenen ist (`.visu-root` für `.visu-root[data-theme="dark"]`
-  // — ionics `--ion-*`-Brücke). Vorher galt jeder Selektor, der bloss kein fremdes
-  // Theme nennt: `.unrelated-root { --fg: #fff }` wanderte in die Umgebung, und
-  // eine dunkle Palette ohne eigenes `--fg` borgte sich den Wert und bestand,
-  // obwohl CSS zwischen diesen Elementen nie kaskadiert.
-  return own.length > 0 && own.startsWith(sel);
+function synthesizeContext(selector: string, doc: Document): Element | null {
+  let compound: selectorParser.Node[] = [];
+  try {
+    selectorParser((root) => {
+      const first = root.nodes[0];
+      if (!first) return;
+      // Bei `a b .c` zählt das LETZTE Compound — das ist das Element, auf dem die
+      // Deklarationen landen.
+      const nodes = first.nodes;
+      let start = 0;
+      nodes.forEach((n, i) => {
+        if (n.type === "combinator") start = i + 1;
+      });
+      compound = nodes.slice(start);
+    }).processSync(selector);
+  } catch {
+    return null;
+  }
+  if (compound.length === 0) return null;
+
+  let tag = "div";
+  const classes: string[] = [];
+  const attrs: [string, string][] = [];
+  let id = "";
+  for (const node of compound) {
+    if (node.type === "tag") tag = node.value;
+    else if (node.type === "class") classes.push(node.value);
+    else if (node.type === "id") id = node.value;
+    else if (node.type === "attribute") {
+      const a = node as selectorParser.Attribute;
+      attrs.push([a.attribute, a.value ?? ""]);
+    } else if (node.type === "pseudo" && a11yRootPseudo(node.value)) {
+      // `:root` ist kein Element, das man bauen kann — es IST das Wurzelelement.
+      return doc.documentElement;
+    }
+  }
+  const el = doc.createElement(tag === "*" ? "div" : tag);
+  for (const c of classes) el.classList.add(c);
+  if (id.length > 0) el.id = id;
+  for (const [name, value] of attrs) el.setAttribute(name, value);
+  doc.body.appendChild(el);
+  return el;
+}
+
+function a11yRootPseudo(value: string): boolean {
+  return value === ":root";
 }
 
 /**
- * Der Kaskaden-Boden EINES Themes: jede Deklaration jedes Blocks, der in dieses
- * Theme kaskadiert ({@link cascadesInto}), in Quelltextreihenfolge. Er liegt unter
- * `base` und den Theme-Token, die ihn überschreiben, und fängt die Token auf, die
- * ausserhalb der erklärten Blöcke definiert sind (ionics `--ion-*`-Brücke unter
- * `.visu-root`).
+ * Der Rang einer Deklaration in der Kaskade — je grösser, desto später gewinnt sie.
+ *
+ * CSS wertet in dieser Reihenfolge (Cascade 5 §6.4): Wichtigkeit, dann Schicht, dann
+ * Spezifität, dann Quellordnung. Vorher wertete diese Fläche NICHTS davon: sie faltete
+ * drei Karten in fester Reihenfolge übereinander (Theme-Boden, `base`, Theme-Token),
+ * und was innerhalb einer Karte später im Quelltext stand, gewann — unabhängig davon,
+ * wie spezifisch es war, ob es `!important` trug oder in welcher `@layer` es stand.
+ *
+ * Zur Schicht: bei NORMALEN Deklarationen gewinnt unlayered gegen jede Schicht, und
+ * unter den Schichten die zuletzt deklarierte. Bei `!important` kehrt sich beides um.
+ * Mehr als diese Umkehr braucht die Fläche nicht — Schichten kommen in Skin-Blättern
+ * bisher nicht verschachtelt vor, und der Fall wird gemeldet, wenn doch.
  */
-function themeEnv(
+interface Ranked {
+  readonly name: string;
+  readonly value: string;
+  readonly rank: readonly number[];
+}
+
+function compareRank(a: readonly number[], b: readonly number[]): number {
+  for (let i = 0; i < Math.max(a.length, b.length); i += 1) {
+    const d = (a[i] ?? 0) - (b[i] ?? 0);
+    if (d !== 0) return d;
+  }
+  return 0;
+}
+
+/**
+ * Die Token-Umgebung EINES Messpunkts: jede Deklaration jedes Blocks, der auf den
+ * Messpunkt oder einen seiner Vorfahren passt, nach echter Kaskade gefaltet.
+ */
+function cascadeEnv(
   sources: readonly string[],
-  own: string,
-  foreign: readonly string[],
+  element: Element,
+  layerOrder: readonly string[],
 ): Map<string, string> {
-  const out = new Map<string, string>();
+  const ranked = new Map<string, Ranked>();
+  let order = 0;
   for (const css of sources) {
     for (const rule of parseRules(css)) {
-      if (rule.conditional) continue; // siehe `tokensFor`
-      if (!rule.selectors.some((sel) => cascadesInto(sel, own, foreign))) continue;
+      // Bedingte Blöcke bleiben draussen: sie gelten nur unter ihrer Bedingung, und
+      // sie als immer aktiv zu behandeln liesse eine kontrastschwache Darstellung
+      // mit einem Wert bestehen, den nur der Sonderfall zeigt.
+      if (rule.conditional) continue;
+      const hit = bestMatch(rule.selectors, element);
+      if (hit === null) continue;
       for (const d of rule.decls) {
-        if (d.prop.startsWith("--") && d.prop.length >= 3) out.set(d.prop, d.value);
+        order += 1;
+        if (!d.prop.startsWith("--") || d.prop.length < 3) continue;
+        const layerIndex = layerOrder.indexOf(rule.layer);
+        const rank = d.important
+          ? [1, -layerIndex, hit[0], hit[1], hit[2], order]
+          : [0, layerIndex, hit[0], hit[1], hit[2], order];
+        const prev = ranked.get(d.prop);
+        if (prev === undefined || compareRank(rank, prev.rank) > 0) {
+          ranked.set(d.prop, { name: d.prop, value: d.value, rank });
+        }
       }
     }
   }
+  const out = new Map<string, string>();
+  for (const [name, r] of ranked) out.set(name, r.value);
   return out;
+}
+
+/**
+ * Die höchste Spezifität, mit der einer der Selektoren dieses Blocks am Messpunkt
+ * greift — oder `null`, wenn keiner greift. Der Messpunkt selbst zählt ebenso wie
+ * jeder seiner Vorfahren, weil Custom Properties erben.
+ */
+function bestMatch(
+  selectors: readonly string[],
+  element: Element,
+): [number, number, number] | null {
+  let best: [number, number, number] | null = null;
+  for (const sel of selectors) {
+    let matched = false;
+    for (let node: Element | null = element; node !== null; node = node.parentElement) {
+      try {
+        if (node.matches(sel)) {
+          matched = true;
+          break;
+        }
+      } catch {
+        // Ein Selektor, den die Laufzeit nicht kennt (neue Pseudoklasse), gilt als
+        // nicht passend — raten wäre hier gefährlicher als übersehen.
+      }
+    }
+    if (!matched) continue;
+    const s = specificity(selectorParser().astSync(sel));
+    const here: [number, number, number] = [s.a, s.b, s.c];
+    if (best === null || compareRank(here, best) > 0) best = here;
+  }
+  return best;
+}
+
+/**
+ * Die Schichtreihenfolge des Blattes, in Deklarationsreihenfolge. Unlayered steht
+ * als leerer Name IMMER hinten — bei normalen Deklarationen gewinnt es damit gegen
+ * jede Schicht, so wie CSS es vorsieht.
+ */
+function layerOrderOf(sources: readonly string[]): string[] {
+  const seen: string[] = [];
+  for (const css of sources) {
+    for (const rule of parseRules(css)) {
+      if (rule.layer.length > 0 && !seen.includes(rule.layer)) seen.push(rule.layer);
+    }
+  }
+  seen.push("");
+  return seen;
 }
 
 /**
@@ -356,9 +486,28 @@ export function allPlainDeclarations(sources: readonly string[]): [string, strin
   return out;
 }
 
-/** Steht dieser Selektor überhaupt in einem der Stylesheets? */
+/**
+ * Trägt irgendein Block des Blattes Token an einen Messpunkt heran, der diesem
+ * Selektor entspricht?
+ *
+ * Die Frage klingt nach „steht der Selektor im Blatt", und genau so wurde sie
+ * beantwortet: wörtlicher Vergleich der Selektorliste. Damit war ein Theme, dessen
+ * Blöcke über `:is(.q, .p)` oder eine andere gleichwertige Schreibweise greifen,
+ * fälschlich `selector-missing` — und ein Skin bekam einen Befund für etwas, das im
+ * Browser einwandfrei funktioniert. Gefragt wird deshalb dasselbe wie überall sonst:
+ * greift am Messpunkt etwas.
+ */
 export function hasSelector(sources: readonly string[], selector: string): boolean {
-  return sources.some((css) => parseRules(css).some((r) => r.selectors.includes(selector)));
+  const doc = new JSDOM("<!doctype html><html><body></body></html>").window.document;
+  const point = synthesizeContext(selector, doc);
+  if (point === null) return false;
+  for (const css of sources) {
+    for (const rule of parseRules(css)) {
+      if (rule.decls.length === 0) continue;
+      if (bestMatch(rule.selectors, point) !== null) return true;
+    }
+  }
+  return false;
 }
 
 /* ---------------------------------------------------------- Farb-Auflösung */
@@ -1157,10 +1306,21 @@ export function measureA11y(input: A11yInput): SupportA11y {
   // Die Selektoren ALLER deklarierten Themes (auch der ausgenommenen): sie sind
   // der Massstab dafür, welcher Block in ein gemessenes Theme kaskadiert und
   // welcher zu einem fremden gehört.
-  const themeSelectors = Object.values(decl.themes);
-
-  const base =
-    sources.length > 0 && decl.base ? tokensFor(sources, decl.base) : new Map<string, string>();
+  /**
+   * Je gemessenem Theme ein MESSPUNKT: ein echtes Element in einem eigenen Dokument,
+   * gegen das die Kaskade entscheidet. Eigenes Dokument statt des globalen, damit die
+   * Messung nicht davon abhängt, in welcher Umgebung sie läuft.
+   *
+   * `decl.base` (typisch `:root`) braucht hier keinen Sonderweg mehr: der Block liegt
+   * auf dem Wurzelelement, ist damit ein Vorfahr jedes Messpunkts, und die Kaskade
+   * ordnet ihn von selbst unter die spezifischeren Theme-Blöcke.
+   */
+  const doc = new JSDOM("<!doctype html><html><body></body></html>").window.document;
+  const context = new Map<string, Element>();
+  for (const [theme, selector] of measuredThemes) {
+    const el = synthesizeContext(selector, doc);
+    if (el !== null) context.set(theme, el);
+  }
   const alphas = decl.alphas && decl.alphas.length > 0 ? decl.alphas : [1];
   /**
    * Deckkräfte kommen aus dem Manifest und werden beim Laden nur TYP-geprüft. Ein
@@ -1187,31 +1347,37 @@ export function measureA11y(input: A11yInput): SupportA11y {
     return good;
   }
 
+  const layerOrder = layerOrderOf(sources);
   for (const [theme, selector] of measuredThemes) {
     if (sources.length === 0) break;
-    const themeTokens = tokensFor(sources, selector);
     /**
-     * Der Kaskaden-Boden DIESES Themes. Er liegt UNTER `base` und den Theme-Token,
-     * die ihn überschreiben, und fängt weiterhin die Token auf, die ausserhalb der
-     * erklärten Blöcke definiert sind (ionics `--ion-*`-Brücke unter `.visu-root`)
-     * — aber er borgt sich nichts mehr aus einem FREMDEN Theme. Vorher wurde er
-     * aus jeder Deklaration jedes Selektors gefüllt: fehlte `--fg` im dunklen
-     * Block, borgte die dunkle Messung ihn still aus dem hellen, und eine
-     * unvollständige dunkle Palette konnte `pass` bekommen.
+     * Die Umgebung DIESES Themes — aus der echten Kaskade, nicht mehr aus drei fest
+     * übereinandergelegten Karten.
+     *
+     * Vorher stand hier `envTheme` (jeder Block, der über eine Zeichenketten-Regel
+     * "in dieses Theme kaskadiert"), darüber `base` (`:root`), darüber die
+     * Theme-Token — und innerhalb jeder Karte gewann schlicht, was später im
+     * Quelltext stand. Spezifität, `!important` und `@layer` kamen nirgends vor,
+     * und ob ein Block wirklich auf den Messpunkt passt, entschied ein
+     * `startsWith`. Jetzt fragt {@link cascadeEnv} ein echtes Element, und
+     * `base`/`themeTokens` fallen als Sonderfälle weg: sie sind gewöhnliche Blöcke,
+     * die die Kaskade von selbst richtig einordnet.
+     *
+     * Ein Theme, dessen Selektor sich nicht zu einem Element bauen lässt, wird
+     * gemeldet statt still übersprungen.
      */
-    const envTheme = themeEnv(
-      sources,
-      selector,
-      themeSelectors.filter((s) => s !== selector),
-    );
+    const point = context.get(theme);
+    if (point === undefined) {
+      findings.push({
+        problem: "selector-missing",
+        detail: `${theme}: aus dem Selektor "${selector}" liess sich kein Messpunkt bauen`,
+      });
+      continue;
+    }
+    const envTheme = cascadeEnv(sources, point, layerOrder);
 
     for (const stop of stops) {
-      const env = new Map<string, string>([
-        ...envTheme,
-        ...base,
-        ...themeTokens,
-        ...stop.overrides,
-      ]);
+      const env = new Map<string, string>([...envTheme, ...stop.overrides]);
 
       // 1) Gründe auflösen und die Kette zusammenmischen.
       const ground = new Map<string, Rgba>();

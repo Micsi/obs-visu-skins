@@ -1222,3 +1222,124 @@ describe("Farbwerte liest culori, var() setzt der Browser-Ablauf ein", () => {
     expect(resolveColor("rgba(35, 40, 48, calc(var(--t) * 0.7))", env)?.a).toBeCloseTo(0.35, 3);
   });
 });
+
+describe("die Kaskade entscheidet ein echtes Element, keine Zeichenkette", () => {
+  it("`!important` schlägt eine spätere gewöhnliche Deklaration", () => {
+    // Vorher gewann schlicht, was später im Quelltext stand: `!important` wurde vom
+    // Wert abgeschnitten und danach nie wieder betrachtet.
+    const r = measure(
+      {
+        stylesheet: SHEET,
+        themes: { dark: ".p" },
+        grounds: [{ token: "--bg" }],
+        tokens: { "--bg": { role: "ground" }, "--fg": { role: "text" } },
+      },
+      ".p{--bg:#ffffff;--fg:#000000 !important}\n.p{--fg:#fefefe}",
+    );
+    // Gewinnt `!important` (schwarz), besteht die Messung; gewinnt das spätere
+    // Fast-Weiss, reisst sie.
+    expect(r.status).toBe("pass");
+  });
+
+  it("höhere Spezifität schlägt frühere Quellordnung nicht — aber spätere Quellordnung bei gleicher Spezifität", () => {
+    // Der spezifischere Block steht ZUERST und muss trotzdem gewinnen.
+    const r = measure(
+      {
+        stylesheet: SHEET,
+        themes: { dark: '.p[data-theme="dark"]' },
+        grounds: [{ token: "--bg" }],
+        tokens: { "--bg": { role: "ground" }, "--fg": { role: "text" } },
+      },
+      '.p[data-theme="dark"]{--fg:#000000}\n.p{--bg:#ffffff;--fg:#fefefe}',
+    );
+    expect(r.status).toBe("pass");
+  });
+
+  it("unlayered schlägt jede `@layer`", () => {
+    // CSS Cascade 5 §6.4.4: bei normalen Deklarationen gewinnt unlayered gegen jede
+    // Schicht — unabhängig von der Quellordnung.
+    const r = measure(
+      {
+        stylesheet: SHEET,
+        themes: { dark: ".p" },
+        grounds: [{ token: "--bg" }],
+        tokens: { "--bg": { role: "ground" }, "--fg": { role: "text" } },
+      },
+      ".p{--bg:#ffffff;--fg:#000000}\n@layer spaet{.p{--fg:#fefefe}}",
+    );
+    expect(r.status).toBe("pass");
+  });
+
+  it("der Universalselektor gilt wie eine Wurzel", () => {
+    // `*{--fg:…}` fiel durch die frühere Wurzel-Liste, wenn es nicht am Anfang stand.
+    const r = measure(
+      {
+        stylesheet: SHEET,
+        themes: { dark: ".p" },
+        grounds: [{ token: "--bg" }],
+        tokens: { "--bg": { role: "ground" }, "--fg": { role: "text" } },
+      },
+      ".p{--bg:#ffffff}\n*{--fg:#000000}",
+    );
+    expect(r.findings).toEqual([]);
+    expect(r.status).toBe("pass");
+  });
+
+  it("ein Block für NACHFAHREN des Themes gilt am Messpunkt nicht", () => {
+    // `.p[data-theme="dark"] .foo` deklariert Token auf einem Nachfahren. Am
+    // Messpunkt selbst gelten sie nicht — die frühere `includes()`-Regel nahm sie
+    // trotzdem, weil der Theme-Selektor im String vorkommt.
+    const r = measure(
+      {
+        stylesheet: SHEET,
+        themes: { dark: '.p[data-theme="dark"]' },
+        grounds: [{ token: "--bg" }],
+        tokens: { "--bg": { role: "ground" }, "--fg": { role: "text" } },
+      },
+      '.p[data-theme="dark"]{--bg:#ffffff;--fg:#000000}\n.p[data-theme="dark"] .foo{--fg:#fefefe}',
+    );
+    expect(r.status).toBe("pass");
+  });
+
+  it("ein fremdes Theme wird nicht angeborgt", () => {
+    // Fehlt `--fg` im dunklen Block, darf die dunkle Messung ihn NICHT aus dem
+    // hellen holen — sonst besteht eine unvollständige Palette.
+    const r = measure(
+      {
+        stylesheet: SHEET,
+        themes: { dark: '.p[data-theme="dark"]', light: '.p[data-theme="light"]' },
+        grounds: [{ token: "--bg" }],
+        tokens: { "--bg": { role: "ground" }, "--fg": { role: "text" } },
+      },
+      '.p[data-theme="dark"]{--bg:#ffffff}\n.p[data-theme="light"]{--bg:#ffffff;--fg:#000000}',
+    );
+    expect(r.findings.map((f) => f.problem)).toContain("unclassified");
+  });
+
+  it("`:is()` im Selektor wird als Selektor gelesen, nicht als Text", () => {
+    const r = measure(
+      {
+        stylesheet: SHEET,
+        themes: { dark: ".p" },
+        grounds: [{ token: "--bg" }],
+        tokens: { "--bg": { role: "ground" }, "--fg": { role: "text" } },
+      },
+      ":is(.q, .p){--bg:#ffffff;--fg:#000000}",
+    );
+    expect(r.findings).toEqual([]);
+    expect(r.combinations).toBeGreaterThan(0);
+  });
+
+  it("ein `@media`-Block bleibt aus der Standard-Umgebung heraus", () => {
+    const r = measure(
+      {
+        stylesheet: SHEET,
+        themes: { dark: ".p" },
+        grounds: [{ token: "--bg" }],
+        tokens: { "--bg": { role: "ground" }, "--fg": { role: "text" } },
+      },
+      ".p{--bg:#ffffff;--fg:#000000}\n@media (forced-colors:active){.p{--fg:#fefefe}}",
+    );
+    expect(r.status).toBe("pass");
+  });
+});
