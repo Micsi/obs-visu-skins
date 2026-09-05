@@ -350,11 +350,19 @@ function synthesizeContext(selector: string, doc: Document): Element | null {
   for (const [index, group] of groups.entries()) {
     const el = elementFor(group.nodes, doc);
     if (el === null) {
-      // `:root` als eigenes Compound: das IST das Wurzelelement, es lässt sich nicht
-      // als Kind bauen. Steht es am Ende, ist der Messpunkt `<html>`.
+      // `:root` im Compound: das IST das Wurzelelement, es lässt sich nicht als Kind
+      // bauen. Alles ANDERE im selben Compound gilt trotzdem und wird auf das
+      // Wurzelelement gelegt — `:root[data-theme="dark"]` ist ein gewöhnlicher
+      // Theme-Selektor, und ihn auf ein nacktes `documentElement` abzubilden hiess,
+      // die generische `:root`-Palette zu messen statt der themenspezifischen.
       if (group.nodes.some((n) => n.type === "pseudo" && a11yRootPseudo(n.value))) {
-        if (index === groups.length - 1) return doc.documentElement;
-        parent = doc.documentElement;
+        const root = doc.documentElement;
+        applyCompound(
+          group.nodes.filter((n) => !(n.type === "pseudo" && a11yRootPseudo(n.value))),
+          root,
+        );
+        if (index === groups.length - 1) return root;
+        parent = root;
         continue;
       }
       return null; // nicht darstellbar — wird als Befund gemeldet
@@ -374,25 +382,27 @@ function synthesizeContext(selector: string, doc: Document): Element | null {
 /** Ein Element aus EINEM Compound (Tag, Klassen, ID, Attribute). */
 function elementFor(nodes: readonly selectorParser.Node[], doc: Document): Element | null {
   let tag = "div";
-  const classes: string[] = [];
-  const attrs: [string, string][] = [];
-  let id = "";
   for (const node of nodes) {
     if (node.type === "tag") tag = node.value;
-    else if (node.type === "class") classes.push(node.value);
-    else if (node.type === "id") id = node.value;
-    else if (node.type === "attribute") {
-      const a = node as selectorParser.Attribute;
-      attrs.push([a.attribute, a.value ?? ""]);
-    } else if (node.type === "pseudo" && a11yRootPseudo(node.value)) {
-      return null; // vom Aufrufer behandelt
+    else if (node.type === "pseudo" && a11yRootPseudo(node.value)) {
+      return null; // vom Aufrufer behandelt: `:root` ist ein bestehendes Element
     }
   }
   const el = doc.createElement(tag === "*" ? "div" : tag);
-  for (const c of classes) el.classList.add(c);
-  if (id.length > 0) el.id = id;
-  for (const [name, value] of attrs) el.setAttribute(name, value);
+  applyCompound(nodes, el);
   return el;
+}
+
+/** Legt Klassen, ID und Attribute eines Compounds auf ein bestehendes Element. */
+function applyCompound(nodes: readonly selectorParser.Node[], el: Element): void {
+  for (const node of nodes) {
+    if (node.type === "class") el.classList.add(node.value);
+    else if (node.type === "id") el.id = node.value;
+    else if (node.type === "attribute") {
+      const a = node as selectorParser.Attribute;
+      el.setAttribute(a.attribute, a.value ?? "");
+    }
+  }
 }
 
 function a11yRootPseudo(value: string): boolean {
@@ -530,12 +540,38 @@ function matchesChain(selectors: readonly string[], element: Element): boolean {
  */
 function layerOrderOf(sources: readonly string[]): string[] {
   const seen: string[] = [];
+  /**
+   * ZUERST die ausdrücklichen Ordnungsanweisungen — `@layer overrides, base;` legt
+   * die Reihenfolge fest, BEVOR irgendein Block auftaucht, und sie hat Vorrang vor
+   * der Reihenfolge des ersten Vorkommens.
+   *
+   * Ohne das wurde die Ordnung aus den Blöcken abgeleitet: mit `@layer base { … }`
+   * gefolgt von `@layer overrides { … }` galt hier `overrides` als später, während
+   * der Browser der Anweisung folgt und `base` gewinnen lässt. Der Lauf mass dann
+   * den falschen der beiden Werte.
+   */
+  for (const css of sources) {
+    let root: postcss.Root;
+    try {
+      root = postcss.parse(css, { from: undefined });
+    } catch {
+      continue;
+    }
+    root.walkAtRules(/^layer$/i, (at) => {
+      if (at.nodes !== undefined) return; // ein Block, keine Anweisung
+      for (const name of postcss.list.comma(at.params)) {
+        const trimmed = name.trim();
+        if (trimmed.length > 0 && !seen.includes(trimmed)) seen.push(trimmed);
+      }
+    });
+  }
+  // Danach jede Schicht, die nur über einen Block bekannt wird.
   for (const css of sources) {
     for (const rule of parseRules(css)) {
       if (rule.layer.length > 0 && !seen.includes(rule.layer)) seen.push(rule.layer);
     }
   }
-  seen.push("");
+  seen.push(""); // unlayered gewinnt bei normalen Deklarationen gegen jede Schicht
   return seen;
 }
 

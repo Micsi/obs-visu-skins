@@ -191,3 +191,50 @@ describe("loadStyles folgt dem, was der Browser auch anwendet", () => {
     expect(out["@fremd/skin/fremd.css"]).toBe(".x{color:#444}");
   });
 });
+
+describe("Import-Formen und Import-Bedingungen", () => {
+  function manifestNaming2(sheet: string): SkinManifest {
+    return {
+      name: "probe",
+      targetsContract: "1.13",
+      unsupported: [],
+      widgets: {},
+      layout: { model: "list", honors: ["order"] },
+      a11y: { stylesheet: sheet, themes: {}, grounds: [], tokens: {} },
+    } as unknown as SkinManifest;
+  }
+
+  it("`url()` OHNE Anführungszeichen ist eine gültige Import-Form", () => {
+    // Der frühere Ausdruck verlangte ein Anführungszeichen direkt nach dem `url(`.
+    // `@import url(./components.css)` fehlte damit in `styles`, ganz ohne Befund.
+    const dir = mkdtempSync(join(tmpdir(), "obs-import-"));
+    writeFileSync(join(dir, "components.css"), ".c{color:#111}");
+    writeFileSync(join(dir, "entry.css"), "@import url(./components.css);\n.e{color:#333}");
+    const out = loadStyles(manifestNaming2("./entry.css"), join(dir, "manifest.json"), (id) => id);
+    expect(Object.values(out).join("\n")).toContain(".c{color:#111}");
+  });
+
+  it("eine Bedingung am Import bleibt am importierten Blatt", () => {
+    // `@import "./print.css" print` wurde als UNBEDINGTE Quelle eingelesen: ein
+    // `!important`-Vordergrund aus dem Druck-Blatt konnte den Bildschirm-Vordergrund
+    // überschreiben, und gemessen wurde eine Darstellung, die kein Bildschirm zeigt.
+    const dir = mkdtempSync(join(tmpdir(), "obs-import-"));
+    writeFileSync(join(dir, "print.css"), ".p{--fg:#000000 !important}");
+    writeFileSync(join(dir, "entry.css"), '@import "./print.css" print;\n.p{--fg:#777777}');
+    const out = loadStyles(manifestNaming2("./entry.css"), join(dir, "manifest.json"), (id) => id);
+    const imported = Object.entries(out).find(([k]) => k.includes("print.css"))!;
+    // Eingewickelt in genau die At-Regel, die der Browser anwendet — `parseRules`
+    // markiert sie dann von selbst als bedingt.
+    expect(imported[0]).toContain("print");
+    expect(imported[1]).toContain("@media print");
+  });
+
+  it("ein Import OHNE Bedingung wird nicht eingewickelt", () => {
+    const dir = mkdtempSync(join(tmpdir(), "obs-import-"));
+    writeFileSync(join(dir, "x.css"), ".x{color:#111}");
+    writeFileSync(join(dir, "entry.css"), '@import "./x.css";\n.e{color:#333}');
+    const out = loadStyles(manifestNaming2("./entry.css"), join(dir, "manifest.json"), (id) => id);
+    const imported = Object.entries(out).find(([k]) => k.includes("x.css"))!;
+    expect(imported[1]).not.toContain("@media");
+  });
+});

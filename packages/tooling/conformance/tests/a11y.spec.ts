@@ -1586,3 +1586,54 @@ describe("`atDefault` meint die Werkseinstellung, nicht nur den Stopp-Namen", ()
     expect(r.violationBreakdown.atDefault).toBe(0);
   });
 });
+
+describe("`@layer`-Ordnung und `:root` mit Constraints", () => {
+  it("eine ausdrückliche Ordnungsanweisung schlägt die Reihenfolge der Blöcke", () => {
+    // `@layer overrides, base;` legt die Reihenfolge fest, BEVOR ein Block auftaucht.
+    // Vorher wurde sie aus den Blöcken abgeleitet: `base` zuerst, `overrides` danach —
+    // hier galt `overrides` als später, während der Browser der Anweisung folgt und
+    // `base` gewinnen lässt. Gemessen wurde also der falsche der beiden Werte.
+    const r = measure(
+      {
+        stylesheet: SHEET,
+        themes: { dark: ".p" },
+        grounds: [{ token: "--bg" }],
+        tokens: { "--bg": { role: "ground" }, "--fg": { role: "text" } },
+      },
+      "@layer overrides, base;\n.p{--bg:#ffffff}\n@layer base{.p{--fg:#777777}}\n@layer overrides{.p{--fg:#000000}}",
+    );
+    // `base` steht in der Anweisung HINTEN und gewinnt: das reissende Grau.
+    expect(r.status).toBe("fail");
+    expect(r.violations.some((v) => v.token === "--fg")).toBe(true);
+  });
+
+  it("ohne Anweisung gilt weiter die Reihenfolge der Blöcke", () => {
+    // Die Gegenprobe: die Anweisung ist ein Zusatz, kein Ersatz.
+    const r = measure(
+      {
+        stylesheet: SHEET,
+        themes: { dark: ".p" },
+        grounds: [{ token: "--bg" }],
+        tokens: { "--bg": { role: "ground" }, "--fg": { role: "text" } },
+      },
+      ".p{--bg:#ffffff}\n@layer base{.p{--fg:#777777}}\n@layer overrides{.p{--fg:#000000}}",
+    );
+    expect(r.status).toBe("pass"); // `overrides` steht später und gewinnt
+  });
+
+  it("`:root[data-theme=…]` misst das Theme, nicht die generische Wurzel", () => {
+    // Der Selektor wurde auf ein nacktes `documentElement` abgebildet, das Attribut
+    // fiel weg — gemessen wurde die generische `:root`-Palette, während der Browser
+    // die themenspezifische anwendet.
+    const r = measure(
+      {
+        stylesheet: SHEET,
+        themes: { dark: ':root[data-theme="dark"]' },
+        grounds: [{ token: "--bg" }],
+        tokens: { "--bg": { role: "ground" }, "--fg": { role: "text" } },
+      },
+      ':root{--bg:#ffffff;--fg:#000000}\n:root[data-theme="dark"]{--fg:#777777}',
+    );
+    expect(r.status).toBe("fail");
+  });
+});

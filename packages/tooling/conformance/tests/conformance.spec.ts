@@ -131,11 +131,12 @@ describe("generateSupport — gap-hart", () => {
    */
   const marking =
     (...actions: string[]): Renderer =>
-    () => ({
-      type: "div",
-      props: {},
-      children: actions.map((a) => ({ type: "button", props: { "data-action": a }, children: a })),
-    });
+    () =>
+      vh(
+        "div",
+        {},
+        actions.map((a) => vh("button", { "data-action": a }, a)),
+      ) as never;
 
   it('meldet "gap" für ein deklariertes widget ohne passenden tiles-Renderer', async () => {
     const brokenManifest: SkinManifest = {
@@ -247,7 +248,7 @@ describe("generateSupport — gap-hart", () => {
   it("misst die Aktions-Achse am gerenderten Baum, nicht am Manifest", async () => {
     // Der Renderer markiert NICHTS — das Manifest behauptet trotzdem beide Aktionen.
     // Genau diese Lücke soll sichtbar werden: die Stufe folgt dem Baum.
-    const silent: Renderer = () => ({ type: "div", props: {}, children: [] });
+    const silent: Renderer = () => vh("div", {}, []) as never;
     const manifest: SkinManifest = {
       name: "claims-too-much",
       targetsContract: "1.10",
@@ -275,12 +276,11 @@ describe("generateSupport — gap-hart", () => {
   });
 
   it("zählt eine Aktion, die nur die Detailfläche markiert, als angeboten", async () => {
-    const silent: Renderer = () => ({ type: "div", props: {}, children: [] });
-    const toggleInDetail: Renderer = () => ({
-      type: "div",
-      props: { "data-action": "toggle" },
-      children: [{ type: "b", props: { "data-action": "setDim" }, children: "45" }],
-    });
+    const silent: Renderer = () => vh("div", {}, []) as never;
+    const toggleInDetail: Renderer = () =>
+      vh("div", { "data-action": "toggle" }, [
+        vh("b", { "data-action": "setDim" }, "45"),
+      ]) as never;
     const manifest: SkinManifest = {
       name: "detail-surface",
       targetsContract: "1.10",
@@ -302,11 +302,7 @@ describe("generateSupport — gap-hart", () => {
 
   it('meldet "broken", wenn ein Renderer eine nicht deklarierte Aktion markiert', async () => {
     // Goldene Regel 3: nicht verdrahtet darf nie vorgetäuscht werden.
-    const liar: Renderer = () => ({
-      type: "div",
-      props: { "data-action": "setDim" },
-      children: [],
-    });
+    const liar: Renderer = () => vh("div", { "data-action": "setDim" }, []) as never;
     const manifest: SkinManifest = {
       name: "pretender",
       targetsContract: "1.10",
@@ -323,11 +319,10 @@ describe("generateSupport — gap-hart", () => {
   });
 
   it("duldet universelle Host-Aktionen ohne Deklaration (§6)", async () => {
-    const hostMarks: Renderer = () => ({
-      type: "div",
-      props: { "data-action": "openDetail" },
-      children: [{ type: "button", props: { "data-action": "stop" }, children: "■" }],
-    });
+    const hostMarks: Renderer = () =>
+      vh("div", { "data-action": "openDetail" }, [
+        vh("button", { "data-action": "stop" }, "■"),
+      ]) as never;
     const manifest: SkinManifest = {
       name: "host-actions",
       targetsContract: "1.10",

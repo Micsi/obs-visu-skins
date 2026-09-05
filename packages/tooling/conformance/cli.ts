@@ -83,16 +83,45 @@ function readInto(
   if (seen.has(file)) return; // zyklische Importe: einmal reicht
   seen.add(file);
   const css = readFileSync(file, "utf8");
-  for (const m of css.matchAll(/@import\s+(?:url\(\s*)?["']([^"']+)["']/g)) {
-    const spec = m[1]!;
-    const importKey = `${key} → ${spec}`;
+  // Beide gültigen Formen des Ziels: `"…"`/`'…'` und `url(…)` MIT oder OHNE Quotes.
+  // Der frühere Ausdruck verlangte ein Anführungszeichen direkt nach dem `url(` und
+  // übersah `@import url(./components.css)` — das importierte Blatt fehlte dann in
+  // `styles`, ohne dass ein Befund entstand.
+  const IMPORT =
+    /@import\s+(?:url\(\s*(?:"([^"]*)"|'([^']*)'|([^)\s]+))\s*\)|"([^"]*)"|'([^']*)')([^;]*)/g;
+  for (const m of css.matchAll(IMPORT)) {
+    const spec = m[1] ?? m[2] ?? m[3] ?? m[4] ?? m[5];
+    if (spec === undefined || spec.length === 0) continue;
+    // Alles nach dem Ziel bis zum `;` ist die Bedingung: Layer, `supports()` und die
+    // Medienabfrage (`@import "./print.css" print`).
+    const condition = (m[6] ?? "").trim();
+    const importKey = `${key} → ${spec}${condition.length > 0 ? ` ${condition}` : ""}`;
     try {
       const target = spec.startsWith(".")
         ? join(dirname(file), spec)
         : isAbsolute(spec)
           ? spec
           : resolve(spec);
+      const before = new Set(Object.keys(out));
       readInto(out, importKey, target, resolve, seen);
+      /**
+       * Eine BEDINGUNG am Import gilt für das ganze importierte Blatt, und sie darf
+       * nicht verlorengehen: `@import "./print.css" print` wurde als unbedingte
+       * Quelle eingelesen, und ein `!important`-Vordergrund aus dem Druck-Blatt
+       * konnte einen kontrastschwachen Bildschirm-Vordergrund überschreiben — der
+       * Lauf mass dann eine Darstellung, die kein Bildschirm zeigt.
+       *
+       * Statt die Bedingung durch die ganze Kette zu reichen, wird der Inhalt in
+       * genau die At-Regel eingewickelt, die er im Browser bekäme. `parseRules`
+       * markiert ihn dann von selbst als `conditional`, und er bleibt aus der
+       * Standard-Umgebung heraus.
+       */
+      if (condition.length > 0 && !/^layer\b/i.test(condition)) {
+        for (const k of Object.keys(out)) {
+          if (before.has(k) || out[k] === undefined || out[k]!.length === 0) continue;
+          out[k] = `@media ${condition} {\n${out[k]}\n}`;
+        }
+      }
     } catch {
       out[importKey] = ""; // unauflösbar -> `stylesheet-unreadable`
     }
