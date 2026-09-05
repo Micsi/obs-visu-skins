@@ -137,6 +137,15 @@ async function main(argv: readonly string[]): Promise<number> {
     process.stderr.write(`conformance failure in ${report.skin}:\n${failures}\n`);
     return 1;
   }
+  // Bestanden — aber eine eingeräumte Lücke in der Deckung darf nicht lautlos
+  // durchgehen. Sie steht im Report (`checkedTweakExtremes: false`); hier steht sie
+  // zusätzlich im CI-Log, damit sie beim Lesen des grünen Laufs auffällt.
+  if (report.a11y && !report.a11y.checkedTweakExtremes) {
+    process.stderr.write(
+      `conformance note in ${report.skin}: a11y bestanden ueber ${report.a11y.combinations} Paarung(en), ` +
+        `aber die Tweak-Deckung ist eingeraeumt unvollstaendig (checkedTweakExtremes: false)\n`,
+    );
+  }
   return 0;
 }
 

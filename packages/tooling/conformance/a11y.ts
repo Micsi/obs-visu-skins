@@ -819,15 +819,29 @@ export function measureA11y(input: A11yInput): SupportA11y {
     }
   }
 
-  // "Extreme geprüft" heisst dreierlei: jede deklarierte Achse hat einen Stopp
-  // erzeugt, KEIN Tweak ist unklassifiziert geblieben, und keiner ist als
-  // farbwirksam-aber-nicht-erfassbar eingeräumt. Ein Skin ohne Tweaks (terminal)
-  // hat nichts anzufahren — dort ist die Aussage trivial wahr, und der Report zeigt
-  // `tweakStops: ["default"]`, die Aussage bleibt also nachlesbar.
-  const checkedTweakExtremes =
-    (axes.length === 0 || stops.length > 1) &&
-    !unclassifiedTweak &&
-    Object.keys(unmeasuredTweaks).length === 0;
+  // Zwei Arten von Loch in der Deckung, und sie wiegen NICHT gleich schwer.
+  //
+  // STILL: eine deklarierte Achse, die keinen Stopp erzeugt hat (Tippfehler im
+  // `values`, leere Liste), oder ein Tweak, den das Manifest gar nicht einordnet.
+  // Beides behauptet Deckung, die es nicht gibt — der Report würde lügen, also
+  // fällt der Skin durch. `unclassifiedTweak` erzeugt zusätzlich ein `finding`,
+  // die Ratsche liegt damit doppelt.
+  //
+  // EINGERÄUMT: `unmeasuredTweaks` — farbwirksam, aber von dieser Fläche nicht
+  // erfassbar, MIT Begründung (eine leere Begründung ist ein `finding`, also
+  // wieder fail). Das ist eine wahre Aussage über eine echte Grenze des
+  // Messwerkzeugs, kein Mangel des Skins: ionic schaltet `stil`/`accentStyle`
+  // über data-Attribute ein anderes Regelwerk frei, nicht über eine Variable.
+  // Solange diese Fläche nur Variablen-Achsen modelliert, ist dort KEIN
+  // ehrlicher Weg zu voller Deckung — ein Gate, das darauf besteht, ist
+  // strukturell unerreichbar und bestraft die Ehrlichkeit (openbridgeserver#181).
+  //
+  // Der Vertrag hält beide Aussagen schon getrennt: `aa` sagt "über alles
+  // Gemessene bestanden", `checkedTweakExtremes` sagt "es war alles Messbare".
+  // Nur die erste ist das Urteil; die zweite bleibt im Report sichtbar, damit
+  // die eingeräumte Lücke nicht verschwindet.
+  const silentGap = !(axes.length === 0 || stops.length > 1) || unclassifiedTweak;
+  const checkedTweakExtremes = !silentGap && Object.keys(unmeasuredTweaks).length === 0;
 
   const measurements: A11yMeasurement[] = [];
   const violations: A11yMeasurement[] = [];
@@ -1027,17 +1041,9 @@ export function measureA11y(input: A11yInput): SupportA11y {
         "die Deklaration erzeugte KEINE einzige Messung — ein Wächter, der nie fällt, beweist nichts",
     });
   }
-  // `checkedTweakExtremes` gehört IN das Urteil, nicht nur in den Report. Vorher
-  // wurde das Flag auf `false` gesetzt, wenn `unmeasuredTweaks` einen farbwirksamen
-  // Tweak einräumt — floss aber nirgends ein: ein Manifest konnte `status: "pass"`
-  // und `aa: true` bekommen, und `generateSupport` behandelte das Gate als
-  // bestanden, weil es nur den Status prüft. Ein eingeräumt ungeprüftes Extrem ist
-  // eine Lücke in der Messung, also kein `pass` (Goldene Regel 3 + 6).
+  // Ins Urteil geht das STILLE Loch (siehe oben), nicht das eingeräumte.
   const ok =
-    violations.length === 0 &&
-    findings.length === 0 &&
-    measurements.length > 0 &&
-    checkedTweakExtremes;
+    violations.length === 0 && findings.length === 0 && measurements.length > 0 && !silentGap;
 
   const deduped = dedupe(findings);
   return {

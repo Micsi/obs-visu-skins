@@ -674,12 +674,13 @@ describe("Der Rückfall-Boden borgt keine Farbe aus einem fremden Theme (F12)", 
   });
 });
 
-describe("Zugestandene und unauflösbare Extreme dürfen kein `pass` sein (F14 · F15)", () => {
-  it("F14 — `checkedTweakExtremes: false` verhindert jetzt das Bestehen", () => {
-    // `unmeasuredTweaks` räumt einen farbwirksamen, nicht erfassbaren Tweak ein.
-    // Das Flag stand im Report und floss NIRGENDS ein: der Skin bekam `pass` und
-    // `aa: true`, und das CLI hielt das Gate für bestanden, weil es nur den Status
-    // prüft. Ein eingeräumt ungeprüftes Extrem ist eine Lücke in der Messung.
+describe("Zugestandene und stille Lücken in der Deckung (F14 · F15)", () => {
+  it("F14 — ein EINGERÄUMTER Tweak senkt die Deckung, nicht das Urteil", () => {
+    // `unmeasuredTweaks` räumt einen farbwirksamen, von dieser Fläche nicht
+    // erfassbaren Tweak ein. Das war zeitweise ein `fail` — und machte das Gate
+    // für attributgeschaltete Skins strukturell unerreichbar: es gibt dort keinen
+    // ehrlichen Weg zu voller Deckung, also bestrafte die Latte die Ehrlichkeit
+    // (openbridgeserver#181). Der Vertrag hält beide Aussagen ohnehin getrennt.
     const decl = {
       ...PASSING_DECL,
       unmeasuredTweaks: {
@@ -687,13 +688,36 @@ describe("Zugestandene und unauflösbare Extreme dürfen kein `pass` sein (F14 �
       },
     };
     const r = measure(decl, PASSING_CSS, { stil: { type: "select", options: ["glass", "ios"] } });
-    // Alles andere ist sauber: keine Verstösse, keine Deklarations-Befunde …
     expect(r.violationCount).toBe(0);
     expect(r.findings).toEqual([]);
-    // … und trotzdem kein `pass`, weil die Extreme zugestanden ungeprüft sind.
+    // Das Urteil folgt dem Gemessenen …
+    expect(r.status).toBe("pass");
+    expect(r.aa).toBe(true);
+    // … die Lücke bleibt trotzdem im Report stehen und verschwindet nicht.
+    expect(r.checkedTweakExtremes).toBe(false);
+    expect(r.unmeasuredTweaks).toHaveProperty("stil");
+  });
+
+  it("F14 — ein VERSCHWIEGENER Tweak fällt weiter durch", () => {
+    // Die Gegenprobe zur Lockerung: derselbe farbwirksame Tweak, nur eben nirgends
+    // eingeordnet. Hier behauptet der Report Deckung, die es nicht gibt — und das
+    // bleibt ein Fehler, sonst wäre `unmeasuredTweaks` bloss die mühsamere Variante
+    // desselben Schweigens.
+    const r = measure(PASSING_DECL, PASSING_CSS, {
+      stil: { type: "select", options: ["glass", "ios"] },
+    });
     expect(r.checkedTweakExtremes).toBe(false);
     expect(r.status).toBe("fail");
     expect(r.aa).toBe(false);
+    expect(r.findings.map((f) => f.problem)).toContain("undeclared-tweak");
+  });
+
+  it("F14 — eine Einräumung OHNE Begründung fällt durch", () => {
+    // Die zweite Gegenprobe: die Einräumung trägt nur, weil sie eine Aussage ist.
+    const decl = { ...PASSING_DECL, unmeasuredTweaks: { stil: "  " } };
+    const r = measure(decl, PASSING_CSS, { stil: { type: "select", options: ["glass", "ios"] } });
+    expect(r.status).toBe("fail");
+    expect(r.findings.map((f) => f.problem)).toContain("exempt-without-reason");
   });
 
   it("F14 — derselbe Skin ohne das Zugeständnis besteht", () => {
