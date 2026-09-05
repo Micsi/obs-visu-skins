@@ -114,6 +114,9 @@ importers:
       '@obs-visu-skins/terminal':
         specifier: workspace:*
         version: link:../../skins/terminal
+      '@types/culori':
+        specifier: ^4.0.1
+        version: 4.0.1
       '@types/jsdom':
         specifier: ^21.1.7
         version: 21.1.7
@@ -789,6 +792,9 @@ packages:
         optional: true
       vue-router:
         optional: true
+
+  '@types/culori@4.0.1':
+    resolution: {integrity: sha512-43M51r/22CjhbOXyGT361GZ9vncSVQ39u62x5eJdBQFviI8zWp2X5jzqg7k4M6PVgDQAClpy2bUe2dtwEgEDVQ==}
 
   '@types/estree@1.0.9':
     resolution: {integrity: sha512-GhdPgy1el4/ImP05X05Uw4cw2/M93BCUmnEvWZNStlCzEKME4Fkk+YpoA5OiHNQmoS7Cafb8Xa3Pya8m1Qrzeg==}
@@ -2092,6 +2098,8 @@ snapshots:
       vue: 3.5.35(typescript@5.9.3)
     optionalDependencies:
       '@stencil/core': 4.43.5
+
+  '@types/culori@4.0.1': {}
 
   '@types/estree@1.0.9': {}
 

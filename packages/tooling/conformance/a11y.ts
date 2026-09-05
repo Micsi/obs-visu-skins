@@ -59,6 +59,8 @@
 //     Tweak die Farbe verschiebt — eine ungedeckte positive Aussage.
 
 import postcss from "postcss";
+import valueParser from "postcss-value-parser";
+import { converter as culoriConverter, parse as culoriParse } from "culori";
 import {
   schema as contractSchema,
   type A11yGround,
@@ -392,8 +394,93 @@ export const COLOR_SHAPED =
  * vorbei wie ein Hexwert. Die benannten Farben stehen als Wortgrenze, damit
  * `border` (enthält „red") nicht anschlägt.
  */
-export const COLOR_BEARING =
-  /(#[0-9a-f]{3,8}\b|\b(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch|color|color-mix|light-dark)\(|\b(?:red|blue|green|black|white|gray|grey|yellow|orange|purple|pink|brown|cyan|magenta|silver|gold|navy|teal|olive|maroon|lime|aqua|fuchsia|indigo|violet|beige|ivory|khaki|coral|salmon|crimson|turquoise|lavender|plum|tan|azure|orchid|tomato|wheat|linen|snow|seashell|honeydew|currentcolor)\b)/i;
+/**
+ * Trägt dieser Wert IRGENDWO eine Farbe?
+ *
+ * Die Frage ist eine andere als „ist das eine Farbe" ({@link resolveColor}): hier
+ * geht es um Werte wie `2px solid #d6a800` oder `linear-gradient(…)`, die Farbe
+ * enthalten, ohne selbst eine flache Farbe zu sein. Sie sind ein BEFUND — nicht
+ * zwingend falsch, aber nicht messbar, und stilles Überspringen wäre wieder der
+ * Ausweg, den diese Fläche sonst überall zumauert.
+ *
+ * Über den Wert-Parser statt über einen Regex auf dem Rohtext, und das behebt zwei
+ * Fehlurteile: die frühere Wortliste schlug in JEDEM Vorkommen an, also auch im
+ * NAMEN einer Variablen (`var(--red-thing)`, `--tomato-border`) — und sie war eine
+ * Liste, blieb also zwangsläufig hinter der Menge der benannten Farben zurück.
+ * Hier entscheidet culori, was ein Farbwort ist, und der Name einer Variablen wird
+ * gar nicht erst angesehen.
+ */
+export function bearsColor(value: string): boolean {
+  let found = false;
+  let parsed;
+  try {
+    parsed = valueParser(value);
+  } catch {
+    return false;
+  }
+  parsed.walk((node) => {
+    if (found) return false;
+    if (node.type === "function") {
+      const fn = node.value.toLowerCase();
+      if (COLOR_FUNCTIONS.has(fn)) {
+        found = true;
+        return false;
+      }
+      if (fn === "var") {
+        // Nur der RÜCKFALL trägt möglicherweise Farbe; der Name nie.
+        const divider = node.nodes.findIndex((n) => n.type === "div" && n.value === ",");
+        if (divider >= 0 && bearsColor(valueParser.stringify(node.nodes.slice(divider + 1)))) {
+          found = true;
+        }
+        return false;
+      }
+      if (fn === "url") return false; // `url(#gradient)` ist kein Farbwert
+      return undefined; // in gewöhnliche Funktionen absteigen (z. B. `linear-gradient`)
+    }
+    if (node.type === "string") return false; // `content: "#1"` ist Text
+    if (node.type === "word") {
+      const w = node.value;
+      if (w.startsWith("--")) return false;
+      if (/^currentcolor$/i.test(w)) {
+        found = true;
+        return false;
+      }
+      // `transparent` ist eine gültige Farbe, aber keine sichtbare: `background:
+      // transparent` umgeht keine Palette und darf kein Befund sein.
+      if (/^transparent$/i.test(w)) return false;
+      if (isCssColorWord(w)) found = true;
+    }
+    return undefined;
+  });
+  return found;
+}
+
+/**
+ * Ein einzelnes Wort, das für CSS eine Farbe IST: `#…` oder ein benannter Ton.
+ *
+ * Der Umweg über die Form ist nötig, weil culori kulanter ist als CSS und eine
+ * Hexfolge auch OHNE Raute annimmt — `font-weight: 600` käme sonst als dunkles Rot
+ * zurück und jede Gewichtsangabe im Blatt wäre ein Phantom-Befund.
+ */
+function isCssColorWord(word: string): boolean {
+  if (!word.startsWith("#") && !/^[a-z]+$/i.test(word)) return false;
+  return culoriParse(word) !== undefined;
+}
+
+const COLOR_FUNCTIONS = new Set([
+  "rgb",
+  "rgba",
+  "hsl",
+  "hsla",
+  "hwb",
+  "lab",
+  "lch",
+  "oklab",
+  "oklch",
+  "color",
+  "color-mix",
+  "light-dark",
+]);
 
 function clamp255(n: number): number {
   return Math.max(0, Math.min(255, Math.round(n)));
@@ -478,74 +565,139 @@ function splitTop(input: string, sep: string): string[] {
 // `cascadeValue`: er entscheidet, welche Deklaration gewinnt, nicht welchen Wert sie hat.
 
 /**
- * Löst einen CSS-Farbwert zu {@link Rgba} auf. Beherrscht die Formen, die ein
- * Skin-Stylesheet für PALETTE-Token real benutzt: Hex (3/4/6/8), `rgb()`/`rgba()`
- * in Komma- und Slash-Syntax, `var()` mit Fallback, `transparent`. Alles andere
- * gibt `null` — und `null` ist ein Befund, kein Überspringen.
+ * Löst einen CSS-Farbwert zu {@link Rgba} auf — in denselben zwei Schritten, in
+ * denen ein Browser es tut.
+ *
+ * ══ Schritt 1: SUBSTITUTION
+ *
+ * `var()` wird TEXTUELL ersetzt, bevor überhaupt jemand weiss, ob ein Farbwert
+ * herauskommt. Der Rückfall greift genau dann, wenn die Bindung fehlt oder
+ * *garantiert ungültig* ist (leer, `initial`) — NICHT, wenn sie einen Wert hat, der
+ * an der verbrauchenden Eigenschaft nichts taugt. Der frühere Code nahm den Rückfall
+ * bei jedem Parse-Fehlschlag, und das war messbar falsch: `--raw: 20px;
+ * --fg: var(--raw, #fff)` ist für CSS eine gültige Custom Property, `color` wird
+ * damit ungültig und ERBT — auf schwarzem Grund also Schwarz auf Schwarz, während
+ * hier Weiss mit 21:1 gemessen wurde und der Skin `pass` bekam.
+ *
+ * ══ Schritt 2: PARSEN, von **culori**
+ *
+ * Erst der substituierte Text wird als Farbe gelesen, und dafür steht eine
+ * Bibliothek statt eines Regex: `#rgb`/`#rgba`/`#rrggbb`/`#rrggbbaa`, `rgb()`/`rgba()`
+ * in Komma-, Leerzeichen- und Slash-Syntax, Prozent- und Bruchkanäle, `hsl()`,
+ * `hwb()`, `lab()`, `lch()`, `oklab()`, `oklch()`, `color()` und die benannten
+ * Farben. Jede dieser Formen war einmal ein eigener Review-Befund am Eigenbau
+ * (fehlende Syntaxen, kaputte Prozentkanäle, verschluckte Nachkommastellen,
+ * Tabulator statt Leerzeichen, fehlendes Clamping des Alphas).
+ *
+ * Was culori nicht kann, macht Schritt 1 vorher: `calc()` wird über
+ * {@link resolveNumber} zu einer Zahl ausgerechnet — ionics `--vz-tile-bg` steht als
+ * `rgba(35, 40, 48, calc(var(--vz-tile-alpha) * 0.7))` im Blatt.
+ *
+ * `null` heisst weiterhin: BEFUND, kein stilles Überspringen.
  */
 export function resolveColor(value: string, env: Map<string, string>, depth = 0): Rgba | null {
+  const substituted = substituteVars(value, env, depth);
+  if (substituted === null) return null;
+  return parseColor(substituted);
+}
+
+/** Ist diese Bindung *garantiert ungültig* — der einzige Fall, der den Rückfall zieht? */
+function guaranteedInvalid(bound: string | undefined): boolean {
+  if (bound === undefined) return true;
+  const t = bound.trim();
+  return t.length === 0 || /^initial$/i.test(t);
+}
+
+/**
+ * Ersetzt jedes `var()` durch seinen Text, rekursiv. Liefert `null` bei einem Zyklus
+ * oder wenn eine Bindung fehlt UND kein Rückfall dasteht — dann hat der Browser
+ * nichts zu berechnen, und wir haben nichts zu messen.
+ */
+function substituteVars(value: string, env: Map<string, string>, depth = 0): string | null {
   if (depth > 16) return null;
-  const v = value.trim();
+  const parsed = valueParser(value);
+  let failed = false;
 
-  if (/^transparent$/i.test(v)) return { r: 0, g: 0, b: 0, a: 0 };
-
-  const hex = /^#([0-9a-f]{3,8})$/i.exec(v);
-  if (hex) {
-    const h = hex[1]!;
-    const expand = (s: string): number => parseInt(s.length === 1 ? s + s : s, 16);
-    if (h.length === 3 || h.length === 4) {
-      return {
-        r: expand(h[0]!),
-        g: expand(h[1]!),
-        b: expand(h[2]!),
-        a: h.length === 4 ? expand(h[3]!) / 255 : 1,
-      };
+  parsed.walk((node) => {
+    if (node.type !== "function" || node.value.toLowerCase() !== "var") return undefined;
+    // `var(--name, rest…)`: der erste Knoten ist der Name, alles nach dem ersten
+    // Trenner ist der Rückfall — samt eigener Kommas, die dort erlaubt sind.
+    const nodes = node.nodes;
+    const name = nodes[0]?.type === "word" ? nodes[0].value : "";
+    if (!name.startsWith("--")) {
+      failed = true;
+      return false;
     }
-    if (h.length === 6 || h.length === 8) {
-      return {
-        r: parseInt(h.slice(0, 2), 16),
-        g: parseInt(h.slice(2, 4), 16),
-        b: parseInt(h.slice(4, 6), 16),
-        a: h.length === 8 ? parseInt(h.slice(6, 8), 16) / 255 : 1,
-      };
+    const divider = nodes.findIndex((n) => n.type === "div" && n.value === ",");
+    const fallback = divider >= 0 ? valueParser.stringify(nodes.slice(divider + 1)).trim() : undefined;
+    const bound = env.get(name);
+    const chosen = guaranteedInvalid(bound) ? fallback : bound;
+    if (chosen === undefined) {
+      failed = true;
+      return false;
     }
-    return null;
-  }
-
-  // `--name` bewusst ohne `\w`: Custom-Property-Namen folgen der vollen
-  // `<dashed-ident>`-Grammatik und dürfen Nicht-ASCII enthalten.
-  const variable = /^var\(\s*(--[^\s,)]+)\s*(?:,([\s\S]*))?\)$/.exec(v);
-  if (variable) {
-    const bound = env.get(variable[1]!);
-    const fallback = variable[2];
-    if (bound !== undefined) {
-      const resolved = resolveColor(bound, env, depth + 1);
-      if (resolved !== null) return resolved;
-      // Der Rückfall greift NICHT nur bei fehlendem Token: auch ein
-      // garantiert-ungültiger Wert (`initial`) oder eine zyklische Bindung lässt
-      // den Browser auf den Rückfall gehen. `--optional: initial; --fg:
-      // var(--optional, #fff)` ist gültiges CSS und berechnet `#fff` — hier galt
-      // es als `unresolvable`, weil der Token ja "existiert".
-      return fallback !== undefined ? resolveColor(fallback, env, depth + 1) : null;
+    const inner = substituteVars(chosen, env, depth + 1);
+    if (inner === null) {
+      failed = true;
+      return false;
     }
-    return fallback !== undefined ? resolveColor(fallback, env, depth + 1) : null;
-  }
+    // Den Funktionsknoten durch den eingesetzten Text ersetzen.
+    const replacement = valueParser(inner).nodes;
+    Object.assign(node, {
+      type: "word",
+      value: valueParser.stringify(replacement),
+      nodes: undefined,
+    });
+    return false; // nicht in den ersetzten Text absteigen
+  });
 
-  const fn = /^rgba?\(([\s\S]*)\)$/i.exec(v);
-  if (fn) {
-    const [head, alphaPart] = splitTop(fn[1]!, "/");
-    const channels = splitTop((head ?? "").replace(/,/g, " ").trim(), " ");
-    if (channels.length < 3) return null;
-    const nums = channels.slice(0, 3).map((c) => resolveNumber(c, env, depth + 1));
-    // Prozentkanäle: resolveNumber liefert 0..1, rgb() meint 0..255.
-    const rgb = nums.map((n, i) => (n === null ? null : /%$/.test(channels[i]!) ? n * 255 : n));
-    if (rgb.some((n) => n === null)) return null;
-    const alphaText = alphaPart ?? channels[3];
-    const a = alphaText === undefined ? 1 : resolveNumber(alphaText, env, depth + 1);
-    if (a === null) return null;
-    return { r: clamp255(rgb[0]!), g: clamp255(rgb[1]!), b: clamp255(rgb[2]!), a };
-  }
-  return null;
+  if (failed) return null;
+  return resolveCalcs(parsed.toString(), env, depth);
+}
+
+/**
+ * Rechnet `calc()`-Ausdrücke zu Zahlen aus, damit der Farb-Parser einen Wert sieht.
+ * Bleibt bewusst auf das beschränkt, was eine Palette braucht (Produkte von Zahlen
+ * und Prozenten); alles andere bleibt stehen und scheitert dann sichtbar am Parsen.
+ */
+function resolveCalcs(text: string, env: Map<string, string>, depth: number): string {
+  if (!/calc\(/i.test(text)) return text;
+  const parsed = valueParser(text);
+  parsed.walk((node) => {
+    if (node.type !== "function" || node.value.toLowerCase() !== "calc") return undefined;
+    const n = resolveNumber(valueParser.stringify(node), env, depth + 1);
+    if (n === null) return false;
+    Object.assign(node, { type: "word", value: String(n), nodes: undefined });
+    return false;
+  });
+  return parsed.toString();
+}
+
+const toRgb = culoriConverter("rgb");
+
+/** Der reine Farb-Parser: substituierter Text rein, {@link Rgba} raus. */
+function parseColor(text: string): Rgba | null {
+  const t = text.trim();
+  if (t.length === 0) return null;
+  // Derselbe Riegel wie in `isCssColorWord`: ohne ihn wäre `--fg: 600` ein gültiger
+  // Farbwert, weil culori Hex auch ohne Raute annimmt. CSS tut das nicht.
+  if (/^[0-9a-f]+$/i.test(t) && !t.startsWith("#")) return null;
+  const parsed = culoriParse(t);
+  if (parsed === undefined) return null;
+  const rgb = toRgb(parsed);
+  if (rgb === undefined) return null;
+  // Ausserhalb von sRGB (weite `oklch`-Werte) wird geklemmt: WCAG rechnet auf sRGB,
+  // und ein Kanal jenseits der Grenze ist auf dem Schirm auch nicht darstellbar.
+  const to255 = (c: number): number => clamp255(Math.round(c * 255));
+  const alpha = rgb.alpha ?? 1;
+  return {
+    r: to255(rgb.r),
+    g: to255(rgb.g),
+    b: to255(rgb.b),
+    // CSS klemmt Alpha auf 0…1; ohne das rechnete `composite` mit einem Wert, den
+    // der Browser nie anwendet.
+    a: Math.min(1, Math.max(0, alpha)),
+  };
 }
 
 /* --------------------------------------------------------------- WCAG 2.1 */
@@ -1176,7 +1328,7 @@ export function measureA11y(input: A11yInput): SupportA11y {
           problem: "unclassified",
           detail: `${selector}: ${name} = "${value}" ist eine Farbe ohne Rolle in a11y.tokens`,
         });
-      } else if (COLOR_BEARING.test(value)) {
+      } else if (bearsColor(value)) {
         seen.add(name);
         findings.push({
           problem: "unclassified",
@@ -1198,11 +1350,10 @@ export function measureA11y(input: A11yInput): SupportA11y {
     // und keinen erklärten Grund, und ein stilles Überspringen wäre wieder genau
     // der Ausweg, den diese Datei sonst überall zumauert.
     for (const [selector, prop, value] of allPlainDeclarations(sources)) {
-      // Strings und `url()` tragen keine Farbe, können aber `#…` enthalten
-      // (`url(#gradient)`, `content: "#1"`) — sonst schlüge der Wächter falsch an,
-      // und ein falsch anschlagender Wächter wird ignoriert.
-      const probe = value.replace(/url\([^)]*\)/gi, "").replace(/"[^"]*"|'[^']*'/g, "");
-      if (!COLOR_BEARING.test(probe)) continue;
+      // Strings und `url()` überspringt `bearsColor` selbst — sie können `#…`
+      // enthalten (`url(#gradient)`, `content: "#1"`), ohne Farbe zu tragen, und ein
+      // falsch anschlagender Wächter wird ignoriert.
+      if (!bearsColor(value)) continue;
       findings.push({
         problem: "unclassified",
         detail: `${selector}: ${prop}: ${value} — eine Farbe an a11y.tokens vorbei. Führe sie über einen deklarierten Token (var(--…)), sonst ist sie ungemessen.`,

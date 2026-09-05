@@ -29,6 +29,7 @@
     "@obs-visu-skins/edomi": "workspace:*",
     "@obs-visu-skins/ionic": "workspace:*",
     "@obs-visu-skins/terminal": "workspace:*",
+    "@types/culori": "^4.0.1",
     "@types/jsdom": "^21.1.7",
     "vitest": "^2.1.8"
   }

@@ -13,7 +13,7 @@
 import { describe, expect, it } from "vitest";
 import type { SkinManifest } from "@obs/visu-contract";
 import {
-  COLOR_BEARING,
+  bearsColor,
   composite,
   contrast,
   declarations,
@@ -732,20 +732,26 @@ describe("Zugestandene und stille Lücken in der Deckung (F14 · F15)", () => {
   });
 
   it("F15 — ein Vordergrund, der erst am Extrem unauflösbar wird, wird gemeldet", () => {
-    // Unauflösbare Vordergründe wurden NUR am Default-Stopp gemeldet. Ein Tweak,
-    // der auf eine benannte CSS-Farbe abbildet, lieferte am Default einen
-    // messbaren Hexwert und an jedem Extrem `null` — und der Report sagte weiter
-    // `checkedTweakExtremes: true` und `pass`, obwohl dort nichts gemessen wurde.
+    // Unauflösbare Vordergründe wurden NUR am Default-Stopp gemeldet: ein Tweak
+    // lieferte am Default einen messbaren Hexwert und an jedem Extrem `null` — und
+    // der Report sagte weiter `checkedTweakExtremes: true` und `pass`, obwohl dort
+    // nichts gemessen wurde.
+    //
+    // Der Fall stand ursprünglich mit `red`, weil der frühere Farb-Parser benannte
+    // Farben nicht kannte. culori kennt sie, und das ist die bessere Messung — der
+    // Fall braucht deshalb einen Wert, der wirklich keine Farbe IST.
     const decl = {
       ...PASSING_DECL,
       tokens: { ...PASSING_DECL.tokens, "--dot": { role: "graphic", on: ["--bg"] } },
       tweakAxes: [{ tweak: "ton", cssVar: "--dot" }],
     };
-    const r = measure(decl, PASSING_CSS, { ton: { type: "select", options: ["red"] } });
-    expect(r.tweakStops).toEqual(["default", "ton=red"]);
+    const r = measure(decl, PASSING_CSS, {
+      ton: { type: "select", options: ["linear-gradient(red, blue)"] },
+    });
+    expect(r.tweakStops).toEqual(["default", "ton=linear-gradient(red, blue)"]);
     const hit = r.findings.find((f) => f.problem === "unresolvable");
     expect(hit, "der Stopp, an dem nichts mehr auflösbar ist, muss auftauchen").toBeDefined();
-    expect(hit!.detail).toContain("ton=red");
+    expect(hit!.detail).toContain("ton=linear-gradient(red, blue)");
     expect(r.status).toBe("fail");
   });
 
@@ -791,13 +797,42 @@ describe("CSS-Parsen — der Waechter darf nicht an der Schreibweise scheitern",
   it("erkennt auch die Farbsyntaxen jenseits von Hex und rgb()", () => {
     // Fehlt eine Syntax im Praedikat, faellt die Deklaration stillschweigend aus
     // der Messung — `color: red` ist genauso an der Palette vorbei wie ein Hexwert.
-    for (const v of ["red", "oklch(70% 0.1 200)", "lab(50% 20 -30)", "hwb(90 10% 10%)"]) {
-      expect(COLOR_BEARING.test(v), v).toBe(true);
+    for (const v of [
+      "red",
+      "oklch(70% 0.1 200)",
+      "lab(50% 20 -30)",
+      "hwb(90 10% 10%)",
+      "2px solid #d6a800",
+      "linear-gradient(rebeccapurple, blue)",
+      "color-mix(in oklab, red, blue)",
+      "currentcolor",
+    ]) {
+      expect(bearsColor(v), v).toBe(true);
     }
-    // Gegenprobe: kein Fehlalarm auf Woertern, die eine Farbe nur ENTHALTEN.
-    for (const v of ["1px solid", "border-box", "inherit"]) {
-      expect(COLOR_BEARING.test(v), v).toBe(false);
+    // Gegenprobe: kein Fehlalarm auf Woertern, die eine Farbe nur ENTHALTEN — und
+    // vor allem nicht auf dem NAMEN einer Variablen. Die frühere Wortliste schlug in
+    // `var(--red-thing)` an und meldete einen Phantom-Befund.
+    for (const v of [
+      "1px solid",
+      "border-box",
+      "inherit",
+      "var(--red-thing)",
+      "var(--tomato-border)",
+      'content: "#1"'.slice(9),
+      "url(#gradient)",
+      // culori nimmt Hex auch OHNE Raute — CSS nicht. Ohne diesen Riegel waere jede
+      // Gewichts- oder Zeitangabe im Blatt ein Phantom-Befund.
+      "600",
+      "700",
+      // `transparent` ist eine gueltige Farbe, aber keine sichtbare: sie umgeht
+      // keine Palette.
+      "transparent",
+    ]) {
+      expect(bearsColor(v), v).toBe(false);
     }
+    expect(resolveColor("600", new Map())).toBeNull();
+    // Aber der RÜCKFALL eines var() zählt sehr wohl.
+    expect(bearsColor("var(--x, #d6a800)")).toBe(true);
   });
 
   it("nimmt den `var()`-Rueckfall auch bei garantiert ungueltigem Wert", () => {
@@ -1103,5 +1138,87 @@ describe("die CSS-Grammatik kommt von postcss, nicht aus einem Regex", () => {
   it("ein unlesbares Blatt wirft nicht, es liefert nichts", () => {
     // Ein Ausnahmefehler hier würde den ganzen Lauf kippen statt den Skin zu melden.
     expect(() => parseRules(".a{")).not.toThrow();
+  });
+});
+
+describe("Farbwerte liest culori, var() setzt der Browser-Ablauf ein", () => {
+  const E = new Map<string, string>();
+
+  it("kennt die Farbsyntaxen, die ein Blatt wirklich benutzt", () => {
+    // Jede Zeile hier stand als eigener Befund am früheren Regex-Parser: fehlende
+    // Syntaxen, kaputte Prozentkanäle, verschluckte Nachkommastellen, Tabulator
+    // statt Leerzeichen, benannte Farben.
+    expect(resolveColor("#abc", E)).toEqual({ r: 170, g: 187, b: 204, a: 1 });
+    expect(resolveColor("#aabbccdd", E)?.a).toBeCloseTo(0.867, 2);
+    expect(resolveColor("rgb(10, 20, 30)", E)).toEqual({ r: 10, g: 20, b: 30, a: 1 });
+    expect(resolveColor("rgb(10 20 30 / 50%)", E)?.a).toBeCloseTo(0.5, 3);
+    expect(resolveColor("rgb(50% 20% 10%)", E)).toEqual({ r: 128, g: 51, b: 26, a: 1 });
+    expect(resolveColor("rgb(10\t20\t30)", E)).toEqual({ r: 10, g: 20, b: 30, a: 1 });
+    expect(resolveColor("hsl(0 100% 50%)", E)).toEqual({ r: 255, g: 0, b: 0, a: 1 });
+    expect(resolveColor("hwb(0 0% 0%)", E)).toEqual({ r: 255, g: 0, b: 0, a: 1 });
+    expect(resolveColor("rebeccapurple", E)).toEqual({ r: 102, g: 51, b: 153, a: 1 });
+    expect(resolveColor("oklch(0.7 0.15 250)", E)).not.toBeNull();
+    expect(resolveColor("lab(50% 40 30)", E)).not.toBeNull();
+    expect(resolveColor("color(srgb 1 0 0)", E)).toEqual({ r: 255, g: 0, b: 0, a: 1 });
+  });
+
+  it("Nachkommastellen in Kanälen gehen nicht verloren", () => {
+    // `rgb(0.5 0.5 0.5)` wurde zu ganzen Kanälen gerundet, bevor gerechnet wurde.
+    const a = resolveColor("rgb(0.4 0.4 0.4)", E)!;
+    const b = resolveColor("rgb(1.4 1.4 1.4)", E)!;
+    expect(a.r).not.toBe(b.r);
+  });
+
+  it("Alpha wird auf 0…1 geklemmt, wie CSS es tut", () => {
+    expect(resolveColor("rgb(0 0 0 / 200%)", E)?.a).toBe(1);
+    expect(resolveColor("rgb(0 0 0 / -1)", E)?.a).toBe(0);
+  });
+
+  it("was keine Farbe IST, bleibt ein Befund", () => {
+    expect(resolveColor("linear-gradient(red, blue)", E)).toBeNull();
+    expect(resolveColor("20px", E)).toBeNull();
+    expect(resolveColor("#12345", E)).toBeNull();
+  });
+
+  it("`var()` wird TEXTUELL eingesetzt, dann geparst", () => {
+    const env = new Map([["--c", "10"], ["--fg", "rgb(var(--c) 20 30)"]]);
+    expect(resolveColor("var(--fg)", env)).toEqual({ r: 10, g: 20, b: 30, a: 1 });
+  });
+
+  it("der Rückfall greift bei fehlender und bei garantiert ungültiger Bindung", () => {
+    expect(resolveColor("var(--fehlt, #ffffff)", E)).toEqual({ r: 255, g: 255, b: 255, a: 1 });
+    const env = new Map([["--leer", "initial"]]);
+    expect(resolveColor("var(--leer, #ffffff)", env)).toEqual({ r: 255, g: 255, b: 255, a: 1 });
+  });
+
+  it("der Rückfall greift NICHT, wenn die Bindung einen gültigen, aber untauglichen Wert hat", () => {
+    // Der entscheidende Fall: `--raw: 20px` ist für CSS eine völlig gültige Custom
+    // Property. `color: var(--raw, #fff)` wird damit an der Eigenschaft ungültig und
+    // ERBT — auf schwarzem Grund also Schwarz auf Schwarz. Der frühere Code nahm bei
+    // jedem Parse-Fehlschlag den Rückfall und mass Weiss mit 21:1.
+    const env = new Map([["--raw", "20px"]]);
+    expect(resolveColor("var(--raw, #ffffff)", env)).toBeNull();
+  });
+
+  it("Kommas IM Rückfall bleiben Teil des Rückfalls", () => {
+    // Der Rückfall darf eigene Kommas enthalten; ein naives `split(",")` machte
+    // daraus drei Argumente und verlor den Wert.
+    expect(resolveColor("var(--fehlt, rgb(10, 20, 30))", E)).toEqual({
+      r: 10,
+      g: 20,
+      b: 30,
+      a: 1,
+    });
+  });
+
+  it("eine zyklische Bindung endet als Befund, nicht als Endlosschleife", () => {
+    const env = new Map([["--a", "var(--b)"], ["--b", "var(--a)"]]);
+    expect(resolveColor("var(--a)", env)).toBeNull();
+  });
+
+  it("`calc()` im Alpha wird ausgerechnet, bevor geparst wird", () => {
+    // ionics `--vz-tile-bg` steht so im Blatt.
+    const env = new Map([["--t", "0.5"]]);
+    expect(resolveColor("rgba(35, 40, 48, calc(var(--t) * 0.7))", env)?.a).toBeCloseTo(0.35, 3);
   });
 });
