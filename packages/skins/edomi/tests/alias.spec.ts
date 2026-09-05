@@ -78,11 +78,24 @@ function customProperties(css: string): Decl[] {
 const ALL = [...customProperties(EDOMI), ...customProperties(IONIC)];
 
 /**
- * Wird diese Deklaration auf `<html>` ausgewertet? Ja, sobald EINER ihrer
- * Selektoren `:root` ist — `:root, .edomi-nav { … }` gilt für beide Elemente.
- * (`every` statt `some` wäre ein Loch: ein solcher Block rutschte durch.)
+ * Wird diese Deklaration auf `<html>` — oder einem Vorfahren des Skin-Wurzel-divs
+ * — ausgewertet?
+ *
+ * Nicht nur `:root`. `html`, `body` und `*` treffen dasselbe Element bzw. einen
+ * Vorfahren, frieren einen Alias also genauso ein; der Generator faltet sie über
+ * dieselbe Regel in seine Umgebung (`cascadesInto`:
+ * `/^(?::root|html|body|\*)\b/`). Ein Wächter, der nur den Literalstring
+ * `":root"` kennt, liesse `html { --x: var(--vz-bg) }` durch.
+ *
+ * Und `some` statt `every`: `:root, .edomi-nav { … }` gilt für BEIDE Elemente,
+ * wird auf `<html>` also ausgewertet — mit `every` rutschte ein solcher Block
+ * durch.
  */
-const appliesToHtml = (d: Decl): boolean => d.selectors.includes(":root");
+// Etwas strenger als cascadesInto: dessen `\b` nach dem `*` laesst den nackten
+// Universalselektor durchfallen (kein Wortzeichen davor/danach). Ein Waechter darf
+// in diese Richtung irren, ein Generator nicht.
+const ROOTISH = /^(?::root\b|html\b|body\b|\*)/;
+const appliesToHtml = (d: Decl): boolean => d.selectors.some((sel) => ROOTISH.test(sel));
 
 /**
  * Token, die IRGENDWO auf einem Nachfahren von `<html>` gesetzt werden — auch
@@ -92,7 +105,7 @@ const appliesToHtml = (d: Decl): boolean => d.selectors.includes(":root");
  * Ausnahme für „steht auch in :root" wäre also das zweite Loch.
  */
 const ON_DESCENDANT = new Set(
-  ALL.filter((d) => d.selectors.some((sel) => sel !== ":root")).map((d) => d.name),
+  ALL.filter((d) => d.selectors.some((sel) => !ROOTISH.test(sel))).map((d) => d.name),
 );
 
 const refs = (value: string): string[] =>
@@ -104,6 +117,18 @@ describe("kein Alias in :root liest ein Token, das erst auf einem Nachfahren ste
     expect(EDOMI.length).toBeGreaterThan(2000);
     expect(IONIC.length).toBeGreaterThan(20000);
     expect(ALL.filter(appliesToHtml).length).toBeGreaterThan(20);
+    // Die Wurzel-Formen, die der Waechter kennen MUSS — sonst ist die Regel
+    // oben nur ein Sonderfall von `:root`.
+    expect([":root", "html", "body", "*", "html.dark"].filter((s) => ROOTISH.test(s))).toEqual([
+      ":root",
+      "html",
+      "body",
+      "*",
+      "html.dark",
+    ]);
+    expect([".edomi-nav", ".visu-root", "html .x"].filter((s) => ROOTISH.test(s))).toEqual([
+      "html .x",
+    ]);
     expect(ON_DESCENDANT.has("--ion-background-color")).toBe(true);
     expect(ON_DESCENDANT.has("--vz-bg")).toBe(true);
   });

@@ -2057,11 +2057,17 @@ ion-content.visu-content {
  *
  * Vorher stand hier `.jal-body` — und darin liegt das Fenster samt Ablesetext.
  * Der Text fiel damit in einen 0.55-Opazitaetsverband und stand gesperrt bei
- * 2.25:1 gegen die Textschwelle 4.5 (am Render nachgemessen 2.00:1: der Glyphkern
- * der gesperrten Kachel misst #77797e = 0.55 * 16 + 0.45 * 245). Das war kein
- * Farbwertproblem: bei 0.55 erreicht auf dem dunkelsten Grund des Ablesebereichs
- * (--jal-shade-lo) selbst REINES SCHWARZ nur 3.42:1. Die Daempfung selbst war das
- * Problem, also faellt sie dort weg.
+ * 2.25:1 gegen die Textschwelle 4.5. Diese Zahl ist GERECHNET, und zwar im
+ * flachen Alpha-Modell des Generators (nur der Vordergrund wird gedaempft). Der
+ * Browser wendet Gruppenopazitaet an und daempft den Grund mit; physisch sind es
+ * 2.00:1 (hell) bzw. 2.46:1 (dunkel) — am Render bestaetigt: der Glyphkern der
+ * gesperrten Kachel misst #77797e = 0.55 * 16 + 0.45 * 245.
+ *
+ * Es war kein Farbwertproblem. Auf dem dunkelsten Grund des Ablesebereichs
+ * (--jal-shade-lo) erreicht selbst REINES SCHWARZ bei 0.55 nur 3.42:1 (flach)
+ * bzw. 2.90:1 (Gruppenopazitaet) und bei 0.7 nur 4.87:1 bzw. 4.42:1 — physisch
+ * reisst dort also selbst 0.7 mit der bestmoeglichen Ink. Die Daempfung selbst
+ * war das Problem, also faellt sie dort weg.
  *
  * Die Sperre bleibt unuebersehbar: die Schraffur liegt weiter ueber dem Fenster
  * (Regel darunter), das Schloss-Badge steht darin — jetzt ungedaempft und damit
@@ -2071,7 +2077,12 @@ ion-content.visu-content {
  * bleibt AA-lesbar (--jal-ink 12.49:1 / 6.73:1, --jal-ink-soft 8.78:1 / 4.73:1
  * gegen die beiden erklaerten Gruende). Dieselbe Linie faehrt .vz-tile schon
  * laenger: dort wird der Rumpf auf 0.7 gedaempft und GEMESSEN, weil readonly
- * lesbar bleiben muss. */
+ * lesbar bleiben muss.
+ *
+ * Der Konformitaetslauf kann diese Regel NICHT halten — er kennt `alphas` je
+ * Token, aber keine Verschachtelung und keine Gruppenopazitaet. Wer `.jal-body`
+ * hier wieder einsetzt, bleibt bei ihm gruen. Die Ratsche dafuer steht in
+ * tests/dimming.spec.ts. */
 .jal-tile.locked .jal-posrail,
 .jal-tile.locked .jal-slatctl,
 .jal-tile.locked .jal-btns,
