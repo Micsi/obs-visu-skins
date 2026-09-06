@@ -39,13 +39,23 @@
 //
 // ══ YAML
 //
-// `js-yaml` ist aus diesem Paket nicht auflösbar (nur transitiv im Store). `parseTriggers`
-// und `parseSteps` sind darum bewusst eng gefasste Reader, die bei jeder Schreibweise, die
-// sie nicht sicher beherrschen, WERFEN statt still leer zu liefern. Beide sind die einzige
-// Stelle, die YAML anfasst: mit `js-yaml` als devDependency wird `parseTriggers` zu
-// `Object.keys(load(text).on)` und `parseSteps` zu einem Durchlauf über `jobs.*.steps`.
-// Nachgestellte Kommentare werden vorher gebleicht (nur ausserhalb von Anführungszeichen,
-// damit `path: a#b` unangetastet bleibt).
+// `js-yaml` ist devDependency dieses Pakets; `parseTriggers` und `parseSteps` lesen aus dem
+// geparsten Dokument, nicht aus Zeilen. Was der Parser liefert und was daraus erhoben wird:
+//
+//   Trigger — die Schlüssel unter `on:`, gleich ob als Block-Mapping, Block-Sequenz,
+//   Flow-Sequenz oder einzelner Skalar geschrieben. Der `on`/`true`-Fallstrick: unter
+//   YAML 1.1 ist `on` ein Boolean, der Schlüssel hiesse dann `true`. js-yaml 4 folgt dem
+//   Core-Schema von YAML 1.2 und liefert die Zeichenkette `on` — ein ausgeschriebenes
+//   `true:` läge aber weiterhin unter `true`. Beide werden genommen, damit die Erhebung
+//   nicht an der Schreibweise hängt. Fehlt `on:` ganz, WIRFT sie.
+//
+//   Schritte — `jobs.*.steps` über alle Jobs. `repository` und `ref` liest der Durchlauf
+//   unter `with:` des Checkout-Schritts, also genau dort, wo sie stehen.
+//
+// Kommentare, Anführungszeichen und Verschachtelung sind damit Sache des Parsers. Eine
+// kaputte Datei fliegt beim Laden mit Pfad, Zeile und Spalte; still leer zurückzugeben wäre
+// der schlimmere Fehler — das machte die Trigger-Prüfung trivial wahr und die
+// Schritt-Erhebung blind.
 //
 // ══ Gegenproben (alle gefahren, echte Meldungen)
 //
@@ -84,6 +94,19 @@
 //    `steps:` umbenannt → die Erhebung fällt LAUT statt still leer zu werden:
 //    .github/workflows/ci.yml liefert keine Schritte — entweder ist der Workflow leer oder
 //    die Erhebung hier ist blind. In beiden Fällen prüfen die folgenden Tests nichts.
+//
+// 7. Der namenlose Schritt mit `name:` unter `with:` — als FESTE PROBE eingecheckt, nicht
+//    als beschriebene Gegenprobe: `tests/fixtures/workflow-nested-with-name.yml`, gemessen
+//    im Block „Erhebung der Schritte". Das eingecheckte `ci.yml` hat keinen solchen
+//    Schritt; ohne diese Datei bliebe alles hier auch mit dem Vorgänger-Reader grün, und
+//    der Fehler könnte unbemerkt zurückkehren. Der Vorgänger suchte `name:` mit `/m` im
+//    GANZEN Schritt-Block und machte aus dem `with`-Feld einen Schrittnamen. Beide Tests
+//    des Blocks gegen ihn gefahren, beide rot:
+//    expected [ 'Echter Schritt', 'Vertrag' ] to deeply equal [ 'Echter Schritt', null ]
+//    expected [ 'Echter Schritt', 'Vertrag' ] to deeply equal [ 'Echter Schritt', …(1) ]
+//    Ein still erfundener Schritt — und danach galt jeder Doku-Absatz mit dem Wort
+//    „Vertrag" als Absatz über den Workflow, in dem zitierte tsc-Meldungen als erfundene
+//    Schrittnamen aufgeschlagen wären.
 //
 // ══ Was diese Ratsche NICHT prüft
 //
@@ -128,6 +151,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { load } from "js-yaml";
 import { describe, expect, it } from "vitest";
 
 import { FENCE_LINE, section, stepFence, type Fence } from "./markdown.js";
@@ -198,106 +222,54 @@ const WORKFLOW_REL: string = (() => {
 
 const WORKFLOW_EXISTS = existsSync(join(WORKFLOW_ROOT, WORKFLOW_REL));
 
-/* ─────────────────────────────── YAML: enge Reader ───────────────────────────────── */
+/* ──────────────────────────────── YAML: der Workflow ─────────────────────────────── */
 
 /**
- * Entfernt YAML-Kommentare — ganzzeilige UND nachgestellte, aber nur ausserhalb von
- * Anführungszeichen. Ein `#` ohne führenden Leerraum (z. B. in `path: a#b` oder in einer
- * URL mit Fragment) ist kein Kommentar und bleibt stehen.
+ * Der geparste Workflow. `filename` sorgt dafür, dass eine kaputte Datei mit Pfad und
+ * Stelle fliegt statt anonym — und sie FLIEGT, statt still ein leeres Dokument zu liefern.
  */
-function bleachComments(line: string): string {
-  let inSingle = false;
-  let inDouble = false;
-  for (let i = 0; i < line.length; i++) {
-    const c = line[i] as string;
-    if (c === "'" && !inDouble) inSingle = !inSingle;
-    else if (c === '"' && !inSingle) inDouble = !inDouble;
-    else if (c === "#" && !inSingle && !inDouble && (i === 0 || /\s/.test(line[i - 1] as string))) {
-      return line.slice(0, i);
-    }
-  }
-  return line;
+const WORKFLOW_DOC: unknown = WORKFLOW_EXISTS
+  ? load(readFileSync(join(WORKFLOW_ROOT, WORKFLOW_REL), "utf8"), { filename: WORKFLOW_REL })
+  : null;
+
+function isMapping(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-const WORKFLOW_YAML = WORKFLOW_EXISTS
-  ? readFileSync(join(WORKFLOW_ROOT, WORKFLOW_REL), "utf8")
-      .split("\n")
-      .map(bleachComments)
-      .join("\n")
-  : "";
-
-function unquote(token: string): string {
-  return token.replace(/^["']|["']$/g, "");
+/** Ein Skalar-Feld, oder `null`, wenn es fehlt bzw. keine Zeichenkette ist. */
+function stringField(value: unknown): string | null {
+  return typeof value === "string" ? value : null;
 }
 
 /**
  * Die unmittelbaren Kindschlüssel von `on:` — die Events, die diesen Workflow feuern.
  *
- * Bewusst eng: erkannt werden `on:` als Block-Mapping bzw. Block-Sequenz, `on: [a, b]`,
- * `on: a` und die wegen des YAML-`on`/`true`-Fallstricks übliche Schreibweise `"on":` /
- * `'on':`. ALLES andere wirft. Ein stiller leerer Rückgabewert wäre der schlimmere Fehler:
- * er machte die Trigger-Prüfung trivial wahr und die Kausalitäts-Prüfung blind.
- *
- * Einzige YAML-Stelle neben `parseSteps` — mit `js-yaml` schrumpft sie auf
- * `Object.keys(load(text).on)`.
+ * Der `on`/`true`-Fallstrick: js-yaml 4 liest `on` nach dem Core-Schema von YAML 1.2 als
+ * Zeichenkette, ein ausgeschriebenes `true:` läge dagegen unter `true`. Beide Schlüssel
+ * werden genommen. Was danach übrig bleibt, WIRFT: ein stiller leerer Rückgabewert machte
+ * die Trigger-Prüfung trivial wahr.
  */
-function parseTriggers(yamlText: string): string[] {
-  const lines = yamlText.split("\n");
-  const at = lines.findIndex((l) => /^(?:on|"on"|'on')\s*:/.test(l));
-  if (at < 0) {
-    throw new Error(
-      `${WORKFLOW_REL} hat keinen erkennbaren \`on:\`-Schlüssel auf oberster Ebene. Ohne die ` +
-        "Trigger lässt sich nicht prüfen, ob die Doku die Ursache roter Läufe richtig erklärt.",
-    );
-  }
-  const head = /^(?:on|"on"|'on')\s*:(.*)$/.exec(lines[at] as string) as RegExpExecArray;
-  const rest = (head[1] as string).trim();
-
-  if (rest.startsWith("[")) {
-    if (!rest.endsWith("]")) {
+function parseTriggers(doc: unknown): string[] {
+  const on = isMapping(doc) ? (doc["on"] ?? doc["true"]) : undefined;
+  if (typeof on === "string") return [on];
+  if (Array.isArray(on)) {
+    const events = on.filter((e): e is string => typeof e === "string");
+    if (events.length !== on.length) {
       throw new Error(
-        `${WORKFLOW_REL}: mehrzeilige Flow-Sequenz hinter \`on:\` — dieser enge Reader ` +
-          "beherrscht sie nicht und liefert lieber gar nichts, als still das Falsche.",
+        `${WORKFLOW_REL}: die Sequenz hinter \`on:\` enthält Einträge, die keine Event-Namen ` +
+          "sind. Die Erhebung wirft, statt sie zu raten.",
       );
     }
-    return rest
-      .slice(1, -1)
-      .split(",")
-      .map((t) => unquote(t.trim()))
-      .filter((t) => t.length > 0)
-      .sort();
+    return [...events].sort();
   }
-  if (rest.length > 0) {
-    if (!/^["']?[A-Za-z_][A-Za-z0-9_-]*["']?$/.test(rest)) {
-      throw new Error(
-        `${WORKFLOW_REL}: \`on: ${rest}\` ist eine Schreibweise, die dieser enge Reader nicht ` +
-          "sicher versteht (Flow-Mapping, Anker, Alias?). Er wirft, statt sie zu raten.",
-      );
-    }
-    return [unquote(rest)];
-  }
-
-  const out: string[] = [];
-  let childIndent = -1;
-  for (let i = at + 1; i < lines.length; i++) {
-    const line = lines[i] as string;
-    if (line.trim() === "") continue;
-    const indent = (/^\s*/.exec(line) as RegExpExecArray)[0].length;
-    if (indent === 0) break;
-    if (childIndent === -1) childIndent = indent;
-    if (indent !== childIndent) continue;
-    const seq = /^\s*-\s*(\S+)\s*$/.exec(line);
-    if (seq) {
-      out.push(unquote(seq[1] as string));
-      continue;
-    }
-    const key = /^\s*(["']?)([A-Za-z_][A-Za-z0-9_-]*)\1\s*:/.exec(line);
-    if (key) out.push(key[2] as string);
-  }
-  return out.sort();
+  if (isMapping(on)) return Object.keys(on).sort();
+  throw new Error(
+    `${WORKFLOW_REL} hat keinen erkennbaren \`on:\`-Schlüssel auf oberster Ebene. Ohne die ` +
+      "Trigger lässt sich nicht prüfen, ob die Doku die Ursache roter Läufe richtig erklärt.",
+  );
 }
 
-const TRIGGERS: readonly string[] = WORKFLOW_EXISTS ? parseTriggers(WORKFLOW_YAML) : [];
+const TRIGGERS: readonly string[] = WORKFLOW_EXISTS ? parseTriggers(WORKFLOW_DOC) : [];
 
 /** Bekannte GitHub-Actions-Events — nur um im Doku-Text Triggernamen von anderem
  *  Backtick-Text (`main`, `pnpm typecheck`, …) zu unterscheiden. */
@@ -337,71 +309,53 @@ interface Step {
 }
 
 /**
- * Die `steps:`-Listenelemente des Workflows. Zweiter (und letzter) YAML-Zugriff; mit
- * `js-yaml` wäre das ein Durchlauf über `jobs.*.steps`.
+ * Die Schritte aller Jobs — `jobs.*.steps`. `repository`/`ref` stehen bei
+ * `actions/checkout` unter `with:` und werden genau dort gelesen.
+ *
+ * Kein Wurf bei leerem Ergebnis: fehlen `jobs:` oder `steps:`, fällt die Liste leer aus,
+ * und der Test „misst gegen einen Workflow, der Schritte UND Trigger hat" meldet das mit
+ * der Datei im Text. Laut wird es dort, nicht schon hier.
  */
-function parseSteps(yamlText: string): Step[] {
-  const lines = yamlText.split("\n");
+function parseSteps(doc: unknown): Step[] {
+  const jobs = isMapping(doc) ? doc["jobs"] : undefined;
+  if (!isMapping(jobs)) return [];
   const out: Step[] = [];
-  for (let i = 0; i < lines.length; i++) {
-    const head = /^(\s*)steps:\s*$/.exec(lines[i] as string);
-    if (!head) continue;
-    const stepsIndent = (head[1] as string).length;
-    let item: string[] | null = null;
-    let itemIndent = -1;
-    const flush = (): void => {
-      if (!item) return;
-      const block = item.join("\n");
-      const field = (key: string): string | null => {
-        const m = new RegExp(`^\\s*(?:-\\s+)?${key}:\\s*(.+?)\\s*$`, "m").exec(block);
-        return m ? unquote(m[1] as string) : null;
-      };
+  for (const job of Object.values(jobs)) {
+    if (!isMapping(job)) continue;
+    const steps = job["steps"];
+    if (!Array.isArray(steps)) continue;
+    for (const step of steps) {
+      if (!isMapping(step)) continue;
+      const withBlock = isMapping(step["with"]) ? step["with"] : {};
       out.push({
-        name: field("name"),
-        uses: field("uses"),
-        repository: field("repository"),
-        ref: field("ref"),
+        name: stringField(step["name"]),
+        uses: stringField(step["uses"]),
+        repository: stringField(withBlock["repository"]),
+        ref: stringField(withBlock["ref"]),
       });
-      item = null;
-    };
-    for (i++; i < lines.length; i++) {
-      const line = lines[i] as string;
-      if (line.trim() === "") {
-        if (item) item.push(line);
-        continue;
-      }
-      const indent = (/^\s*/.exec(line) as RegExpExecArray)[0].length;
-      if (indent <= stepsIndent) {
-        i--;
-        break;
-      }
-      if (/^\s*-\s/.test(line) && (itemIndent === -1 || indent === itemIndent)) {
-        flush();
-        itemIndent = indent;
-        item = [line];
-      } else if (item) {
-        item.push(line);
-      }
     }
-    flush();
   }
   return out;
 }
 
-const STEPS: readonly Step[] = WORKFLOW_EXISTS ? parseSteps(WORKFLOW_YAML) : [];
+const STEPS: readonly Step[] = WORKFLOW_EXISTS ? parseSteps(WORKFLOW_DOC) : [];
 
 /**
  * Wie die Doku einen Schritt benennen KANN: über seinen `name`, und wenn er namenlos ist,
  * über sein `uses` ohne Version. Genau diese Zeichenketten werden im Text gesucht — damit
  * ist die Erhebung unabhängig davon, ob die Doku „…", `…` oder **…** benutzt.
  */
-const STEP_REFS: readonly string[] = [
-  ...new Set(
-    STEPS.map((step) => step.name ?? step.uses?.split("@")[0] ?? null).filter(
-      (r): r is string => r !== null,
+function stepRefsOf(steps: readonly Step[]): string[] {
+  return [
+    ...new Set(
+      steps
+        .map((step) => step.name ?? step.uses?.split("@")[0] ?? null)
+        .filter((r): r is string => r !== null),
     ),
-  ),
-];
+  ];
+}
+
+const STEP_REFS: readonly string[] = stepRefsOf(STEPS);
 
 const NAMED_STEP_NAMES = STEPS.map((s) => s.name).filter((n): n is string => n !== null);
 
@@ -471,6 +425,45 @@ const WORKFLOW_BLOCKS: readonly DocBlock[] = DOCS.flatMap((doc) =>
 );
 
 /* ─────────────────────────────────────── Tests ───────────────────────────────────── */
+
+/**
+ * Feste Probe für die Erhebung selbst — sie hängt an keinem Doku-Text und an keiner
+ * Workflow-Datei des Repos, sondern an `tests/fixtures/workflow-nested-with-name.yml`.
+ *
+ * Warum sie sein muss: das eingecheckte `ci.yml` hat keinen namenlosen Schritt mit einem
+ * `name:` unter `with:`. Ohne diese Probe bleiben alle übrigen Tests hier auch mit dem
+ * Vorgänger-Reader grün, der genau daran ein „Vertrag" erfand — der Fehler könnte
+ * unbemerkt zurückkehren, sobald jemand den Parser wieder gegen Zeilen tauscht.
+ *
+ * Gefahren wird der PRODUKTIONSWEG: `load` → `parseSteps` → `stepRefsOf`. Nur die Wurzel
+ * ist eine andere, genau wie bei `WORKFLOW_ROOT`.
+ */
+describe("Erhebung der Schritte", () => {
+  const FIXTURE = "fixtures/workflow-nested-with-name.yml";
+  const doc: unknown = load(
+    readFileSync(fileURLToPath(new URL(FIXTURE, import.meta.url)), "utf8"),
+    { filename: FIXTURE },
+  );
+  const steps = parseSteps(doc);
+
+  it("macht aus `with: name:` keinen Schrittnamen", () => {
+    expect(
+      steps.map((s) => s.name),
+      `${FIXTURE}: der zweite Schritt ist namenlos und trägt \`name: Vertrag\` unter \`with:\`. ` +
+        'Wird daraus ein Schrittname, gilt „Vertrag" als echter Schritt: die Doku dürfte ihn ' +
+        "nennen, ohne dass es ihn gibt, und jeder Absatz mit dem Wort zählte als Absatz über " +
+        "den Workflow.",
+    ).toEqual(["Echter Schritt", null]);
+  });
+
+  it("referenziert den namenlosen Schritt über sein `uses`", () => {
+    expect(
+      stepRefsOf(steps),
+      `${FIXTURE}: ein namenloser Schritt muss über sein \`uses\` ohne Version referenzierbar ` +
+        "sein — sonst kann die Doku ihn nicht benennen und wird für eine korrekte Nennung rot.",
+    ).toEqual(["Echter Schritt", "actions/upload-artifact"]);
+  });
+});
 
 describe("Doku über den CI-Workflow des Contract-Bumps", () => {
   it("nennt eine Workflow-Datei, die es wirklich gibt", () => {
