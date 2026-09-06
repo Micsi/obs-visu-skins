@@ -95,18 +95,18 @@
 //    .github/workflows/ci.yml liefert keine Schritte — entweder ist der Workflow leer oder
 //    die Erhebung hier ist blind. In beiden Fällen prüfen die folgenden Tests nichts.
 //
-// 7. Reality-Probe über `WORKFLOW_ROOT`: `ci.yml` um einen namenlosen
-//    `- uses: actions/upload-artifact@v4` mit `with:` → `name: Vertrag` ergänzt. Der
-//    Vorgänger-Reader suchte `name:` mit `/m` im GANZEN Schritt-Block und machte aus dem
-//    `with`-Feld einen Schrittnamen. Sichtbar am Ende der Vorhanden-Liste (zusammen mit
-//    Gegenprobe 3 gefahren, damit die Liste überhaupt gedruckt wird):
-//    … Vorhanden sind: Recreate dev-link path, Build contract, Install (skins), Lint,
-//    Typecheck, Test (Vitest), Conformance gate (all skins), Vertrag.
+// 7. Der namenlose Schritt mit `name:` unter `with:` — als FESTE PROBE eingecheckt, nicht
+//    als beschriebene Gegenprobe: `tests/fixtures/workflow-nested-with-name.yml`, gemessen
+//    im Block „Erhebung der Schritte". Das eingecheckte `ci.yml` hat keinen solchen
+//    Schritt; ohne diese Datei bliebe alles hier auch mit dem Vorgänger-Reader grün, und
+//    der Fehler könnte unbemerkt zurückkehren. Der Vorgänger suchte `name:` mit `/m` im
+//    GANZEN Schritt-Block und machte aus dem `with`-Feld einen Schrittnamen. Beide Tests
+//    des Blocks gegen ihn gefahren, beide rot:
+//    expected [ 'Echter Schritt', 'Vertrag' ] to deeply equal [ 'Echter Schritt', null ]
+//    expected [ 'Echter Schritt', 'Vertrag' ] to deeply equal [ 'Echter Schritt', …(1) ]
 //    Ein still erfundener Schritt — und danach galt jeder Doku-Absatz mit dem Wort
 //    „Vertrag" als Absatz über den Workflow, in dem zitierte tsc-Meldungen als erfundene
-//    Schrittnamen aufgeschlagen wären. Über den Parser endet dieselbe Liste wieder bei
-//    Conformance gate (all skins); der Schritt bleibt namenlos und wird über sein `uses`
-//    referenziert.
+//    Schrittnamen aufgeschlagen wären.
 //
 // ══ Was diese Ratsche NICHT prüft
 //
@@ -345,13 +345,17 @@ const STEPS: readonly Step[] = WORKFLOW_EXISTS ? parseSteps(WORKFLOW_DOC) : [];
  * über sein `uses` ohne Version. Genau diese Zeichenketten werden im Text gesucht — damit
  * ist die Erhebung unabhängig davon, ob die Doku „…", `…` oder **…** benutzt.
  */
-const STEP_REFS: readonly string[] = [
-  ...new Set(
-    STEPS.map((step) => step.name ?? step.uses?.split("@")[0] ?? null).filter(
-      (r): r is string => r !== null,
+function stepRefsOf(steps: readonly Step[]): string[] {
+  return [
+    ...new Set(
+      steps
+        .map((step) => step.name ?? step.uses?.split("@")[0] ?? null)
+        .filter((r): r is string => r !== null),
     ),
-  ),
-];
+  ];
+}
+
+const STEP_REFS: readonly string[] = stepRefsOf(STEPS);
 
 const NAMED_STEP_NAMES = STEPS.map((s) => s.name).filter((n): n is string => n !== null);
 
@@ -421,6 +425,45 @@ const WORKFLOW_BLOCKS: readonly DocBlock[] = DOCS.flatMap((doc) =>
 );
 
 /* ─────────────────────────────────────── Tests ───────────────────────────────────── */
+
+/**
+ * Feste Probe für die Erhebung selbst — sie hängt an keinem Doku-Text und an keiner
+ * Workflow-Datei des Repos, sondern an `tests/fixtures/workflow-nested-with-name.yml`.
+ *
+ * Warum sie sein muss: das eingecheckte `ci.yml` hat keinen namenlosen Schritt mit einem
+ * `name:` unter `with:`. Ohne diese Probe bleiben alle übrigen Tests hier auch mit dem
+ * Vorgänger-Reader grün, der genau daran ein „Vertrag" erfand — der Fehler könnte
+ * unbemerkt zurückkehren, sobald jemand den Parser wieder gegen Zeilen tauscht.
+ *
+ * Gefahren wird der PRODUKTIONSWEG: `load` → `parseSteps` → `stepRefsOf`. Nur die Wurzel
+ * ist eine andere, genau wie bei `WORKFLOW_ROOT`.
+ */
+describe("Erhebung der Schritte", () => {
+  const FIXTURE = "fixtures/workflow-nested-with-name.yml";
+  const doc: unknown = load(
+    readFileSync(fileURLToPath(new URL(FIXTURE, import.meta.url)), "utf8"),
+    { filename: FIXTURE },
+  );
+  const steps = parseSteps(doc);
+
+  it("macht aus `with: name:` keinen Schrittnamen", () => {
+    expect(
+      steps.map((s) => s.name),
+      `${FIXTURE}: der zweite Schritt ist namenlos und trägt \`name: Vertrag\` unter \`with:\`. ` +
+        'Wird daraus ein Schrittname, gilt „Vertrag" als echter Schritt: die Doku dürfte ihn ' +
+        "nennen, ohne dass es ihn gibt, und jeder Absatz mit dem Wort zählte als Absatz über " +
+        "den Workflow.",
+    ).toEqual(["Echter Schritt", null]);
+  });
+
+  it("referenziert den namenlosen Schritt über sein `uses`", () => {
+    expect(
+      stepRefsOf(steps),
+      `${FIXTURE}: ein namenloser Schritt muss über sein \`uses\` ohne Version referenzierbar ` +
+        "sein — sonst kann die Doku ihn nicht benennen und wird für eine korrekte Nennung rot.",
+    ).toEqual(["Echter Schritt", "actions/upload-artifact"]);
+  });
+});
 
 describe("Doku über den CI-Workflow des Contract-Bumps", () => {
   it("nennt eine Workflow-Datei, die es wirklich gibt", () => {

@@ -1,0 +1,18 @@
+# Feste Probe für die Schritt-Erhebung — KEIN lauffähiger Workflow.
+#
+# Der namenlose Schritt trägt unter `with:` ein Feld `name:`. Der Vorgänger-Reader suchte
+# `name:` zeilenweise mit /m im ganzen Schritt-Block und machte daraus den Schrittnamen
+# „Vertrag" — einen Schritt, den es nicht gibt. Über den YAML-Parser bleibt der Schritt
+# namenlos und wird über sein `uses` referenziert.
+name: fixture
+on: push
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Echter Schritt
+        run: echo hi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Vertrag
+          path: dist/
